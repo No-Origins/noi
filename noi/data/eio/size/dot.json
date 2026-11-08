@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.size.dot",
+  "name": "Dot size",
+  "classification": {
+    "type": "token",
+    "subtype": "size"
+  },
+  "semantics": {
+    "definition": "The width and height of a state dot, such as the one on a badge.",
+    "responsibility": "Keep state dots one size wherever they appear."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 8
+  }
+}

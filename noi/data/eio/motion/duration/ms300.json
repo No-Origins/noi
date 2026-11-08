@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.motion.duration.ms300",
+  "name": "300 ms",
+  "classification": {
+    "type": "token",
+    "subtype": "duration"
+  },
+  "semantics": {
+    "definition": "The longest motion: anything arriving, such as the phone menu growing from its button.",
+    "responsibility": "Show where something came from, and no longer."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "ms": 300
+  }
+}

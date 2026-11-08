@@ -1,0 +1,25 @@
+{
+  "path": "noi.eio.color.palette.green-400",
+  "name": "Green 400",
+  "classification": {
+    "type": "token",
+    "subtype": "color"
+  },
+  "semantics": {
+    "definition": "Green ladder step 400, Tailwind's OKLCH value 0.792 0.209 151.711.",
+    "responsibility": "Provide this green for status roles to use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "status",
+    "value": {
+      "colorSpace": "oklch",
+      "components": [
+        0.792,
+        0.209,
+        151.711
+      ],
+      "hex": "#05DF72"
+    }
+  }
+}

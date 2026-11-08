@@ -1,0 +1,25 @@
+{
+  "name": "@noi/eio-react",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Eidos components for No Origins apps, built only from @noi/eio-tokens. Shipped as TypeScript source; apps compile it.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test test/rules.test.mjs test/words.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noi/eio-tokens": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "19.3.1",
+    "typescript": "7.0.2"
+  }
+}

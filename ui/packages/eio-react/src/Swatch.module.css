@@ -1,0 +1,18 @@
+.swatch {
+  display: inline-block;
+  flex: none;
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-pill);
+}
+.small {
+  width: var(--eio-size-icon-small);
+  height: var(--eio-size-icon-small);
+}
+.default {
+  width: var(--eio-size-control-small);
+  height: var(--eio-size-control-small);
+}
+.large {
+  width: var(--eio-size-control-default);
+  height: var(--eio-size-control-default);
+}

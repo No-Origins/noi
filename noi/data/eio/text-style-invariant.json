@@ -1,0 +1,103 @@
+{
+  "path": "noi.eio.inv.text-style",
+  "name": "Text style invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos text style must meet.",
+    "responsibility": "Make every style point at a usable font and size step, use only weights its font has, and stay readable in every script it can show."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "text-style"
+    },
+    "schema": {
+      "title": "Eidos text style spec",
+      "type": "object",
+      "required": [
+        "font",
+        "size",
+        "lineHeight",
+        "weight",
+        "tracking",
+        "case",
+        "reading"
+      ],
+      "additionalProperties": false,
+      "$defs": {
+        "font": {
+          "type": "string",
+          "pattern": "^noi\\.eio\\.type\\.font\\.[a-z][a-z0-9-]*$"
+        }
+      },
+      "properties": {
+        "font": {
+          "description": "The font family, by path.",
+          "$ref": "#/$defs/font"
+        },
+        "fallback": {
+          "description": "A second font for scripts the first cannot draw, such as Devanagari.",
+          "$ref": "#/$defs/font"
+        },
+        "size": {
+          "description": "The size step, by path.",
+          "type": "string",
+          "pattern": "^noi\\.eio\\.type\\.size\\.[a-z][a-z0-9-]*$"
+        },
+        "lineHeight": {
+          "description": "Line height in px, on the 4 px grid. It belongs to the style, not the size step.",
+          "type": "number",
+          "multipleOf": 4,
+          "minimum": 12,
+          "maximum": 120
+        },
+        "weight": {
+          "description": "A weight the font has.",
+          "enum": [
+            100,
+            200,
+            300,
+            400,
+            500,
+            600,
+            700,
+            800,
+            900
+          ]
+        },
+        "tracking": {
+          "description": "Letter spacing in em.",
+          "type": "number",
+          "minimum": -0.1,
+          "maximum": 0.2
+        },
+        "case": {
+          "enum": [
+            "none",
+            "upper"
+          ]
+        },
+        "reading": {
+          "description": "Paragraph text people read at length, held to the reading minimums.",
+          "type": "boolean"
+        }
+      }
+    },
+    "checks": [
+      {
+        "name": "eio.text-style",
+        "params": {
+          "minimums": {
+            "size": 12,
+            "readingSize": 16,
+            "readingLineHeight": 1.5,
+            "devanagariLineHeight": 1.25
+          }
+        }
+      }
+    ]
+  }
+}

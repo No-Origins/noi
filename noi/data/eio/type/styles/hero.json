@@ -1,0 +1,22 @@
+{
+  "path": "noi.eio.type.style.hero",
+  "name": "Hero text",
+  "classification": {
+    "type": "token",
+    "subtype": "text-style"
+  },
+  "semantics": {
+    "definition": "The one name a screen is called by, over its title.",
+    "responsibility": "Set this kind of text the same way in every app."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "font": "noi.eio.type.font.yatra-one",
+    "size": "noi.eio.type.size.px48",
+    "lineHeight": 60,
+    "weight": 400,
+    "tracking": 0,
+    "case": "none",
+    "reading": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@noi/eio-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Eidos tokens for No Origins apps, generated from Mero by `noi export eio`. Do not edit the generated files.",
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./fonts.css": "./fonts.css",
+    "./tokens.json": "./tokens.json",
+    ".": "./tokens.ts"
+  },
+  "files": ["tokens.css", "fonts.css", "tokens.ts", "tokens.json", "fonts"]
+}

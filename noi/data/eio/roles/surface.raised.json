@@ -1,0 +1,24 @@
+{
+  "path": "noi.eio.color.surface.raised",
+  "name": "Raised surface",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The background of menus and popovers that sit above the page.",
+    "responsibility": "Separate floating content from the page in the dark theme."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "popover"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.white"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-900"
+    }
+  }
+}

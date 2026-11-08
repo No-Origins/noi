@@ -1,0 +1,26 @@
+/* Panes follow the window class through the --eio-window-* variables; no width is written here. */
+.panes {
+  display: flex;
+  gap: var(--eio-space-gap-pane);
+  max-width: var(--eio-size-width-page);
+  margin: 0 auto;
+  padding: 0 var(--eio-window-margin);
+}
+/* The list: there only where two panes sit side by side, its wrapper stepping aside so the list sits in the row. */
+.beside {
+  display: var(--eio-window-two-panes);
+}
+.list {
+  flex: 1;
+  min-width: 0;
+}
+.page {
+  flex: 2;
+  min-width: 0;
+}
+.onePane {
+  display: var(--eio-window-one-pane);
+}
+.twoPanes {
+  display: var(--eio-window-two-panes);
+}

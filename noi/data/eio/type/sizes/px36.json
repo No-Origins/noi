@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.type.size.px36",
+  "name": "36 px",
+  "classification": {
+    "type": "token",
+    "subtype": "font-size"
+  },
+  "semantics": {
+    "definition": "The 36 px step of the Eidos size ladder.",
+    "responsibility": "Hold the 36 px size that display titles use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "tailwind": "4xl"
+  },
+  "spec": {
+    "px": 36
+  }
+}

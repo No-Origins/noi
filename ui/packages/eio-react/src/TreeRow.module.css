@@ -1,0 +1,102 @@
+/* The tree item holds the row and, for a row that opens, its arrow button over the arrow's slot. */
+.item {
+  position: relative;
+}
+.row {
+  position: relative;
+  width: 100%;
+  height: var(--eio-size-control-default);
+  padding: 0 var(--eio-space-inset-control);
+  padding-left: calc(var(--eio-space-inset-control) + var(--depth, 0) * var(--eio-space-gap-stack));
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border: none;
+  border-radius: var(--eio-radius-field);
+  background: transparent;
+  color: var(--eio-color-text-primary);
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  /* Hover, press and selection fade their color: Eidos motion, 100 ms. */
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.row::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--eio-size-control-default) - var(--eio-size-target-minimum)) / 2) 0;
+}
+.row:hover {
+  background: var(--eio-color-state-highlight);
+}
+.row:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: calc(0px - var(--eio-border-width-focus));
+}
+.selected,
+.selected:hover {
+  background: var(--eio-color-state-hover);
+  font-weight: var(--eio-type-style-heading-weight);
+}
+.chevron {
+  width: var(--eio-size-icon-small);
+  display: grid;
+  place-items: center;
+  color: var(--eio-color-text-muted);
+  flex: none;
+}
+.preview {
+  width: var(--eio-size-control-small);
+  height: var(--eio-size-control-small);
+  display: grid;
+  place-items: center;
+  color: var(--eio-color-text-muted);
+  flex: none;
+}
+.name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.count {
+  color: var(--eio-color-text-muted);
+}
+
+/* The arrow's own button: the minimum target, centred on the arrow's slot. */
+.toggle {
+  position: absolute;
+  top: calc((var(--eio-size-control-default) - var(--eio-size-target-minimum)) / 2);
+  left: calc(var(--eio-space-inset-control) + var(--depth, 0) * var(--eio-space-gap-stack) + var(--eio-size-icon-small) / 2 - var(--eio-size-target-minimum) / 2);
+  width: var(--eio-size-target-minimum);
+  height: var(--eio-size-target-minimum);
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--eio-radius-pill);
+  background: transparent;
+  color: var(--eio-color-text-muted);
+  cursor: pointer;
+}
+.toggle:hover {
+  color: var(--eio-color-text-primary);
+}
+.toggle {
+  transition: color var(--eio-motion-duration-ms100) var(--eio-motion-easing-standard);
+}
+/* A row an arrow has just revealed drops in and fades up: Eidos motion, 200 ms. Closing is instant. */
+.appear {
+  animation: appear var(--eio-motion-duration-ms200) var(--eio-motion-easing-standard) both;
+}
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(calc(0px - var(--eio-space-gap-inline) / 2));
+  }
+}
+.toggle:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: calc(0px - var(--eio-border-width-focus));
+}

@@ -1,0 +1,47 @@
+{
+  "path": "noi.gov.inv.role",
+  "name": "Role invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Governance role must meet.",
+    "responsibility": "Make every role one Cedar permit with two blanks, who and where, granting only actions its own system declares."
+  },
+  "authority_scope": "b57aa1d2-8500-4b81-b217-73590afcb75a",
+  "spec": {
+    "applies_to": {
+      "type": "rule",
+      "subtype": "role"
+    },
+    "schema": {
+      "title": "Governance role",
+      "type": "object",
+      "required": [
+        "system",
+        "cedar"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "system": {
+          "description": "The system whose actions the role grants, as declared in code: mero or governance. A role picks actions from one system.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "maxLength": 80
+        },
+        "cedar": {
+          "description": "A Cedar permit template: principal == ?principal, resource in ?resource, and actions the system declares. A grant fills in who and where.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        }
+      }
+    },
+    "checks": [
+      {
+        "name": "gov.role",
+        "params": {}
+      }
+    ]
+  }
+}

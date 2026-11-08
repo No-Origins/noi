@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.space.inset.control",
+  "name": "Control inset",
+  "classification": {
+    "type": "token",
+    "subtype": "space-role"
+  },
+  "semantics": {
+    "definition": "The padding at the sides of buttons and fields.",
+    "responsibility": "Keep this kind of space the same in every product."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "ref": "noi.eio.space.scale.px16"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.type.size.px20",
+  "name": "20 px",
+  "classification": {
+    "type": "token",
+    "subtype": "font-size"
+  },
+  "semantics": {
+    "definition": "The 20 px step of the Eidos size ladder.",
+    "responsibility": "Hold the 20 px size that card headings use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "tailwind": "xl"
+  },
+  "spec": {
+    "px": 20
+  }
+}

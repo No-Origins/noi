@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.inv.duration",
+  "name": "Duration invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos motion duration must meet.",
+    "responsibility": "Keep motion short, on a 50 ms step: nothing in Eidos moves for longer than 300 ms."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "duration"
+    },
+    "schema": {
+      "title": "Eidos duration",
+      "type": "object",
+      "required": [
+        "ms"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ms": {
+          "description": "How long a motion takes, in ms: a multiple of 50 from 50 to 300. With reduced motion on, every duration is 0.",
+          "type": "integer",
+          "multipleOf": 50,
+          "minimum": 50,
+          "maximum": 300
+        }
+      }
+    }
+  }
+}

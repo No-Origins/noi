@@ -1,0 +1,29 @@
+[package]
+name = "noi-mer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[dependencies]
+noi-inv = { path = "../noi-inv" }
+noi-gov = { path = "../noi-gov", features = ["client"] }
+noi-eio = { path = "../noi-eio" }
+noi-log = { path = "../noi-log" }
+tracing = "0.1"
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json", "migrate", "macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+clap = { version = "4", features = ["derive", "env"] }
+semver = "1"
+axum = "0.8"
+[[bin]]
+name = "noi"
+path = "src/main.rs"
+[dev-dependencies]
+# Mero asking a real Governance server, with a software passkey standing in for Touch ID.
+noi-gov = { path = "../noi-gov", features = ["server"] }
+webauthn-authenticator-rs = { version = "0.6.2", features = ["softpasskey"] }
+url = "2"

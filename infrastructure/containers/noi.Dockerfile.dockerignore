@@ -1,0 +1,19 @@
+# Only what the Rust build needs enters the build: everything else stays out, and with it the
+# owner-only files beside these folders (noi/*.local.env, noi/*.local.pem).
+**
+!noi/Cargo.toml
+!noi/Cargo.lock
+!noi/crates/**
+!noi/migrations/**
+!noi/data/**
+!noi/vendor/**
+# Never a secret from our own folders, even if one were put there. (The copied crates are left
+# whole: some ship sample certificates as test files, and Cargo checks every file.)
+noi/*.local.*
+noi/*.pem
+noi/crates/**/*.local.*
+noi/crates/**/*.pem
+noi/crates/**/.env*
+noi/data/**/*.local.*
+noi/data/**/*.pem
+noi/migrations/**/*.local.*

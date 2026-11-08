@@ -1,0 +1,30 @@
+{
+  "path": "noi.eio.color.action.on-secondary",
+  "name": "Text on secondary action",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "Text and icons on a secondary action.",
+    "responsibility": "Stay readable on violet."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "secondary-foreground"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.neutral-950"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-950"
+    },
+    "contrast": [
+      {
+        "against": "noi.eio.color.action.secondary",
+        "kind": "text"
+      }
+    ]
+  }
+}

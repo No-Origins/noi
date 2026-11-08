@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.space.scale.px16",
+  "name": "16 px",
+  "classification": {
+    "type": "token",
+    "subtype": "space"
+  },
+  "semantics": {
+    "definition": "The 16 px step of the Eidos spacing scale.",
+    "responsibility": "Hold the 16 px space that the stack gap and control insets use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 16
+  }
+}

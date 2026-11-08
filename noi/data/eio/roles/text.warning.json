@@ -1,0 +1,31 @@
+{
+  "path": "noi.eio.color.text.warning",
+  "name": "Warning text",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "Text and icons that warn about something needing attention, such as unsaved changes.",
+    "responsibility": "Make warnings readable on the page and on raised surfaces, always with an icon or a word as well."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.amber-700"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.amber-400"
+    },
+    "contrast": [
+      {
+        "against": "noi.eio.color.surface.page",
+        "kind": "text"
+      },
+      {
+        "against": "noi.eio.color.surface.raised",
+        "kind": "text"
+      }
+    ]
+  }
+}

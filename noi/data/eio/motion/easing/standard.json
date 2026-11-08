@@ -1,0 +1,21 @@
+{
+  "path": "noi.eio.motion.easing.standard",
+  "name": "Standard curve",
+  "classification": {
+    "type": "token",
+    "subtype": "easing"
+  },
+  "semantics": {
+    "definition": "The one curve every Eidos motion uses.",
+    "responsibility": "Start quickly and settle gently, without overshooting."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "bezier": [
+      0.2,
+      0,
+      0,
+      1
+    ]
+  }
+}

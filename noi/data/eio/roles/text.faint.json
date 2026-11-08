@@ -1,0 +1,24 @@
+{
+  "path": "noi.eio.color.text.faint",
+  "name": "Faint text",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "Decorative text meant to be found, not read.",
+    "responsibility": "Add quiet detail that never carries content."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "faint-foreground"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.neutral-400"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-600"
+    }
+  }
+}

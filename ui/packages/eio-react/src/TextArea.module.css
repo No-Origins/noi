@@ -1,0 +1,32 @@
+/* Field's border, corners and padding around any number of lines (rule 5). The padding makes one line
+   exactly a Field's height, in body words or in mono. */
+.textarea {
+  --line: var(--eio-type-style-body-line-height);
+  display: block;
+  width: 100%;
+  min-height: var(--eio-size-control-default);
+  margin: 0;
+  padding: calc((var(--eio-size-control-default) - var(--line)) / 2 - var(--eio-border-width-default)) var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-surface-page);
+  color: var(--eio-color-text-primary);
+  resize: vertical;
+}
+.mono {
+  --line: var(--eio-type-style-mono-line-height);
+}
+.textarea::placeholder {
+  color: var(--eio-color-text-muted);
+}
+.textarea:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+.textarea:disabled,
+.textarea:read-only {
+  border-color: var(--eio-color-border-default);
+}
+.textarea:disabled {
+  color: var(--eio-color-text-faint);
+}

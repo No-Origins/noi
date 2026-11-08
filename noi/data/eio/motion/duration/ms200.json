@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.motion.duration.ms200",
+  "name": "200 ms",
+  "classification": {
+    "type": "token",
+    "subtype": "duration"
+  },
+  "semantics": {
+    "definition": "Motion for opening rows, and for anything leaving the screen.",
+    "responsibility": "Show a change quickly enough that nobody waits for it."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "ms": 200
+  }
+}

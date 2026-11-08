@@ -1,0 +1,15 @@
+.icon {
+  flex: none;
+}
+.small {
+  width: var(--eio-size-icon-small);
+  height: var(--eio-size-icon-small);
+}
+.default {
+  width: var(--eio-size-icon-default);
+  height: var(--eio-size-icon-default);
+}
+.large {
+  width: var(--eio-size-icon-large);
+  height: var(--eio-size-icon-large);
+}

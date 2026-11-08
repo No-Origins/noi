@@ -1,0 +1,17 @@
+{
+  "path": "noi.eio.layout.window.expanded",
+  "name": "Expanded window",
+  "classification": {
+    "type": "token",
+    "subtype": "window"
+  },
+  "semantics": {
+    "definition": "Windows 840 px wide and up, such as a tablet in landscape or a desktop window.",
+    "responsibility": "Decide the layout of every product in a expanded window: its margin and how many panes it shows."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "minWidth": 840,
+    "panes": 2
+  }
+}

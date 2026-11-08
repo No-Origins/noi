@@ -1,0 +1,56 @@
+/* Field's frame around a real select (rule 5). Only the closed select is Eidos: opened, the list is
+   the system's own, the Mac's menu or the phone's picker. */
+.select {
+  /* How far the target reaches past the frame, above and below, to make the minimum. */
+  --reach: calc((var(--eio-size-target-minimum) - var(--eio-size-control-default)) / 2 + var(--eio-border-width-default));
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: var(--eio-size-control-default);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-surface-page);
+  color: var(--eio-color-text-primary);
+}
+.wide {
+  display: flex;
+  width: 100%;
+}
+.control {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  width: 100%;
+  /* The select itself reaches past the frame to the minimum target, so a click just above or below
+     the frame opens it too (rule 1). It still takes only the frame's height in the layout. */
+  height: calc(100% + 2 * var(--reach));
+  margin: calc(-1 * var(--reach)) 0;
+  padding: 0 calc(var(--eio-space-inset-control) + var(--eio-size-icon-small) + var(--eio-space-gap-inline)) 0 var(--eio-space-inset-control);
+  border: none;
+  border-radius: inherit;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.control:disabled {
+  color: var(--eio-color-text-faint);
+  cursor: default;
+}
+.select:has(.control:disabled) {
+  border-color: var(--eio-color-border-default);
+}
+.arrow {
+  position: absolute;
+  right: var(--eio-space-inset-control);
+  color: var(--eio-color-text-muted);
+  pointer-events: none;
+}
+.select:focus-within {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}

@@ -1,0 +1,15 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+  color: var(--eio-color-text-primary);
+}
+.default {
+  padding: var(--eio-space-inset-card);
+}
+.tight {
+  padding: var(--eio-space-inset-control);
+}

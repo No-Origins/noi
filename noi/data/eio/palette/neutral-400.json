@@ -1,0 +1,25 @@
+{
+  "path": "noi.eio.color.palette.neutral-400",
+  "name": "Neutral 400",
+  "classification": {
+    "type": "token",
+    "subtype": "color"
+  },
+  "semantics": {
+    "definition": "Neutral ladder step 400: a pure grey at OKLCH lightness 0.708.",
+    "responsibility": "Provide this grey for color roles to use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "neutral",
+    "value": {
+      "colorSpace": "oklch",
+      "components": [
+        0.708,
+        0,
+        0
+      ],
+      "hex": "#A1A1A1"
+    }
+  }
+}

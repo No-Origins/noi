@@ -1,0 +1,24 @@
+{
+  "path": "noi.eio.color.action.secondary",
+  "name": "Secondary action",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The fill of a secondary action.",
+    "responsibility": "Carry the brand violet on secondary actions."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "secondary"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.violet"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.violet"
+    }
+  }
+}

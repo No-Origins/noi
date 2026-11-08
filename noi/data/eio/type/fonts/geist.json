@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.type.font.geist",
+  "name": "Geist",
+  "classification": {
+    "type": "token",
+    "subtype": "font-family"
+  },
+  "semantics": {
+    "definition": "The Eidos reading and interface font.",
+    "responsibility": "Set card headings, body text and captions."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "Geist",
+    "weights": [
+      100,
+      200,
+      300,
+      400,
+      500,
+      600,
+      700,
+      800,
+      900
+    ],
+    "italic": true,
+    "scripts": [
+      "latin",
+      "cyrillic",
+      "vietnamese"
+    ],
+    "license": "OFL-1.1",
+    "source": "https://fonts.google.com/specimen/Geist"
+  }
+}

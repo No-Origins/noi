@@ -1,0 +1,25 @@
+{
+  "path": "noi.eio.color.palette.amber-700",
+  "name": "Amber 700",
+  "classification": {
+    "type": "token",
+    "subtype": "color"
+  },
+  "semantics": {
+    "definition": "Amber ladder step 700, Tailwind's OKLCH value 0.555 0.163 48.998.",
+    "responsibility": "Provide this amber for status roles to use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "status",
+    "value": {
+      "colorSpace": "oklch",
+      "components": [
+        0.555,
+        0.163,
+        48.998
+      ],
+      "hex": "#BB4D00"
+    }
+  }
+}

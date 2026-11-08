@@ -1,0 +1,184 @@
+/* Review: one batch, its changes and the decision, and the Change form. Tokens only. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.group {
+  display: flex;
+  flex-direction: column;
+}
+.groupName {
+  padding: var(--eio-space-gap-inline) 0;
+  color: var(--eio-color-text-muted);
+}
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--eio-space-gap-inline);
+  padding: var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  color: var(--eio-color-text-muted);
+}
+.muted {
+  color: var(--eio-color-text-muted);
+}
+
+/* One batch. */
+.batch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.batchHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-stack);
+}
+/* Titles and paths wrap anywhere rather than push the page wider (rule 5). */
+.batch h1,
+.batch h2 {
+  overflow-wrap: anywhere;
+}
+.batchHead > * {
+  min-width: 0;
+}
+.proposal {
+  gap: var(--eio-space-gap-stack);
+}
+.proposalHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.drawn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) dashed var(--eio-color-border-input);
+  border-radius: var(--eio-radius-card);
+}
+.diff {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.diffRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+/* Before and after: side by side where two panes fit, before above after where one pane fills the window. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(var(--eio-window-panes), minmax(0, 1fr));
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  min-width: 0;
+}
+.diff pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.before {
+  color: var(--eio-color-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--eio-color-text-faint);
+}
+.decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  padding-top: var(--eio-space-gap-stack);
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+/* The buttons and the note share the row, and wrap to fill the width when it is narrow. */
+.decision > button {
+  flex: 1 1 auto;
+}
+.note {
+  flex: 10 1 calc(var(--eio-size-control-large) * 5);
+}
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--eio-space-gap-inline);
+  /* A result arrives: it rises and fades in, 300 ms. */
+  animation: arrive var(--eio-motion-duration-ms300) var(--eio-motion-easing-standard) both;
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--eio-space-gap-stack));
+  }
+}
+.error {
+  color: var(--eio-color-text-danger);
+}
+.done {
+  color: var(--eio-color-text-success);
+}
+.history {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.event {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 4fr);
+  gap: var(--eio-space-gap-stack);
+}
+.quote {
+  padding-left: var(--eio-space-gap-stack);
+  border-left: var(--eio-border-width-focus) solid var(--eio-color-border-default);
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+  max-width: var(--eio-size-width-reading);
+}
+
+/* The Change form. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+}
+/* A text link beside a button is a control too: it gets the full target. */
+.buttons .link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--eio-size-target-minimum);
+}
+
+/* Links in running text: the text's own color, with an underline, never the browser's blue. */
+.link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--eio-color-text-faint);
+}
+.link:hover {
+  text-decoration-color: currentColor;
+}

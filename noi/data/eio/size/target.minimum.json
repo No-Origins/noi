@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.size.target.minimum",
+  "name": "Minimum touch target",
+  "classification": {
+    "type": "token",
+    "subtype": "size"
+  },
+  "semantics": {
+    "definition": "The smallest area a finger or pointer can hit, on every platform.",
+    "responsibility": "Hold the 44 × 44 minimum that every control's hit area meets, even when it looks smaller."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 44
+  }
+}

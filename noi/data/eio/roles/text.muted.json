@@ -1,0 +1,34 @@
+{
+  "path": "noi.eio.color.text.muted",
+  "name": "Muted text",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "Supporting text, such as descriptions and placeholders.",
+    "responsibility": "Stay readable while ranking below primary text."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "muted-foreground"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.neutral-500"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-400"
+    },
+    "contrast": [
+      {
+        "against": "noi.eio.color.surface.page",
+        "kind": "text"
+      },
+      {
+        "against": "noi.eio.color.surface.raised",
+        "kind": "text"
+      }
+    ]
+  }
+}

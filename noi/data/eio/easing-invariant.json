@@ -1,0 +1,39 @@
+{
+  "path": "noi.eio.inv.easing",
+  "name": "Curve invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos motion curve must meet.",
+    "responsibility": "Keep motion calm: a curve whose control points stay between its start and its end, so nothing bounces or overshoots."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "easing"
+    },
+    "schema": {
+      "title": "Eidos curve",
+      "type": "object",
+      "required": [
+        "bezier"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bezier": {
+          "description": "The two control points of a cubic Bézier curve, x1, y1, x2, y2, each from 0 to 1, as CSS cubic-bezier() takes them.",
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

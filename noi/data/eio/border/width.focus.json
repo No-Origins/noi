@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.border.width.focus",
+  "name": "Focus ring width",
+  "classification": {
+    "type": "token",
+    "subtype": "border-width"
+  },
+  "semantics": {
+    "definition": "The width of the focus ring a focused control shows, 2 px outside it.",
+    "responsibility": "Keep this kind of line the same width in every product."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 2
+  }
+}

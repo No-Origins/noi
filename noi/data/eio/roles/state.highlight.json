@@ -1,0 +1,32 @@
+{
+  "path": "noi.eio.color.state.highlight",
+  "name": "Highlight tint",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The fill of a highlighted menu item: lime mixed 4% into the raised surface.",
+    "responsibility": "Mark the current menu item quietly."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "accent"
+  },
+  "spec": {
+    "light": {
+      "mix": {
+        "color": "noi.eio.color.palette.lime",
+        "percent": 4,
+        "over": "noi.eio.color.palette.white"
+      }
+    },
+    "dark": {
+      "mix": {
+        "color": "noi.eio.color.palette.lime",
+        "percent": 4,
+        "over": "noi.eio.color.palette.neutral-900"
+      }
+    }
+  }
+}

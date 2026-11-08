@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.radius.card",
+  "name": "Card corners",
+  "classification": {
+    "type": "token",
+    "subtype": "radius"
+  },
+  "semantics": {
+    "definition": "The corners of cards, panels and dialogs.",
+    "responsibility": "Keep containers the same shape in every product; first version, can change on its own."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 16
+  }
+}

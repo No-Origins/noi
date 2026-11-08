@@ -1,0 +1,25 @@
+# Tries the three images on this Mac against today's database (agreed 8 Nov): run ./try-here.sh,
+# which gives each server its database login from the owner-only env files for this run only.
+# The three share one network, so they reach each other at 127.0.0.1 as they do without containers;
+# only this Mac can reach them, on the usual ports.
+name: noi-try
+services:
+  mero:
+    image: noi/mero:dev
+    environment:
+      DATABASE_URL: ${MERO_DATABASE_URL:?run ./try-here.sh}
+      NOI_GOV_URL: http://127.0.0.1:8788
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["127.0.0.1:8787:8787", "127.0.0.1:8788:8788", "127.0.0.1:3000:3000"]
+  governance:
+    image: noi/governance:dev
+    network_mode: service:mero
+    environment:
+      NOI_GOV_DATABASE_URL: ${GOV_DATABASE_URL:?run ./try-here.sh}
+  app:
+    image: noi/app:dev
+    network_mode: service:mero
+    environment:
+      MERO_URL: http://127.0.0.1:8787
+      GOVERNANCE_API: http://127.0.0.1:8788
+      GOVERNANCE_URL: http://localhost:8788

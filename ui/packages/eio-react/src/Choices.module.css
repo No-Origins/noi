@@ -1,0 +1,27 @@
+/* A question and its choices: a real fieldset whose legend is the question (rule 4). */
+.choices {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+}
+.legend {
+  padding: 0 0 var(--eio-space-gap-inline);
+  color: var(--eio-color-text-muted);
+}
+.options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.across .options {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--eio-space-gap-stack);
+}
+.note {
+  color: var(--eio-color-text-muted);
+}

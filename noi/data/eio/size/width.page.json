@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.size.width.page",
+  "name": "Page width",
+  "classification": {
+    "type": "token",
+    "subtype": "size"
+  },
+  "semantics": {
+    "definition": "The widest page content may run; wider windows center it and add space at the sides.",
+    "responsibility": "Keep page content from stretching on wide windows."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 1200
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.type.size.px48",
+  "name": "48 px",
+  "classification": {
+    "type": "token",
+    "subtype": "font-size"
+  },
+  "semantics": {
+    "definition": "The 48 px step of the Eidos size ladder.",
+    "responsibility": "Hold the 48 px size that hero names use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "tailwind": "5xl"
+  },
+  "spec": {
+    "px": 48
+  }
+}

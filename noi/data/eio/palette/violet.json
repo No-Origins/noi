@@ -1,0 +1,25 @@
+{
+  "path": "noi.eio.color.palette.violet",
+  "name": "Violet",
+  "classification": {
+    "type": "token",
+    "subtype": "color"
+  },
+  "semantics": {
+    "definition": "The No Origins brand violet.",
+    "responsibility": "Hold the exact violet value that No Origins products use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "brand",
+    "value": {
+      "colorSpace": "oklch",
+      "components": [
+        0.619,
+        0.208,
+        294.842
+      ],
+      "hex": "#9262F3"
+    }
+  }
+}

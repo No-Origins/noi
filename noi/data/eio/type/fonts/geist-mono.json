@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.type.font.geist-mono",
+  "name": "Geist Mono",
+  "classification": {
+    "type": "token",
+    "subtype": "font-family"
+  },
+  "semantics": {
+    "definition": "The Eidos fixed-width font.",
+    "responsibility": "Set labels, buttons, numbers, ids and code, so digits line up."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "Geist Mono",
+    "weights": [
+      100,
+      200,
+      300,
+      400,
+      500,
+      600,
+      700,
+      800,
+      900
+    ],
+    "italic": true,
+    "scripts": [
+      "latin",
+      "cyrillic",
+      "vietnamese"
+    ],
+    "license": "OFL-1.1",
+    "source": "https://fonts.google.com/specimen/Geist+Mono"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "path": "noi.eio.type.style.title",
+  "name": "Title text",
+  "classification": {
+    "type": "token",
+    "subtype": "text-style"
+  },
+  "semantics": {
+    "definition": "A section title.",
+    "responsibility": "Set this kind of text the same way in every app."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "font": "noi.eio.type.font.tenor-sans",
+    "fallback": "noi.eio.type.font.yatra-one",
+    "size": "noi.eio.type.size.px30",
+    "lineHeight": 40,
+    "weight": 400,
+    "tracking": 0,
+    "case": "none",
+    "reading": false
+  }
+}

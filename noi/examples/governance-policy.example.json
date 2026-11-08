@@ -1,0 +1,12 @@
+{
+  "id": "GOV-001-local",
+  "revision": 1,
+  "scopes": [
+    { "uid": "00000000-0000-4000-8000-000000000001", "parent": null }
+  ],
+  "grants": [
+    { "subject": "observer", "scope": "00000000-0000-4000-8000-000000000001", "role": "observer" },
+    { "subject": "design-agent", "scope": "00000000-0000-4000-8000-000000000001", "role": "contributor" },
+    { "subject": "local-maintainer", "scope": "00000000-0000-4000-8000-000000000001", "role": "maintainer" }
+  ]
+}

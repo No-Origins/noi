@@ -1,0 +1,42 @@
+{
+  "path": "noi.eio.inv.space-role",
+  "name": "Spacing role invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos spacing role must meet.",
+    "responsibility": "Make every spacing role point at one registered scale step, so products use roles and never a raw step."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "space-role"
+    },
+    "schema": {
+      "title": "Eidos spacing role",
+      "type": "object",
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "description": "The scale step this role uses, by path.",
+          "type": "string",
+          "pattern": "^noi\\.eio\\.space\\.scale\\.[a-z][a-z0-9-]*$"
+        }
+      }
+    },
+    "checks": [
+      {
+        "name": "eio.reference",
+        "params": {
+          "field": "ref",
+          "subtype": "space"
+        }
+      }
+    ]
+  }
+}

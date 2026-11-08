@@ -1,0 +1,90 @@
+/* The top bar: one row on every window. Its height is --explorer-bar in global.css; keep the two in step. */
+.bar {
+  height: calc(var(--eio-size-control-default) + var(--eio-space-gap-group));
+  padding: 0 var(--eio-window-margin);
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border-bottom: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  background: var(--eio-color-surface-page);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.brand {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--eio-space-gap-inline);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+/* The name is a link home; its target reaches the minimum height. */
+a.brand::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--eio-size-target-minimum) / 2);
+  height: var(--eio-size-target-minimum);
+}
+/* Beside the name where two panes fit. */
+.tabsInline {
+  margin-left: calc(var(--eio-space-gap-group) + var(--eio-space-gap-inline));
+}
+/* The live count and Theme, at the end of the row. */
+.end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.brandLabel {
+  color: var(--eio-color-text-muted);
+}
+.live {
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  color: var(--eio-color-text-muted);
+  white-space: nowrap;
+}
+.dot {
+  width: var(--eio-size-dot);
+  height: var(--eio-size-dot);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-action-primary);
+}
+/* Words only where two panes sit side by side, such as "Live ·". */
+.wide {
+  display: var(--eio-window-two-panes);
+}
+
+/* ——— The menu, where one pane fills the window ——— */
+.menuButton {
+  display: inline-flex;
+}
+/* The menu's head sits exactly over the top bar: ✕ where ☰ was, the name, the live count. */
+.menuHead {
+  height: var(--eio-size-control-default);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+/* The tabs across the menu, sharing its width equally: all four in a row where they fit, two and two
+   on a phone. A column is never narrower than three targets. */
+.tabsRow nav {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--eio-size-target-minimum) * 3), 1fr));
+}
+.tabsRow a {
+  justify-content: center;
+  padding: 0 var(--eio-space-gap-inline);
+}
+/* Theme at the foot of the menu. */
+.menuFoot {
+  margin-top: auto;
+}

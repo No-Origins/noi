@@ -1,0 +1,28 @@
+# No Origins: one repository for noi, ui, infrastructure and Planning (8 Nov).
+# Each folder's own .gitignore still applies: noi keeps its secrets, target and vendor out,
+# infrastructure/supabase its backups.
+
+# This Mac
+.DS_Store
+.pnpm-store/
+
+# Secrets, wherever they are: database logins, this Mac's vouch key, local settings
+*.local.env
+*.local.pem
+*.local.json
+.env
+.env.*
+!.env.example
+
+# Built or downloaded, never written by hand
+node_modules/
+.next/
+noi/target/
+noi/vendor/
+*.tsbuildinfo
+
+# Planning: the board files and their images change on every redraw. The scripts that draw
+# them, and the HTML and Swift that make the images, are kept.
+Planning/**/*.tldraw
+Planning/board-scripts/renders/*.png
+Planning/board-scripts/renders/*.jpg

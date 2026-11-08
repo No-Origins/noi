@@ -1,0 +1,35 @@
+/* App-wide basics. Every value comes from @noi/eio-tokens. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+:root {
+  /* The top bar's height, for what stays in view below it. See topbar.module.css. */
+  --explorer-bar: calc(var(--eio-size-control-default) + var(--eio-space-gap-group));
+}
+body {
+  background: var(--eio-color-surface-page);
+  color: var(--eio-color-text-primary);
+}
+/* Links the app draws itself get the same focus ring as Eidos components. */
+a:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+
+/* The error page, shown when Mero's read service is not answering. */
+.noi-error {
+  max-width: var(--eio-size-width-reading);
+  margin: 0 auto;
+  padding: var(--eio-space-gap-section) var(--eio-window-margin);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--eio-space-gap-stack);
+}
+.noi-error-muted {
+  color: var(--eio-color-text-muted);
+}

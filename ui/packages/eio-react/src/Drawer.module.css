@@ -1,0 +1,69 @@
+/* The drawer covers the whole window. */
+.drawer {
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: var(--eio-color-surface-page);
+  color: var(--eio-color-text-primary);
+  overflow-y: auto;
+}
+/* Nothing dims the page: the drawer itself covers it. */
+.drawer::backdrop {
+  background: transparent;
+}
+/* The drawer itself scrolls, not its body: a scrolling box can take focus, and focus belongs on the
+   first control inside. */
+.body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+  padding: calc(var(--eio-space-gap-group) / 2) var(--eio-window-margin) var(--eio-space-gap-group);
+}
+
+/* Arriving takes 300 ms, leaving 200 ms, on the standard curve; with reduced motion, no time at all. */
+.drawer[data-motion='in'] {
+  animation: fade-in var(--eio-motion-duration-ms300) var(--eio-motion-easing-standard) both;
+}
+.drawer[data-motion='out'] {
+  animation: fade-out var(--eio-motion-duration-ms200) var(--eio-motion-easing-standard) both;
+}
+/* From a button: a circle grows out of it until it covers the window, and shrinks back into it. */
+.grows[data-motion='in'] {
+  animation-name: grow-in;
+}
+.grows[data-motion='out'] {
+  animation-name: grow-out;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+/* 150% of the window's radius reaches its farthest corner from anywhere inside it. */
+@keyframes grow-in {
+  from {
+    clip-path: circle(var(--from-r) at var(--from-x) var(--from-y));
+  }
+  to {
+    clip-path: circle(150% at var(--from-x) var(--from-y));
+  }
+}
+@keyframes grow-out {
+  from {
+    clip-path: circle(150% at var(--from-x) var(--from-y));
+  }
+  to {
+    clip-path: circle(var(--from-r) at var(--from-x) var(--from-y));
+  }
+}

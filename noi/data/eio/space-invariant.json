@@ -1,0 +1,42 @@
+{
+  "path": "noi.eio.inv.space",
+  "name": "Spacing scale invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos spacing scale step must meet.",
+    "responsibility": "Keep every space on one 4 px grid and one 0 to 64 px scale."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "space"
+    },
+    "schema": {
+      "title": "Eidos spacing scale step",
+      "type": "object",
+      "required": [
+        "px"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "px": {
+          "description": "One step of the 0 to 64 px scale, on the 4 px grid, against a 16 px base: rem on web, pt on iOS, dp on Android.",
+          "enum": [
+            0,
+            4,
+            8,
+            12,
+            16,
+            24,
+            32,
+            48,
+            64
+          ]
+        }
+      }
+    }
+  }
+}

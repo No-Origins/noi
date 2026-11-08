@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.space.gap.stack",
+  "name": "Stack gap",
+  "classification": {
+    "type": "token",
+    "subtype": "space-role"
+  },
+  "semantics": {
+    "definition": "The space between stacked lines, such as a title and its text or fields in a form.",
+    "responsibility": "Keep this kind of space the same in every product."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "ref": "noi.eio.space.scale.px16"
+  }
+}

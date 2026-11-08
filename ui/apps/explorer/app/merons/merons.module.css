@@ -1,0 +1,567 @@
+/* Merons: the navigator on the left, one meron or group on the right. Every value is a token;
+   samples of a meron's own value (its color, font or size) are set inline from Mero. */
+
+/* ——— Layout ———
+   Panes (from Eidos) places the list and the page; Merons and Review share these two. */
+/* The list stays in view below the top bar while the page scrolls. */
+.left {
+  position: sticky;
+  top: var(--explorer-bar);
+  max-height: calc(100dvh - var(--explorer-bar));
+  overflow-y: auto;
+  padding: var(--eio-space-gap-pane) 0;
+}
+.right {
+  padding: var(--eio-space-gap-pane) 0 var(--eio-space-gap-section);
+}
+.muted {
+  color: var(--eio-color-text-muted);
+}
+.inline {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--eio-color-text-faint);
+}
+.inline:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ——— Navigator ——— */
+.navigator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.tree {
+  display: flex;
+  flex-direction: column;
+}
+.aa {
+  display: inline-block;
+  width: var(--eio-size-icon-default);
+  font-size: var(--eio-type-size-px16);
+  line-height: var(--eio-size-icon-default);
+  text-align: center;
+}
+
+/* ——— A meron's page ——— */
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.titleRow h1 {
+  overflow-wrap: anywhere;
+}
+.titleAction {
+  margin-left: auto;
+}
+/* A link that looks like a secondary button, for actions that open a page. */
+.linkButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-height: var(--eio-size-control-default);
+  padding: 0 var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-button);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+/* Its target reaches the minimum, like a button's (measured from inside the border). */
+.linkButton::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--eio-size-control-default) - var(--eio-size-target-minimum)) / 2 - var(--eio-border-width-default)) 0;
+}
+.linkButton:hover {
+  background: var(--eio-color-state-hover);
+}
+.crumbs {
+  color: var(--eio-color-text-muted);
+  overflow-wrap: anywhere;
+}
+.crumbs a {
+  color: inherit;
+  text-decoration: none;
+}
+.crumbs a:hover {
+  color: var(--eio-color-text-primary);
+  text-decoration: underline;
+}
+.lead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  max-width: var(--eio-size-width-reading);
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eio-space-gap-stack);
+}
+
+/* Facts: small cards of label, value and note. */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--eio-size-control-large) * 3), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+/* Small facts: the record, where values are words rather than numbers. */
+.small .fact dd:first-of-type {
+  font-family: var(--eio-type-style-body-font);
+  font-size: var(--eio-type-style-body-size);
+  font-weight: var(--eio-type-style-body-weight);
+  line-height: var(--eio-type-style-body-line-height);
+}
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Checks: an icon and a sentence each. */
+.checks {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--eio-space-gap-inline);
+}
+.mark {
+  display: flex;
+  flex: none;
+  color: var(--eio-color-text-success);
+}
+.fail .mark {
+  color: var(--eio-color-text-danger);
+}
+.na {
+  color: var(--eio-color-text-muted);
+}
+.na .mark {
+  color: var(--eio-color-text-faint);
+}
+
+/* Links to other merons. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-height: var(--eio-size-target-minimum);
+  padding: 0 var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-button);
+  background: var(--eio-color-surface-card);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.chip:hover {
+  background: var(--eio-color-state-hover);
+}
+.connections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+/* The kind of link beside its merons, or above them when the row is narrow. */
+.connRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.connRow > :first-child {
+  flex: 1 1 calc(var(--eio-size-control-large) * 2);
+}
+.connRow > :last-child {
+  flex: 4 1 calc(var(--eio-size-control-large) * 5);
+  min-width: 0;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-inline);
+}
+
+/* The record's stored spec. */
+.json {
+  overflow-x: auto;
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+}
+
+/* A role or rule, in Cedar. */
+.cedar {
+  overflow-x: auto;
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+}
+
+/* ——— Systems and groups: a card per part ——— */
+/* Two columns while each keeps its minimum, else one. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(calc(var(--eio-size-control-large) * 4), calc((100% - var(--eio-space-gap-stack)) / 2))), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+.childCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.childCard:hover {
+  background: var(--eio-color-state-hover);
+}
+.childHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--eio-space-gap-inline);
+}
+.sample {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-height: var(--eio-size-icon-large);
+}
+.sampleItem {
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+}
+.miniBar {
+  display: block;
+  max-width: 100%;
+  height: var(--eio-size-dot);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-action-primary);
+}
+.miniBox {
+  display: block;
+  border: var(--eio-border-width-default) solid var(--eio-color-text-muted);
+}
+.miniCorner {
+  display: block;
+  width: calc(var(--eio-size-control-large) * 2);
+  height: var(--eio-size-control-large);
+  border: var(--eio-border-width-focus) solid var(--eio-color-text-muted);
+}
+.miniLine {
+  display: block;
+  width: var(--eio-size-icon-large);
+  background: var(--eio-color-text-muted);
+}
+
+/* ——— Colors ——— */
+.colorBlock {
+  height: calc(var(--eio-size-control-large) * 4);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+}
+/* Light beside dark while each keeps its minimum, else light above dark. */
+.themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(calc(var(--eio-size-control-large) * 5), calc((100% - var(--eio-space-gap-stack)) / 2))), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+/* Each panel sets data-theme, so its frame and badges are that theme's roles. */
+.themePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-page);
+  color: var(--eio-color-text-primary);
+}
+.ground {
+  padding: var(--eio-space-inset-control);
+  border-radius: var(--eio-radius-field);
+}
+.fill,
+.edge {
+  display: block;
+  height: calc(var(--eio-size-control-large) * 2);
+  border-radius: var(--eio-radius-field);
+}
+.fill {
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.edge {
+  border: var(--eio-border-width-default) solid;
+}
+.edgeFocus {
+  border-width: var(--eio-border-width-focus);
+}
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-inline);
+}
+
+/* ——— Typography ——— */
+.specimen {
+  gap: var(--eio-space-gap-stack);
+  overflow-wrap: anywhere;
+}
+.specimenRow {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--eio-space-gap-group);
+}
+/* The line box: shows where each line of the style sits. */
+.lineBox {
+  background-image: linear-gradient(to bottom, transparent calc(100% - var(--eio-border-width-default)), var(--eio-color-border-default) 0);
+  background-size: 100% 1lh;
+  overflow-wrap: anywhere;
+}
+.aside {
+  padding-left: var(--eio-space-gap-stack);
+  border-left: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.weights {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--eio-size-control-large) * 2), 1fr));
+  gap: var(--eio-space-gap-inline);
+}
+.weight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  padding: var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+}
+
+/* ——— Spacing, sizes and shape ——— */
+/* A space is drawn as the gap between two blocks. */
+.spaced {
+  display: flex;
+  align-items: stretch;
+  height: calc(var(--eio-size-control-large) * 2);
+}
+.block {
+  display: block;
+  width: calc(var(--eio-size-control-large) * 2);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-surface-page);
+}
+.gap {
+  display: block;
+  background: var(--eio-color-action-primary);
+}
+.stage {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--eio-size-control-large) * 3);
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+  overflow: hidden;
+}
+.bar {
+  display: block;
+  max-width: 100%;
+  height: var(--eio-size-control-small);
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-action-primary);
+}
+.box {
+  display: block;
+  border: var(--eio-border-width-default) solid var(--eio-color-text-primary);
+}
+.corner {
+  display: block;
+  width: calc(var(--eio-size-control-large) * 3);
+  height: calc(var(--eio-size-control-large) * 2);
+  border: var(--eio-border-width-focus) solid var(--eio-color-text-primary);
+}
+.rule {
+  display: block;
+  width: 100%;
+  background: var(--eio-color-text-primary);
+}
+.panes {
+  display: flex;
+  gap: var(--eio-space-gap-inline);
+  width: 100%;
+}
+.pane {
+  flex: 1;
+  height: calc(var(--eio-size-control-large) * 2);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-state-highlight);
+}
+
+/* ——— Invariants ——— */
+/* An invariant's rules beside what it covers, or above it when the page is narrow. */
+.split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: var(--eio-space-gap-stack);
+}
+.split > :first-child {
+  flex: 3 1 calc(var(--eio-size-control-large) * 5);
+  min-width: 0;
+}
+.split > :last-child {
+  flex: 2 1 calc(var(--eio-size-control-large) * 4);
+  min-width: 0;
+}
+.rules {
+  gap: var(--eio-space-gap-stack);
+}
+.ruleHead {
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+}
+.fields {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.fieldRow {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: baseline;
+  gap: var(--eio-space-gap-inline);
+}
+.fieldName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.ruleCheck {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  padding-top: var(--eio-space-gap-stack);
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.sentences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  padding-left: var(--eio-space-gap-group);
+}
+.covered {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+
+/* ——— Motion: a duration's sample and a curve's drawing ——— */
+.motionSample {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+}
+.motionTrack {
+  flex: 1;
+  height: var(--eio-size-icon-small);
+  position: relative;
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-border-default);
+}
+.motionLane {
+  position: absolute;
+  inset: 0 var(--eio-size-icon-small) 0 0;
+}
+.motionMover {
+  width: 100%;
+  height: 100%;
+  transition: transform var(--sample-duration) var(--eio-motion-easing-standard);
+}
+.motionMover[data-across] {
+  transform: translateX(100%);
+}
+.motionDot {
+  display: block;
+  width: var(--eio-size-icon-small);
+  height: var(--eio-size-icon-small);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-action-secondary);
+}
+.curve {
+  width: calc(var(--eio-size-control-large) * 4);
+  max-width: 100%;
+  height: auto;
+}
+.curveAxis {
+  fill: none;
+  stroke: var(--eio-color-border-default);
+  stroke-width: 1;
+}
+.curveHandle {
+  fill: none;
+  stroke: var(--eio-color-text-faint);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.curveLine {
+  fill: none;
+  stroke: var(--eio-color-text-primary);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}

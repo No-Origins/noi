@@ -1,0 +1,19 @@
+[package]
+name = "noi-log"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "What every NOI server shares: logs with tracing (one line per request, nothing secret in it), health checks and limits."
+
+[dependencies]
+axum = "0.8"
+uuid.workspace = true
+serde_json.workspace = true
+tokio = { version = "1", features = ["time"] }
+tracing = "0.1"
+# Only what we use: plain or JSON lines, and a filter for how much. No colours, so logs read cleanly in files.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "env-filter", "json", "smallvec", "tracing-log"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tower = { version = "0.5", features = ["util"] }

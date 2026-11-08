@@ -1,0 +1,427 @@
+/* Page designs for the subdomains (7 Nov): sample data only, nothing live. Every value is a token. */
+
+/* ——— The top bar every subdomain shares ——— */
+.bar {
+  height: calc(var(--eio-size-control-default) + var(--eio-space-gap-group));
+  padding: 0 var(--eio-window-margin);
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border-bottom: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  background: var(--eio-color-surface-page);
+}
+/* Padded above and below to the minimum target, so a press near the name still takes you home. */
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--eio-space-gap-inline);
+  padding: calc((var(--eio-size-target-minimum) - var(--eio-type-style-heading-line-height)) / 2) 0;
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.brandLabel {
+  color: var(--eio-color-text-muted);
+  /* Only where two panes fit: on a phone the bar keeps the system's name, the menu and you. */
+  display: var(--eio-window-two-panes);
+}
+.systems {
+  margin-left: calc(var(--eio-space-gap-group) + var(--eio-space-gap-inline));
+}
+.end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.you {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--eio-size-target-minimum);
+  gap: var(--eio-space-gap-inline);
+  white-space: nowrap;
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+}
+/* The system's own views, under the shared bar: a row as tall as the minimum target. Where a phone is
+   too narrow for every view, the row scrolls sideways; the page never does. */
+.views {
+  padding: 0 var(--eio-window-margin);
+  height: calc(var(--eio-size-target-minimum) + var(--eio-border-width-default));
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-group);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.view {
+  position: relative;
+  flex: none;
+  height: 100%;
+  min-width: var(--eio-size-target-minimum);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--eio-space-gap-inline);
+  white-space: nowrap;
+  color: var(--eio-color-text-muted);
+  text-decoration: none;
+}
+.viewOn {
+  color: var(--eio-color-text-primary);
+}
+.viewOn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--eio-border-width-focus);
+  background: var(--eio-color-text-primary);
+}
+
+/* ——— Pages ——— */
+.reading {
+  max-width: var(--eio-size-width-reading);
+  margin: 0 auto;
+  padding: var(--eio-space-gap-section) var(--eio-window-margin);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.wide {
+  max-width: var(--eio-size-width-page);
+  margin: 0 auto;
+  padding: var(--eio-space-gap-section) var(--eio-window-margin);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.left {
+  padding: var(--eio-space-gap-pane) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.right {
+  padding: var(--eio-space-gap-pane) 0 var(--eio-space-gap-section);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.muted {
+  color: var(--eio-color-text-muted);
+}
+.faint {
+  color: var(--eio-color-text-faint);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.groupName {
+  color: var(--eio-color-text-muted);
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+/* A line in a card: what it is, its facts, and its action at the end. */
+/* On a phone its words take the whole line and the action drops below, rather than squeezing them. */
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+  padding: var(--eio-space-gap-stack) 0;
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.line:first-of-type {
+  border-top: 0;
+}
+.lineText {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: 0;
+  flex: 1 1 calc(var(--eio-size-width-reading) / 3);
+}
+.lineEnd {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+
+/* ——— Sign in ——— */
+.signIn {
+  max-width: var(--eio-size-width-reading);
+  margin: 0 auto;
+  padding: var(--eio-space-gap-section) var(--eio-window-margin);
+}
+.signInCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+
+/* ——— Make a role ——— */
+.verbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--eio-size-width-reading) / 2.4), 1fr));
+  gap: var(--eio-space-gap-inline);
+}
+.cedar {
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-raised);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ——— The record ——— */
+.table {
+  display: flex;
+  flex-direction: column;
+}
+.record {
+  display: grid;
+  grid-template-columns: 5ch minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+  padding: var(--eio-space-gap-stack) 0;
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.recordHead {
+  color: var(--eio-color-text-muted);
+  border-top: 0;
+}
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-width: 0;
+}
+.clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ——— Approve with Touch ID ——— */
+/* The touch mark beside its words; on a phone, above them. */
+.touch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-group);
+  align-items: flex-start;
+}
+.touch > :last-child {
+  flex: 1 1 calc(var(--eio-size-width-reading) / 2);
+  min-width: 0;
+}
+.touchMark {
+  flex: none;
+  width: var(--eio-size-control-large);
+  height: var(--eio-size-control-large);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-action-primary);
+  color: var(--eio-color-action-on-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* A long path breaks onto the next line on a phone, rather than reaching past the card. */
+.places {
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+}
+.change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+}
+.pair {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  white-space: nowrap;
+}
+.chip {
+  width: var(--eio-size-control-default);
+  height: var(--eio-size-control-default);
+  border-radius: var(--eio-radius-field);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+
+/* ——— The list of designs ——— */
+.designs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--eio-size-width-reading) / 2), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+.designLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ——— Layout idea B · a side rail of systems ———
+   Where one pane fills the window, the rail is behind the menu button, as the shared bar's systems are. */
+.railLayout {
+  display: flex;
+  min-height: 100dvh;
+}
+.rail {
+  flex: none;
+  width: calc(var(--eio-size-width-reading) / 2.4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+  padding: var(--eio-space-gap-stack);
+  border-right: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  background: var(--eio-color-surface-page);
+}
+.railBrand {
+  display: flex;
+  flex-direction: column;
+  padding: var(--eio-space-inset-control);
+}
+.railSystems {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+}
+.railSystem {
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-height: var(--eio-size-target-minimum);
+  padding: 0 var(--eio-space-inset-control);
+  border-radius: var(--eio-radius-field);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+}
+.railSystemOn {
+  background: var(--eio-color-state-highlight);
+}
+.railLater {
+  color: var(--eio-color-text-faint);
+}
+.railViews {
+  display: flex;
+  flex-direction: column;
+  margin-left: calc(var(--eio-size-icon-default) + var(--eio-space-gap-inline) + var(--eio-space-inset-control));
+}
+.railView {
+  min-height: var(--eio-size-target-minimum);
+  display: flex;
+  align-items: center;
+  color: var(--eio-color-text-muted);
+  text-decoration: none;
+}
+.railViewOn {
+  color: var(--eio-color-text-primary);
+}
+.railFoot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  padding: var(--eio-space-inset-control);
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.railMain {
+  flex: 1;
+  min-width: 0;
+}
+.crumbs {
+  white-space: nowrap;
+  height: calc(var(--eio-size-control-default) + var(--eio-space-gap-group));
+  padding: 0 var(--eio-window-margin);
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border-bottom: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  color: var(--eio-color-text-muted);
+}
+
+/* ——— Layout idea C · one switcher and a search ——— */
+.switchBar {
+  position: relative;
+}
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-height: var(--eio-size-target-minimum);
+  padding: 0 var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-pill);
+  color: var(--eio-color-text-primary);
+  background: var(--eio-color-surface-page);
+}
+.search {
+  flex: 1;
+  min-width: 0;
+  max-width: var(--eio-size-width-reading);
+  margin-left: var(--eio-space-gap-group);
+}
+.switchMenu {
+  position: absolute;
+  top: calc(100% + var(--eio-space-gap-inline));
+  left: var(--eio-window-margin);
+  /* Never wider than the window, less its margins. */
+  width: min(calc(var(--eio-size-width-reading) / 1.6), calc(100% - 2 * var(--eio-window-margin)));
+  z-index: 2;
+  background: var(--eio-color-surface-raised);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  padding: var(--eio-space-gap-inline);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+}
+.switchItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--eio-space-gap-stack);
+  padding: var(--eio-space-inset-control);
+  border-radius: var(--eio-radius-field);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+}
+.switchItemOn {
+  background: var(--eio-color-state-highlight);
+}
+/* On a phone, you and Sign out at the foot of the switcher. */
+.switchFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eio-space-gap-inline);
+  padding: var(--eio-space-gap-inline) var(--eio-space-inset-control) 0;
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}

@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.size.icon.large",
+  "name": "Large icon",
+  "classification": {
+    "type": "token",
+    "subtype": "size"
+  },
+  "semantics": {
+    "definition": "Icons beside headings.",
+    "responsibility": "Keep large icons no taller than a 28 px heading line."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 24
+  }
+}

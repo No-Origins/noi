@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.size.control.small",
+  "name": "Small control height",
+  "classification": {
+    "type": "token",
+    "subtype": "size"
+  },
+  "semantics": {
+    "definition": "The height of badges and counts.",
+    "responsibility": "Keep small pills one height wherever they appear."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 24
+  }
+}

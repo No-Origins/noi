@@ -1,0 +1,125 @@
+{
+  "path": "noi.eio.inv.color-role",
+  "name": "Color role invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos color role must meet.",
+    "responsibility": "Make every role point at palette colors, give it a value per theme, and keep the pairs it declares readable."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "color-role"
+    },
+    "schema": {
+      "title": "Eidos color role spec",
+      "type": "object",
+      "required": [
+        "light",
+        "dark"
+      ],
+      "additionalProperties": false,
+      "$defs": {
+        "palette": {
+          "type": "string",
+          "pattern": "^noi\\.eio\\.color\\.palette\\.[a-z][a-z0-9-]*$"
+        },
+        "value": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "ref"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "ref": {
+                  "$ref": "#/$defs/palette"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "mix"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "mix": {
+                  "type": "object",
+                  "required": [
+                    "color",
+                    "percent",
+                    "over"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "color": {
+                      "$ref": "#/$defs/palette"
+                    },
+                    "percent": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "exclusiveMaximum": 100
+                    },
+                    "over": {
+                      "$ref": "#/$defs/palette"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "properties": {
+        "light": {
+          "description": "The role in the light theme.",
+          "$ref": "#/$defs/value"
+        },
+        "dark": {
+          "description": "The role in the dark theme.",
+          "$ref": "#/$defs/value"
+        },
+        "contrast": {
+          "description": "Surfaces this role is read on. Text needs the text minimum; borders and focus the ui minimum.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "against",
+              "kind"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "against": {
+                "type": "string",
+                "pattern": "^noi\\.eio\\.color\\.[a-z][a-z0-9.-]*$"
+              },
+              "kind": {
+                "enum": [
+                  "text",
+                  "ui"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "checks": [
+      {
+        "name": "eio.color-role",
+        "params": {
+          "minimums": {
+            "text": 4.5,
+            "ui": 3
+          }
+        }
+      }
+    ]
+  }
+}

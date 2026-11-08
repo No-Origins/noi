@@ -1,0 +1,32 @@
+{
+  "path": "noi.eio.color.state.hover",
+  "name": "Hover tint",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The fill of a hovered row or control: lime mixed 14% into the page.",
+    "responsibility": "Show hover with a hint of the brand color."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "muted"
+  },
+  "spec": {
+    "light": {
+      "mix": {
+        "color": "noi.eio.color.palette.lime",
+        "percent": 14,
+        "over": "noi.eio.color.palette.white"
+      }
+    },
+    "dark": {
+      "mix": {
+        "color": "noi.eio.color.palette.lime",
+        "percent": 14,
+        "over": "noi.eio.color.palette.neutral-950"
+      }
+    }
+  }
+}

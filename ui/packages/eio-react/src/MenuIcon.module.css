@@ -1,0 +1,27 @@
+.icon {
+  width: var(--eio-size-icon-small);
+  height: var(--eio-size-icon-small);
+  flex: none;
+}
+/* Turning back to ☰ is leaving (200 ms); turning into ✕ is arriving (300 ms). */
+.line {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition-property: transform, opacity;
+  transition-duration: var(--eio-motion-duration-ms200);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.open .line {
+  transition-duration: var(--eio-motion-duration-ms300);
+}
+/* Percentages of the 20-unit grid: each outer line moves 4.5 units to the middle, then turns. */
+.open .top {
+  transform: rotate(45deg) translateY(22.5%);
+}
+.open .middle {
+  opacity: 0;
+  transform: scaleX(0);
+}
+.open .bottom {
+  transform: rotate(-45deg) translateY(-22.5%);
+}

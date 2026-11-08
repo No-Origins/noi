@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.motion.duration.ms100",
+  "name": "100 ms",
+  "classification": {
+    "type": "token",
+    "subtype": "duration"
+  },
+  "semantics": {
+    "definition": "The quickest motion: hover, press and selection fading their color.",
+    "responsibility": "Make a control answer at once, without a jump."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "ms": 100
+  }
+}

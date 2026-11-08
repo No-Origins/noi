@@ -1,0 +1,13 @@
+#!/bin/sh
+# Runs noi on this Mac with Mero's own database login (mero.local.env, owner-only; made by
+# infrastructure/supabase/runtime-logins.py). Mero asks Governance about every request, so start
+# Governance too. For migrations the operator passes their own login:
+#   DATABASE_URL=postgresql://postgres:…@127.0.0.1:55322/postgres scripts/noi-dev migrate
+set -eu
+cd "$(dirname "$0")/.."
+if [ -z "${DATABASE_URL:-}" ] && [ -f mero.local.env ]; then
+  set -a
+  . ./mero.local.env
+  set +a
+fi
+exec cargo run --locked --bin noi -- "$@"

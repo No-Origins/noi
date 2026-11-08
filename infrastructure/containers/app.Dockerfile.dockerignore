@@ -1,0 +1,9 @@
+# Only the app's sources enter the build; installed packages, builds and secrets stay out.
+**
+!ui/**
+**/node_modules
+**/.next
+**/*.tsbuildinfo
+**/*.local.*
+**/.env
+**/.env.*

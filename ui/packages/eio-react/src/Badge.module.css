@@ -1,0 +1,49 @@
+.badge {
+  height: var(--eio-size-control-small);
+  padding: 0 var(--eio-space-gap-inline);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-surface-raised);
+  color: var(--eio-color-text-primary);
+  white-space: nowrap;
+}
+.danger {
+  color: var(--eio-color-text-danger);
+  border-color: var(--eio-color-text-danger);
+}
+.warning {
+  color: var(--eio-color-text-warning);
+  border-color: var(--eio-color-text-warning);
+}
+.success {
+  color: var(--eio-color-text-success);
+}
+.dot {
+  width: var(--eio-size-dot);
+  height: var(--eio-size-dot);
+  border-radius: var(--eio-radius-pill);
+  flex: none;
+}
+.active {
+  background: var(--eio-color-action-primary);
+}
+.proposed {
+  background: var(--eio-color-action-secondary);
+}
+.deprecated {
+  background: var(--eio-color-text-faint);
+}
+.count {
+  min-width: var(--eio-size-control-small);
+  height: var(--eio-size-control-small);
+  padding: 0 var(--eio-space-gap-inline);
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-action-secondary);
+  color: var(--eio-color-action-on-secondary);
+  letter-spacing: 0;
+}

@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.space.scale.px24",
+  "name": "24 px",
+  "classification": {
+    "type": "token",
+    "subtype": "space"
+  },
+  "semantics": {
+    "definition": "The 24 px step of the Eidos spacing scale.",
+    "responsibility": "Hold the 24 px space that the group gap and card insets use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 24
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "path": "noi.eio.color.surface.card",
+  "name": "Card surface",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The background of a card.",
+    "responsibility": "Set cards on the page without a separate fill."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "card"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.white"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-950"
+    }
+  }
+}

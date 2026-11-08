@@ -1,0 +1,69 @@
+.field {
+  height: var(--eio-size-control-default);
+  padding: 0 var(--eio-space-inset-control);
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-surface-page);
+  color: var(--eio-color-text-muted);
+}
+.field {
+  position: relative;
+}
+/* The target reaches the minimum above and below the frame, without covering the input itself. */
+.field::before,
+.field::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Placed from inside the border, so the border is added back. */
+  height: calc((var(--eio-size-target-minimum) - var(--eio-size-control-default)) / 2 + var(--eio-border-width-default));
+}
+.field::before {
+  bottom: 100%;
+}
+.field::after {
+  top: 100%;
+}
+.field:focus-within {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--eio-color-text-primary);
+  font: inherit;
+}
+.input::placeholder {
+  color: var(--eio-color-text-muted);
+}
+.hint {
+  color: var(--eio-color-text-muted);
+}
+.clear {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--eio-color-text-muted);
+  cursor: pointer;
+}
+/* The clear button's touch target reaches the minimum around its small icon. */
+.clear::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--eio-size-icon-small) - var(--eio-size-target-minimum)) / 2);
+}
+.clear:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  border-radius: var(--eio-radius-pill);
+}

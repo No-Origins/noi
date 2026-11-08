@@ -1,0 +1,22 @@
+{
+  "path": "noi.eio.type.style.label",
+  "name": "Label text",
+  "classification": {
+    "type": "token",
+    "subtype": "text-style"
+  },
+  "semantics": {
+    "definition": "The small capitals that name a thing.",
+    "responsibility": "Set this kind of text the same way in every app."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "font": "noi.eio.type.font.geist-mono",
+    "size": "noi.eio.type.size.px12",
+    "lineHeight": 16,
+    "weight": 500,
+    "tracking": 0.08,
+    "case": "upper",
+    "reading": false
+  }
+}

@@ -1,0 +1,92 @@
+/* The role and rule editor, its sentence, and the sentence on a rule's page and in Review. Tokens only. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+}
+/* One part of the form: Eidos controls, placed. */
+.part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.part + .part {
+  padding-top: var(--eio-space-gap-stack);
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.muted {
+  color: var(--eio-color-text-muted);
+}
+.system {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.system + .system {
+  margin-top: var(--eio-space-gap-stack);
+}
+/* The verbs: Checkbox tiles, as many columns as fit. */
+.verbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--eio-size-control-large) * 4)), 1fr));
+  gap: var(--eio-space-gap-inline);
+}
+/* The sentence: what the rule says, in words. */
+.sentence {
+  max-width: var(--eio-size-width-reading);
+}
+/* What a change adds: the accent, so it can't be missed in what your touch approves. */
+.added {
+  border-radius: calc(var(--eio-radius-field) / 4);
+  background: var(--eio-color-action-primary);
+  color: var(--eio-color-action-on-primary);
+  box-decoration-break: clone;
+}
+.removed {
+  color: var(--eio-color-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--eio-color-text-faint);
+}
+/* The Cedar the form writes, under its Disclosure. */
+.code {
+  overflow-x: auto;
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-page);
+}
+.error {
+  color: var(--eio-color-text-danger);
+}
+.switch {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--eio-size-target-minimum);
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--eio-color-text-faint);
+  cursor: pointer;
+}
+.switch:hover {
+  text-decoration-color: currentColor;
+}
+/* Before and after, in words, in Review. */
+.words {
+  display: grid;
+  grid-template-columns: repeat(var(--eio-window-panes), minmax(0, 1fr));
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  min-width: 0;
+}

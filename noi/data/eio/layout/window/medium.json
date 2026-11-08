@@ -1,0 +1,17 @@
+{
+  "path": "noi.eio.layout.window.medium",
+  "name": "Medium window",
+  "classification": {
+    "type": "token",
+    "subtype": "window"
+  },
+  "semantics": {
+    "definition": "Windows 600 to 839 px wide, such as a tablet in portrait.",
+    "responsibility": "Decide the layout of every product in a medium window: its margin and how many panes it shows."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "minWidth": 600,
+    "panes": 1
+  }
+}

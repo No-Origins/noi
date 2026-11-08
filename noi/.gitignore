@@ -1,0 +1,19 @@
+/target/
+.env
+.env.*
+!.env.example
+/explorer/registry.json
+.DS_Store
+
+/node_modules/
+
+/governance.local.json
+
+# This Mac's Hyperbase key: the private half of the agent-vouching block.
+/*.local.pem
+
+# Mero's and Governance's own database logins (infrastructure/supabase/runtime-logins.py).
+/*.local.env
+
+# Crates copied from this Mac's cache for the container builds (8 Nov); never committed.
+/vendor/

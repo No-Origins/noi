@@ -1,0 +1,52 @@
+{
+  "path": "noi.eio.inv.radius",
+  "name": "Corner invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos corner role must meet.",
+    "responsibility": "Keep every corner on one scale: 0 to 24 px on the 4 px grid, or fully round."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "radius"
+    },
+    "schema": {
+      "title": "Eidos corner role",
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "px"
+          ]
+        },
+        {
+          "required": [
+            "full"
+          ]
+        }
+      ],
+      "properties": {
+        "px": {
+          "description": "A corner radius in px from the scale.",
+          "enum": [
+            0,
+            4,
+            8,
+            12,
+            16,
+            24
+          ]
+        },
+        "full": {
+          "description": "Fully round: half the element's own height, like a pill or a circle.",
+          "const": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "path": "noi.eio",
+  "name": "Eidos · Design System",
+  "classification": { "type": "system", "subtype": "design-system" },
+  "semantics": {
+    "definition": "The No Origins design system.",
+    "responsibility": "Own the design tokens that No Origins products share."
+  },
+  "release_mode": "independent",
+  "authority_scope": "0ceaa988-76dd-46d1-a19e-e6ca4be61046"
+}

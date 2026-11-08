@@ -1,0 +1,33 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "explorer",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "/Users/hiddenstack/No Origins/ui/apps/explorer",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "mero",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/hiddenstack/No Origins/noi' && set -a && . ./mero.local.env && set +a && exec ./target/debug/noi serve --eio-tokens ../ui/packages/eio-tokens"
+      ],
+      "port": 8787
+    },
+    {
+      "name": "governance",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/hiddenstack/No Origins/noi' && set -a && . ./governance.local.env && set +a && exec ./target/debug/noi-gov serve"
+      ],
+      "port": 8788
+    }
+  ]
+}

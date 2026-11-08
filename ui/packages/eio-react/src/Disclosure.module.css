@@ -1,0 +1,38 @@
+/* A fold-open section. The arrow turns in 200 ms; what it reveals drops 4 px and fades in, as tree
+   rows do. Closing is instant; with reduced motion, both are (rule 6). */
+.summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  width: fit-content;
+  min-height: var(--eio-size-target-minimum);
+  color: var(--eio-color-text-muted);
+  cursor: pointer;
+  transition: color var(--eio-motion-duration-ms100) var(--eio-motion-easing-standard);
+}
+.summary::-webkit-details-marker {
+  display: none;
+}
+.summary:hover {
+  color: var(--eio-color-text-primary);
+}
+.summary:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+.arrow {
+  transition: transform var(--eio-motion-duration-ms200) var(--eio-motion-easing-standard);
+}
+.fold[open] > .summary .arrow {
+  transform: rotate(90deg);
+}
+.body {
+  animation: appear var(--eio-motion-duration-ms200) var(--eio-motion-easing-standard) both;
+}
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(calc(0px - var(--eio-space-gap-inline) / 2));
+  }
+}

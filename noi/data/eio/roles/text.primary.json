@@ -1,0 +1,38 @@
+{
+  "path": "noi.eio.color.text.primary",
+  "name": "Primary text",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "Text people read first, such as body text and headings.",
+    "responsibility": "Stay readable on every surface it is used on."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "foreground"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.neutral-950"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-50"
+    },
+    "contrast": [
+      {
+        "against": "noi.eio.color.surface.page",
+        "kind": "text"
+      },
+      {
+        "against": "noi.eio.color.surface.raised",
+        "kind": "text"
+      },
+      {
+        "against": "noi.eio.color.state.hover",
+        "kind": "text"
+      }
+    ]
+  }
+}

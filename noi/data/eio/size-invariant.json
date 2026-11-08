@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.inv.size",
+  "name": "Size invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos size must meet.",
+    "responsibility": "Keep control, touch-target, icon and content-width sizes on the 4 px grid."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "size"
+    },
+    "schema": {
+      "title": "Eidos size",
+      "type": "object",
+      "required": [
+        "px"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "px": {
+          "description": "A size in px on the 4 px grid, against a 16 px base: a control, touch target, icon or content width.",
+          "type": "integer",
+          "multipleOf": 4,
+          "minimum": 4,
+          "maximum": 1600
+        }
+      }
+    }
+  }
+}

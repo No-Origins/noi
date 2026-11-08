@@ -1,0 +1,30 @@
+{
+  "path": "noi.eio.color.focus.ring",
+  "name": "Focus ring",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The ring around whatever has keyboard focus.",
+    "responsibility": "Show focus clearly, at 3 : 1 or better."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "circles": "ring"
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.neutral-500"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-500"
+    },
+    "contrast": [
+      {
+        "against": "noi.eio.color.surface.page",
+        "kind": "ui"
+      }
+    ]
+  }
+}

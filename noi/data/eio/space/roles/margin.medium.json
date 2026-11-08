@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.space.margin.medium",
+  "name": "Medium margin",
+  "classification": {
+    "type": "token",
+    "subtype": "space-role"
+  },
+  "semantics": {
+    "definition": "The space between the window edge and the content in a medium window.",
+    "responsibility": "Keep this kind of space the same in every product."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "ref": "noi.eio.space.scale.px24"
+  }
+}

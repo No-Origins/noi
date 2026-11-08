@@ -1,0 +1,91 @@
+{
+  "path": "noi.eio.inv.font-family",
+  "name": "Font family invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos font family's spec must meet.",
+    "responsibility": "Record what each font file actually provides, and only admit fonts licensed for web and native apps."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "font-family"
+    },
+    "schema": {
+      "title": "Eidos font family spec",
+      "type": "object",
+      "required": [
+        "family",
+        "weights",
+        "italic",
+        "scripts",
+        "license",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "description": "The family name apps load, such as Geist Mono.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "weights": {
+          "description": "The weights the font file has. A one-weight font lists one; a style may only use these.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              100,
+              200,
+              300,
+              400,
+              500,
+              600,
+              700,
+              800,
+              900
+            ]
+          }
+        },
+        "italic": {
+          "description": "Whether the font has a true italic. Apps never fake one.",
+          "type": "boolean"
+        },
+        "scripts": {
+          "description": "Writing systems the font draws.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "latin",
+              "cyrillic",
+              "vietnamese",
+              "devanagari"
+            ]
+          }
+        },
+        "license": {
+          "description": "SPDX id. The license must allow web and native apps; a new one needs a maintainer.",
+          "const": "OFL-1.1"
+        },
+        "source": {
+          "description": "Where the font files come from.",
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "minSize": {
+          "description": "The smallest size, in px, a style may set this font at.",
+          "type": "number",
+          "minimum": 12,
+          "maximum": 96
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.size.icon.default",
+  "name": "Default icon",
+  "classification": {
+    "type": "token",
+    "subtype": "size"
+  },
+  "semantics": {
+    "definition": "Icons beside body text.",
+    "responsibility": "Keep default icons no taller than a 24 px body line."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 20
+  }
+}

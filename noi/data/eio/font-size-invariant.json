@@ -1,0 +1,42 @@
+{
+  "path": "noi.eio.inv.font-size",
+  "name": "Font size invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos size step's spec must meet.",
+    "responsibility": "Keep every text size on one ladder, measured against a 16 px base."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "font-size"
+    },
+    "schema": {
+      "title": "Eidos font size spec",
+      "type": "object",
+      "required": [
+        "px"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "px": {
+          "description": "One step of the 12 to 48 px ladder, against a 16 px base: rem on web, Dynamic Type on iOS, sp on Android.",
+          "enum": [
+            12,
+            14,
+            16,
+            18,
+            20,
+            24,
+            30,
+            36,
+            48
+          ]
+        }
+      }
+    }
+  }
+}

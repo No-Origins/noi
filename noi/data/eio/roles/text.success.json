@@ -1,0 +1,31 @@
+{
+  "path": "noi.eio.color.text.success",
+  "name": "Success text",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "Text and icons that confirm something passed or finished.",
+    "responsibility": "Make passes readable on the page and on raised surfaces, always with an icon or a word as well."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.green-700"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.green-400"
+    },
+    "contrast": [
+      {
+        "against": "noi.eio.color.surface.page",
+        "kind": "text"
+      },
+      {
+        "against": "noi.eio.color.surface.raised",
+        "kind": "text"
+      }
+    ]
+  }
+}

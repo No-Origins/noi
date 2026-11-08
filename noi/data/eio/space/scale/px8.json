@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.space.scale.px8",
+  "name": "8 px",
+  "classification": {
+    "type": "token",
+    "subtype": "space"
+  },
+  "semantics": {
+    "definition": "The 8 px step of the Eidos spacing scale.",
+    "responsibility": "Hold the 8 px space that the inline gap use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 8
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "path": "noi.eio.color.palette.lime",
+  "name": "Lime",
+  "classification": {
+    "type": "token",
+    "subtype": "color"
+  },
+  "semantics": {
+    "definition": "The No Origins brand lime.",
+    "responsibility": "Hold the exact lime value that No Origins products use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "brand",
+    "value": {
+      "colorSpace": "oklch",
+      "components": [
+        0.896,
+        0.196,
+        119.552
+      ],
+      "hex": "#CEEE38"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "path": "noi.eio.inv.color-token",
+  "name": "Color token invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos color token's spec must meet.",
+    "responsibility": "Define the shape of a color token's value so every color token is checked the same way."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "color"
+    },
+    "schema": {
+      "title": "Eidos color token spec",
+      "type": "object",
+      "required": [
+        "family",
+        "value"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "description": "brand, neutral or status. A new family needs a maintainer.",
+          "enum": [
+            "brand",
+            "neutral",
+            "status"
+          ]
+        },
+        "value": {
+          "description": "A color in OKLCH, the way Circles stores it, with an optional sRGB hex for people.",
+          "type": "object",
+          "required": [
+            "colorSpace",
+            "components"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "colorSpace": {
+              "const": "oklch"
+            },
+            "components": {
+              "description": "Lightness 0\u20131, chroma 0 or more, hue in degrees 0 up to 360.",
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "exclusiveMaximum": 360
+                }
+              ],
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "hex": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

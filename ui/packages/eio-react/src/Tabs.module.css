@@ -1,0 +1,41 @@
+/* Where the row is too narrow for every tab, the rest go to the next line, never past the edge. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-inline);
+}
+.tab {
+  position: relative;
+  height: var(--eio-size-control-default);
+  padding: 0 var(--eio-space-inset-control);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-button);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  /* Hover, press and selection fade their color: Eidos motion, 100 ms. */
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.tab::before {
+  content: '';
+  position: absolute;
+  /* Measured from inside the border, so the border is added back. */
+  inset: calc((var(--eio-size-control-default) - var(--eio-size-target-minimum)) / 2 - var(--eio-border-width-default)) 0;
+}
+.tab:hover:not(.selected) {
+  background: var(--eio-color-state-hover);
+}
+.tab:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+.selected {
+  background: var(--eio-color-action-primary);
+  border-color: var(--eio-color-action-primary);
+  color: var(--eio-color-action-on-primary);
+}

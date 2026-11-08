@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.radius.button",
+  "name": "Button corners",
+  "classification": {
+    "type": "token",
+    "subtype": "radius"
+  },
+  "semantics": {
+    "definition": "The corners of buttons: fully round pills.",
+    "responsibility": "Keep buttons the same shape in every product; first version, can change on its own."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "full": true
+  }
+}

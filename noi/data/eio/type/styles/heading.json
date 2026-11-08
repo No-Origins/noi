@@ -1,0 +1,23 @@
+{
+  "path": "noi.eio.type.style.heading",
+  "name": "Heading text",
+  "classification": {
+    "type": "token",
+    "subtype": "text-style"
+  },
+  "semantics": {
+    "definition": "A card or group title.",
+    "responsibility": "Set this kind of text the same way in every app."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "font": "noi.eio.type.font.geist",
+    "fallback": "noi.eio.type.font.yatra-one",
+    "size": "noi.eio.type.size.px20",
+    "lineHeight": 28,
+    "weight": 600,
+    "tracking": 0,
+    "case": "none",
+    "reading": false
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "path": "noi.eio.type.font.tenor-sans",
+  "name": "Tenor Sans",
+  "classification": {
+    "type": "token",
+    "subtype": "font-family"
+  },
+  "semantics": {
+    "definition": "The Eidos title font.",
+    "responsibility": "Set section titles, at 24 px and up only."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "Tenor Sans",
+    "weights": [
+      400
+    ],
+    "italic": false,
+    "scripts": [
+      "latin",
+      "cyrillic"
+    ],
+    "license": "OFL-1.1",
+    "source": "https://fonts.google.com/specimen/Tenor+Sans",
+    "minSize": 24
+  }
+}

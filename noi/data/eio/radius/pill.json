@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.radius.pill",
+  "name": "Pill corners",
+  "classification": {
+    "type": "token",
+    "subtype": "radius"
+  },
+  "semantics": {
+    "definition": "The corners of badges, avatars and toggles: fully round.",
+    "responsibility": "Keep small round things round in every product."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "full": true
+  }
+}

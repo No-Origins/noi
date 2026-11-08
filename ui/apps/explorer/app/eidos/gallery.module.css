@@ -1,0 +1,65 @@
+/* Light and dark side by side where two panes fit; one above the other where one fills the window. */
+.page {
+  display: grid;
+  grid-template-columns: repeat(var(--eio-window-panes), minmax(0, 1fr));
+  min-height: 100vh;
+}
+.theme {
+  background: var(--eio-color-surface-page);
+  color: var(--eio-color-text-primary);
+  padding: var(--eio-space-gap-section) var(--eio-window-margin);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+/* The part's name beside its examples, or above them when the column is narrow. */
+.part {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-stack);
+  align-items: start;
+}
+.partName {
+  flex: 0 0 calc(var(--eio-space-gap-section) * 2.5);
+  color: var(--eio-color-text-muted);
+  padding-top: var(--eio-space-gap-inline);
+}
+.parts {
+  flex: 1 1 calc(var(--eio-size-control-large) * 5);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+}
+.tree {
+  width: var(--eio-size-width-reading);
+  max-width: 100%;
+}
+.muted {
+  color: var(--eio-color-text-muted);
+}
+/* A control under its words, both inside one label, as the forms place a TextArea. */
+.labelled {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+/* Checkbox tiles: as many columns as fit, as a role's verbs are laid out. */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--eio-size-control-large) * 4)), 1fr));
+  gap: var(--eio-space-gap-inline);
+}
+.code {
+  overflow-x: auto;
+  padding: var(--eio-space-inset-card);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+}

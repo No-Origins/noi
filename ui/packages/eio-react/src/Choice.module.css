@@ -1,0 +1,108 @@
+/* Checkbox and Radio. The row is the label, so its words are part of the 44 px target (rule 1).
+   The real input stays in the page with the browser's drawing turned off; Eidos draws the box. */
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-height: var(--eio-size-target-minimum);
+  cursor: pointer;
+}
+.box {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--eio-size-icon-default);
+  height: var(--eio-size-icon-default);
+}
+.input {
+  appearance: none;
+  -webkit-appearance: none;
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-check);
+  background: var(--eio-color-surface-page);
+  cursor: inherit;
+  transition-property: background-color, border-color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.round .input {
+  border-radius: var(--eio-radius-pill);
+}
+/* On is lime, with a mark: never color alone. It keeps its border, since lime on white is 1.3:1 (rule 2). */
+.input:checked {
+  background: var(--eio-color-action-primary);
+}
+.mark {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  pointer-events: none;
+  color: var(--eio-color-action-on-primary);
+}
+.dot {
+  width: var(--eio-size-dot);
+  height: var(--eio-size-dot);
+  border-radius: var(--eio-radius-pill);
+  background: currentColor;
+}
+.input:checked ~ .mark {
+  visibility: visible;
+}
+.input:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+/* Locked looks locked: the default border and faint words, like a disabled Button (rule 3). */
+.input:disabled {
+  border-color: var(--eio-color-border-default);
+  background: var(--eio-color-surface-page);
+}
+.input:disabled ~ .mark {
+  color: var(--eio-color-text-faint);
+}
+.choice:has(.input:disabled) {
+  color: var(--eio-color-text-faint);
+  cursor: default;
+}
+
+/* A tile: its words and what it does, in a frame that tints when it is on. */
+.tile {
+  align-items: flex-start;
+  padding: var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-field);
+  transition-property: background-color, border-color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.tile:has(.input:checked) {
+  border-color: var(--eio-color-text-primary);
+  background: var(--eio-color-state-highlight);
+}
+.tile:has(.input:disabled) {
+  border-color: var(--eio-color-border-default);
+  background: var(--eio-color-surface-page);
+}
+/* On a tile the whole frame shows the focus ring, not the box. */
+.tile .input:focus-visible {
+  outline: none;
+}
+.tile:has(.input:focus-visible) {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+.words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.detail {
+  color: var(--eio-color-text-muted);
+}
+.choice:has(.input:disabled) .detail {
+  color: var(--eio-color-text-faint);
+}
