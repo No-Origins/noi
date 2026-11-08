@@ -1,0 +1,13 @@
+{
+  "$comment": "TypeScript settings every package shares (Monorepo decision 4, agreed 8 Nov). Each package's tsconfig extends this and adds only its own.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  }
+}

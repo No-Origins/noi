@@ -1,5 +1,13 @@
-# Only the app's sources enter the build; installed packages, builds and secrets stay out.
+# Only the workspace's files and the app's sources enter the build; installed packages, builds and
+# secrets stay out.
 **
+!package.json
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+!.npmrc
+!tsconfig.base.json
+!noi/package.json
+!infrastructure/supabase/package.json
 !ui/**
 **/node_modules
 **/.next

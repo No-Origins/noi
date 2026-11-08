@@ -13,9 +13,9 @@ Supabase is an independent shared infrastructure package at `/Users/hiddenstack/
 Start shared services from their infrastructure folder:
 
 ```sh
-cd "/Users/hiddenstack/No Origins/infrastructure/supabase"
-pnpm install --frozen-lockfile
-pnpm run stack:start
+cd "/Users/hiddenstack/No Origins"
+pnpm install --frozen-lockfile    # once, for the whole repository: one workspace, one lockfile
+pnpm --dir infrastructure/supabase run stack:start
 ```
 
 Run Mero and Governance from the application folder. Since step 3 (7 Nov) each has its own database login in an owner-only file, `mero.local.env` and `governance.local.env` (ignored by Git), written once by the operator with `python3 -I ../infrastructure/supabase/runtime-logins.py`. Mero's login reaches only schema `mer`, Governance's only `gov`; the operator keeps `postgres` for migrations, backups and restoring. The launch configurations in `../.claude/launch.json` start both servers with their files.

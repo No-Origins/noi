@@ -7,16 +7,15 @@ See the [shared platform setup](../../infrastructure/supabase/README.md) for ser
 Start the platform from its own folder:
 
 ```sh
-cd "/Users/hiddenstack/No Origins/infrastructure/supabase"
-pnpm install --frozen-lockfile
-pnpm run stack:start
+cd "/Users/hiddenstack/No Origins"
+pnpm install --frozen-lockfile    # once, for the whole repository: one workspace, one lockfile
+pnpm --dir infrastructure/supabase run stack:start
 ```
 
 Then run the registry from its application folder:
 
 ```sh
 cd "/Users/hiddenstack/No Origins/noi"
-pnpm install --frozen-lockfile
 pnpm run registry:migrate
 pnpm run registry:seed
 pnpm run explorer

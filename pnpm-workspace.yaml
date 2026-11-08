@@ -1,0 +1,6 @@
+# One pnpm workspace for the whole repository (Monorepo decision 1, agreed 8 Nov): one install, one lockfile.
+packages:
+  - "ui/apps/*"
+  - "ui/packages/*"
+  - "noi"
+  - "infrastructure/supabase"

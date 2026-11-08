@@ -1,8 +1,0 @@
-{
-  "name": "noi-ui",
-  "private": true,
-  "packageManager": "pnpm@10.33.0",
-  "engines": {
-    "node": ">=22"
-  }
-}

@@ -9,9 +9,9 @@ This is the independent local database platform for No Origins applications. The
 Requires a running Docker-compatible service, Node.js 22+ and pnpm 10.33.0. The Supabase CLI is pinned to 2.122.0 in this package. The existing local stack has already been initialized; do not initialize a second stack per application.
 
 ```sh
-cd "/Users/hiddenstack/No Origins/infrastructure/supabase"
-pnpm install --frozen-lockfile
-pnpm run stack:start
+cd "/Users/hiddenstack/No Origins"
+pnpm install --frozen-lockfile    # once, for the whole repository: one workspace, one lockfile
+pnpm --dir infrastructure/supabase run stack:start
 ```
 
 | Service | Endpoint |
@@ -46,7 +46,6 @@ For the current registry, run its migrations and seed from its own folder:
 
 ```sh
 cd "/Users/hiddenstack/No Origins/xei-registry"
-pnpm install --frozen-lockfile
 pnpm run registry:migrate
 pnpm run registry:seed
 pnpm run explorer

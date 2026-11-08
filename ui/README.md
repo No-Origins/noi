@@ -1,6 +1,6 @@
 # No Origins UI
 
-The front ends of No Origins Infrastructure, in one pnpm workspace. Data never lives here: it comes from Mero (`../noi`).
+The front ends of No Origins Infrastructure. They are part of the repository's one pnpm workspace, kept at the top of the No Origins folder with one lockfile: run `pnpm install` there, once, for everything. Data never lives here: it comes from Mero (`../noi`).
 
 - `packages/eio-tokens` (`@noi/eio-tokens`): Eidos tokens, generated from Mero, with the fonts bundled for offline use.
 - `packages/eio-react` (`@noi/eio-react`): Eidos components, built only from the tokens. Button, Field, Badge and Count, Tabs and Tab, Card, TreeRow, Swatch, Icon, MenuIcon (☰ that turns into ✕), Panes (a list and its page) with WhenOnePane and WhenTwoPanes, and Drawer (a modal panel that covers the window, growing out of the button that opens it). A TreeRow with `onToggle` has its arrow as its own button, and `appear` drops in a row an arrow revealed. `pnpm test` there checks the agreed rules on every component's styles: colors only from roles, lengths only from tokens, no window widths, durations or curves of their own, and every token it reads exists.
