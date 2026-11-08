@@ -2,6 +2,7 @@
   "name": "no-origins",
   "private": true,
   "description": "No Origins: one workspace for the app, the Eidos packages, noi's scripts and the Supabase tools. Rust keeps its own Cargo workspace in noi.",
+  "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22"

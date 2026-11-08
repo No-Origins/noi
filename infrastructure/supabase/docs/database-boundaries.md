@@ -2,7 +2,7 @@
 
 ## Decision
 
-Use one independently managed **No Origins Systems** Supabase stack for the current local No Origins environment. Applications connect to its one main PostgreSQL database (`postgres`) and own explicit schemas, permissions and migrations. The XEI registry owns `xec`; future app schemas are assigned when those applications exist.
+Use one independently managed **No Origins Systems** Supabase stack for the current local No Origins environment. Applications connect to its one main PostgreSQL database (`postgres`) and own explicit schemas, permissions and migrations. Mero owns `mer` and Governance owns `gov`; future app schemas are assigned when those applications exist.
 
 Brand identity and database deployment boundaries are different concerns. One brand can use several databases, and several related applications can use one database. For the current small set of related applications, one shared service avoids duplicating local infrastructure and makes deliberate shared data integration easier. This is an architectural recommendation for the current stage, not a claim that every future No Origins product must share a database.
 
@@ -12,17 +12,17 @@ PostgreSQL schemas group tables inside a database; access across schemas depends
 
 - The shared infrastructure package owns service startup/shutdown, configuration, upgrades and platform backup coordination.
 - Each application owns its domain tables and migrations. Applications qualify table names and use a dedicated runtime role/login with only the required grants.
-- Cross-application access is explicit. Registry writes use XEC validation and XGA authorization through domain operations, even when the calling application shares the database server.
+- Cross-application access is explicit. Registry writes use Invariants validation and Governance authorization through domain operations, even when the calling application shares the database server.
 - Supabase Auth identities can be shared where product requirements call for it. Access to one application does not automatically confer access to every application. Application authorization remains explicit.
-- Browser-facing schemas must be deliberately exposed and have appropriate grants and RLS. `xec` and `xec_migrations` remain outside the Data API's exposed schemas. [Supabase custom schemas](https://supabase.com/docs/guides/api/using-custom-schemas), [row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- Browser-facing schemas must be deliberately exposed and have appropriate grants and RLS. `mer` and `mer_migrations` remain outside the Data API's exposed schemas. [Supabase custom schemas](https://supabase.com/docs/guides/api/using-custom-schemas), [row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 
 The local development connection currently uses the postgres owner. The existing registry backend group role restricts ordinary runtime operations, but a dedicated login has not yet been provisioned for each future application. Production login provisioning and application authorization remain future work.
 
 ## Migration isolation
 
-Independent applications must not all use SQLx's default `public._sqlx_migrations` table. Version numbers and missing-migration validation can collide. The registry now keeps its tracker in `xec_migrations`, using a dedicated migration connection and a controlled search path. Its actual data stays in `xec`.
+Independent applications must not all use SQLx's default `public._sqlx_migrations` table. Version numbers and missing-migration validation can collide. The registry now keeps its tracker in `mer_migrations`, using a dedicated migration connection and a controlled search path. Its actual data stays in `mer`.
 
-For the earlier registry-only installation, `xei migrate` verifies every legacy history row's version, checksum and successful status before moving that ledger into `xec_migrations`. A mixed, failed or changed legacy history is refused for manual reconciliation. If another application has public migration history on a database without XEC, the registry leaves it alone and uses its own tracker. The administrative migration step does not change entity records or their identities.
+For the earlier registry-only installation, `noi migrate` verifies every legacy history row's version, checksum and successful status before moving that ledger into `mer_migrations`. A mixed, failed or changed legacy history is refused for manual reconciliation. If another application has public migration history on a database without Mero, the registry leaves it alone and uses its own tracker. The administrative migration step does not change entity records or their identities.
 
 Migrations require a migration owner, separately from runtime credentials. Deployments must coordinate the order of migrations touching truly shared objects. Separate history tables prevent bookkeeping collisions; they do not resolve conflicting ownership of the same table.
 
@@ -41,5 +41,6 @@ No Origins/
 ├── Planning/
 ├── infrastructure/
 │   └── supabase/       # shared platform and pinned CLI tooling
-└── xei-registry/       # Rust application, xec migrations and explorer
+├── noi/                # Rust: Mero, Governance and the Invariants' checks; mer and gov migrations
+└── ui/                 # the Explorer and the Eidos packages
 ```

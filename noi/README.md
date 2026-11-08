@@ -1,6 +1,6 @@
 # No Origins Infrastructure (NOI)
 
-Project source location: `/Users/hiddenstack/No Origins/noi`.
+This is the `noi` folder of the No Origins repository: the Rust side.
 
 A Rust/PostgreSQL foundation for Mero (MER, the registry: every meron with its spec, state and history), Invariants (INV, the rules every meron must always pass), Governance's rules for Mero (GOV-MER) and Eidos's checks (EIO, the design system). Governance is a peer domain owning authority. The operational registry is the source of truth. JSON exports and the visual explorer are projections.
 
@@ -8,12 +8,12 @@ Renamed on 2026-11-05 from XEI (umbrella and registry), XEC (contracts), XGA (go
 
 ## Connect to the shared No Origins database
 
-Supabase is an independent shared infrastructure package at `/Users/hiddenstack/No Origins/infrastructure/supabase`. The registry connects to the **No Origins Systems** database (`no-origins-systems`) and owns its `mer` schema. Other No Origins applications can use the same database with separately owned schemas, permissions and migration histories. See the [shared platform setup](../infrastructure/supabase/README.md) and [database boundaries](../infrastructure/supabase/docs/database-boundaries.md).
+Supabase is an independent shared infrastructure package at `infrastructure/supabase`. The registry connects to the **No Origins Systems** database (`no-origins-systems`) and owns its `mer` schema. Other No Origins applications can use the same database with separately owned schemas, permissions and migration histories. See the [shared platform setup](../infrastructure/supabase/README.md) and [database boundaries](../infrastructure/supabase/docs/database-boundaries.md).
 
 Start shared services from their infrastructure folder:
 
 ```sh
-cd "/Users/hiddenstack/No Origins"
+# from the top of the repository
 pnpm install --frozen-lockfile    # once, for the whole repository: one workspace, one lockfile
 pnpm --dir infrastructure/supabase run stack:start
 ```
@@ -21,7 +21,7 @@ pnpm --dir infrastructure/supabase run stack:start
 Run Mero and Governance from the application folder. Since step 3 (7 Nov) each has its own database login in an owner-only file, `mero.local.env` and `governance.local.env` (ignored by Git), written once by the operator with `python3 -I ../infrastructure/supabase/runtime-logins.py`. Mero's login reaches only schema `mer`, Governance's only `gov`; the operator keeps `postgres` for migrations, backups and restoring. The launch configurations in `../.claude/launch.json` start both servers with their files.
 
 ```sh
-cd "/Users/hiddenstack/No Origins/noi"
+cd noi
 DATABASE_URL=postgresql://postgres:…@127.0.0.1:55322/postgres pnpm run registry:migrate   # the operator
 pnpm run mero                                   # Mero's API on 127.0.0.1:8787, with mero.local.env
 ```
@@ -64,7 +64,7 @@ Governance answers "may they?" for every NOI system from its own schema, `gov`. 
 noi gov migrate                                  # schema gov (administrative)
 noi gov copy                                     # copy the roles and rules approved in Mero
 noi gov serve                                    # http://localhost:8788 (open by name, not 127.0.0.1)
-noi gov setup --handle hiddenstack --name Ada  # once: the first owner and a 10-minute passkey link
+noi gov setup --handle HANDLE --name "Your name"  # once: the first owner and a 10-minute passkey link
 noi gov passkey add HANDLE                       # a new first-passkey link, only while there is none
 ```
 

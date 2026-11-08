@@ -46,7 +46,7 @@ Initial views: complete graph, structural hierarchy, dependencies, governance; t
 
 ## Shared infrastructure ownership
 
-Supabase now lives at `/Users/hiddenstack/No Origins/infrastructure/supabase`, independently of this application. The same No Origins Systems database, volumes and ports are retained. The registry owns `mer`; other applications own separately assigned schemas and permissions. The registry's migration history is isolated in `mer_migrations._sqlx_migrations` using a dedicated migration connection. Existing registry-only public history is verified before adoption; mixed or inconsistent history is refused.
+Supabase now lives at `infrastructure/supabase`, independently of this application. The same No Origins Systems database, volumes and ports are retained. The registry owns `mer`; other applications own separately assigned schemas and permissions. The registry's migration history is isolated in `mer_migrations._sqlx_migrations` using a dedicated migration connection. Existing registry-only public history is verified before adoption; mixed or inconsistent history is refused.
 
 Application identity and the No Origins brand do not dictate a physical database boundary. The initial recommendation is one shared local platform, with separate environments and the option to split applications when isolation, recovery or workload needs justify it. See the shared platform's database-boundaries document for ownership and limits. Meron mutations continue through the registry's Invariants/Governance operations; a shared database does not grant other applications authority over Invariants tables.
 
