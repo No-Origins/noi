@@ -1,0 +1,60 @@
+# The app and the Eidos packages (Going Public on GitHub decision 5, agreed 8 Nov). Runs for every pull
+# request and every push to main; skipped when nothing the app is built from changed.
+name: App
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'ui/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+              - '.node-version'
+              - 'tsconfig.base.json'
+              - '.github/workflows/app.yml'
+
+  app:
+    name: Typecheck, test and build
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -r --filter "./ui/**" run typecheck
+      - name: Tests (the Eidos rules, the Explorer's styles)
+        run: pnpm -r --filter "./ui/**" test
+      - name: Build the Explorer
+        run: pnpm --filter explorer build

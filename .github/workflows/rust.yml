@@ -1,0 +1,71 @@
+# Rust: Mero, Governance and the checks in noi (Going Public on GitHub decision 5, agreed 8 Nov).
+# Runs for every pull request and every push to main. When nothing in noi changed the work is skipped,
+# and a skipped job still counts as passed for main's protection.
+name: Rust
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'noi/**'
+              - '.github/workflows/rust.yml'
+
+  rust:
+    name: Format, lint and test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: noi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: noi
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy, warnings are errors
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Tests
+        run: cargo test --locked --workspace --all-features
+      - name: The database tests, against Postgres
+        run: cargo test --locked --workspace --all-features -- --ignored
+        env:
+          NOI_TEST_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
