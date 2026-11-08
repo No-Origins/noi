@@ -229,7 +229,8 @@ fn eio_window_classes_pass_their_invariant() {
 fn eio_corners_and_border_widths_pass_their_invariants() {
     let radius = invariant("radius-invariant.json");
     let width = invariant("border-width-invariant.json");
-    for (dir, c, count) in [("radius", &radius, 4), ("border", &width, 2)] {
+    // Five corners since 8 Nov: radius.check (4 px), the checkbox's, joined field, card, button and pill.
+    for (dir, c, count) in [("radius", &radius, 5), ("border", &width, 2)] {
         let merons = data(dir);
         assert_eq!(merons.len(), count, "{dir}");
         for e in &merons {
