@@ -332,10 +332,7 @@ mod tests {
     #[test]
     fn references_must_resolve_and_fallbacks_must_add_a_script() {
         let error = check(&style("inter", 16, 24, 400)).unwrap_err();
-        assert_eq!(
-            error,
-            "noi.eio.type.font.inter is not a usable font family"
-        );
+        assert_eq!(error, "noi.eio.type.font.inter is not a usable font family");
         let mut odd = style("geist", 16, 24, 400);
         odd["size"] = json!(format!("{S}huge"));
         assert!(check(&odd)

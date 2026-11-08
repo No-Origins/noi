@@ -3,16 +3,16 @@
 //! text-style check, and the reference check that role tokens such as spacing roles use; in
 //! `noi-gov`, the role and rule checks, which read Cedar against the actions each system declares.
 use crate::{admitted, applicable_invariants, load, resolve, Error, Result};
-use serde_json::{json, Value};
-use sqlx::PgConnection;
-use std::collections::{BTreeMap, HashMap};
-use uuid::Uuid;
-use noi_inv::{InvariantSpec, Meron, MeronType, RevisionRef, ValidationError};
 use noi_eio::{
     FontSpec, Oklch, ReferenceParams, Resolved, RoleParams, RoleSpec, SizeSpec, StyleSpec,
     TypeParams, TypeResolved, COLOR_ROLE_CHECK, REFERENCE_CHECK, TEXT_STYLE_CHECK,
 };
 use noi_gov::{ROLE_CHECK, RULE_CHECK};
+use noi_inv::{InvariantSpec, Meron, MeronType, RevisionRef, ValidationError};
+use serde_json::{json, Value};
+use sqlx::PgConnection;
+use std::collections::{BTreeMap, HashMap};
+use uuid::Uuid;
 
 /// The Governance checks need nothing but the meron's own spec.
 fn no_params(check: &str, params: &Value) -> std::result::Result<(), String> {

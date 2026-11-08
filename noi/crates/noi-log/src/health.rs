@@ -21,7 +21,11 @@ pub fn ready(checks: &[(&str, bool)]) -> Response {
         .iter()
         .map(|(name, ok)| (name.to_string(), json!(if *ok { "ok" } else { "not ok" })))
         .collect();
-    let status = if ok { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    let status = if ok {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
     (status, Json(json!({ "ok": ok, "checks": parts }))).into_response()
 }
 
@@ -32,14 +36,20 @@ mod tests {
 
     async fn body(r: Response) -> (StatusCode, Value) {
         let status = r.status();
-        (status, serde_json::from_slice(&to_bytes(r.into_body(), 1 << 16).await.unwrap()).unwrap())
+        (
+            status,
+            serde_json::from_slice(&to_bytes(r.into_body(), 1 << 16).await.unwrap()).unwrap(),
+        )
     }
 
     #[tokio::test]
     async fn ready_only_when_every_part_answers() {
         let (status, v) = body(ready(&[("database", true), ("governance", true)])).await;
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(v, json!({"ok": true, "checks": {"database": "ok", "governance": "ok"}}));
+        assert_eq!(
+            v,
+            json!({"ok": true, "checks": {"database": "ok", "governance": "ok"}})
+        );
         let (status, v) = body(ready(&[("database", true), ("governance", false)])).await;
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(v["checks"]["governance"], "not ok");

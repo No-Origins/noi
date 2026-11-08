@@ -39,7 +39,12 @@ pub fn role_actions(cedar: &str) -> Option<Vec<String>> {
         ActionConstraint::Eq(action) => vec![action],
         ActionConstraint::In(actions) => actions,
     };
-    Some(named.iter().map(|a| a.id().unescaped().to_string()).collect())
+    Some(
+        named
+            .iter()
+            .map(|a| a.id().unescaped().to_string())
+            .collect(),
+    )
 }
 
 /// The systems that declare actions. Each is also a Cedar action group holding all of its
@@ -222,8 +227,18 @@ mod tests {
         for action in GOVERNANCE_ACTIONS {
             assert!(text.contains(&format!("\"{action}\"")), "{action}");
         }
-        assert_eq!(role_actions(r#"permit (principal == ?principal, action in [Action::"read", Action::"propose"], resource in ?resource);"#), Some(vec!["read".into(), "propose".into()]));
-        assert_eq!(role_actions(r#"permit (principal == ?principal, action in Action::"governance", resource in ?resource);"#), Some(vec!["governance".into()]));
+        assert_eq!(
+            role_actions(
+                r#"permit (principal == ?principal, action in [Action::"read", Action::"propose"], resource in ?resource);"#
+            ),
+            Some(vec!["read".into(), "propose".into()])
+        );
+        assert_eq!(
+            role_actions(
+                r#"permit (principal == ?principal, action in Action::"governance", resource in ?resource);"#
+            ),
+            Some(vec!["governance".into()])
+        );
         assert_eq!(role_actions("not cedar"), None);
         // The JSON name and the Cedar name are the same.
         for action in Action::ALL {

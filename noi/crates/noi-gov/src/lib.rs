@@ -5,18 +5,18 @@ use std::{future::Future, pin::Pin};
 use uuid::Uuid;
 
 mod cedar;
-pub mod form;
 #[cfg(feature = "client")]
 mod client;
+pub mod form;
 mod policy;
 #[cfg(feature = "server")]
 pub mod server;
-#[cfg(feature = "client")]
-pub use client::{AskGovernance, GovernanceClient, Who};
 pub use cedar::{
     check_role, check_rule, role_actions, schema_text, GOVERNANCE_ACTIONS, ROLE_CHECK, RULE_CHECK,
     SYSTEMS,
 };
+#[cfg(feature = "client")]
+pub use client::{AskGovernance, GovernanceClient, Who};
 pub use policy::{GovernancePolicy, Grant, Role, Scope, ScopedAuthorizer};
 
 /// How an asker proves who they are. Mero passes it to Governance unread.
@@ -154,8 +154,7 @@ pub struct LocalDevelopmentGrant {
 }
 impl LocalDevelopmentGrant {
     pub fn new(subject: String, namespace: String) -> Result<Self, &'static str> {
-        if subject.trim().is_empty() || !(namespace == "noi" || namespace.starts_with("noi."))
-        {
+        if subject.trim().is_empty() || !(namespace == "noi" || namespace.starts_with("noi.")) {
             return Err("nonblank subject and noi namespace required");
         }
         Ok(Self { subject, namespace })
@@ -163,21 +162,23 @@ impl LocalDevelopmentGrant {
 }
 impl Authorizer for LocalDevelopmentGrant {
     fn authorize<'a>(&'a self, request: &'a AuthorizationRequest) -> Answer<'a> {
-        answer(if request.actor.subject == self.subject
-            && !request.resources.is_empty()
-            && request.resources.iter().all(|r| {
-                r.path == self.namespace || r.path.starts_with(&format!("{}.", self.namespace))
-            })
-        {
-            Decision::Allow {
-                reference: "local-development-explicit-grant-v1".into(),
-                policies: vec![],
-            }
-        } else {
-            Decision::Deny {
-                reason: "actor or resource is outside the development capability".into(),
-            }
-        })
+        answer(
+            if request.actor.subject == self.subject
+                && !request.resources.is_empty()
+                && request.resources.iter().all(|r| {
+                    r.path == self.namespace || r.path.starts_with(&format!("{}.", self.namespace))
+                })
+            {
+                Decision::Allow {
+                    reference: "local-development-explicit-grant-v1".into(),
+                    policies: vec![],
+                }
+            } else {
+                Decision::Deny {
+                    reason: "actor or resource is outside the development capability".into(),
+                }
+            },
+        )
     }
 }
 #[cfg(test)]
@@ -195,8 +196,16 @@ mod tests {
     }
     #[test]
     fn places_are_each_named_once_in_order() {
-        let r = |p: &str| Resource { uid: Uuid::nil(), path: p.into(), revision: 0, authority_scope: Uuid::nil() };
-        assert_eq!(places(&[r("noi.b"), r("noi.a"), r("noi.b")]), vec!["noi.a", "noi.b"]);
+        let r = |p: &str| Resource {
+            uid: Uuid::nil(),
+            path: p.into(),
+            revision: 0,
+            authority_scope: Uuid::nil(),
+        };
+        assert_eq!(
+            places(&[r("noi.b"), r("noi.a"), r("noi.b")]),
+            vec!["noi.a", "noi.b"]
+        );
     }
     #[test]
     fn fails_closed_and_checks_every_resource() {
@@ -214,12 +223,24 @@ mod tests {
             }],
             intent: Value::Null,
         };
-        assert!(matches!(now(DenyAll.authorize(&request)), Decision::Deny { .. }));
+        assert!(matches!(
+            now(DenyAll.authorize(&request)),
+            Decision::Deny { .. }
+        ));
         let grant = LocalDevelopmentGrant::new("dev".into(), "noi.inv".into()).unwrap();
-        assert!(matches!(now(grant.authorize(&request)), Decision::Allow { .. }));
+        assert!(matches!(
+            now(grant.authorize(&request)),
+            Decision::Allow { .. }
+        ));
         request.resources[0].path = "noi.inv-evil".into();
-        assert!(matches!(now(grant.authorize(&request)), Decision::Deny { .. }));
+        assert!(matches!(
+            now(grant.authorize(&request)),
+            Decision::Deny { .. }
+        ));
         request.resources.clear();
-        assert!(matches!(now(grant.authorize(&request)), Decision::Deny { .. }));
+        assert!(matches!(
+            now(grant.authorize(&request)),
+            Decision::Deny { .. }
+        ));
     }
 }

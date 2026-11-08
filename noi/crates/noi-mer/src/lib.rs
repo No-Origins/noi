@@ -3,6 +3,11 @@ use chrono::{DateTime, Utc};
 
 /// A kept problem: seq, when, request ID, method, path, status, what.
 type ProblemRow = (i64, DateTime<Utc>, String, String, String, i32, String);
+use noi_gov::{
+    answer, places, Action, Actor, Answer, AuthorizationRequest, Authorizer, Decision, DenyAll,
+    Resource,
+};
+use noi_inv::*;
 use serde_json::{json, Value};
 use sqlx::{
     postgres::PgPoolOptions, Connection, FromRow, PgConnection, PgPool, Postgres, Transaction,
@@ -14,11 +19,6 @@ use std::{
     time::Duration,
 };
 use uuid::Uuid;
-use noi_inv::*;
-use noi_gov::{
-    answer, places, Action, Actor, Answer, AuthorizationRequest, Authorizer, Decision, DenyAll,
-    Resource,
-};
 
 mod checks;
 pub mod reference;
@@ -52,7 +52,14 @@ pub struct Registry {
 impl Registry {
     /// Keeps one problem for the Problems page (agreed 8 Nov). Nothing secret reaches here: the path
     /// has no query, and `what` is the inner reason a request failed.
-    pub async fn record_problem(&self, request_id: &str, method: &str, path: &str, status: i32, what: &str) -> Result<()> {
+    pub async fn record_problem(
+        &self,
+        request_id: &str,
+        method: &str,
+        path: &str,
+        status: i32,
+        what: &str,
+    ) -> Result<()> {
         sqlx::query("INSERT INTO mer.problems(request_id, method, path, status, what) VALUES($1,$2,$3,$4,$5)")
             .bind(request_id)
             .bind(method)
@@ -212,9 +219,7 @@ impl Registry {
         let uid = Uuid::new_v4();
         let scope = match proposal.authority_scope {
             Some(id) => id,
-            None if proposal.path == "noi"
-                && proposal.classification.kind == MeronType::System =>
-            {
+            None if proposal.path == "noi" && proposal.classification.kind == MeronType::System => {
                 uid
             }
             None => {
@@ -240,12 +245,14 @@ impl Registry {
             resources.push(resource(&scope_meron));
         }
         let (invariants, checked) = conformance(conn, &proposal).await?;
-        let decision = self.authorize(
-            actor,
-            Action::Propose,
-            resources,
-            json!({"proposal":proposal,"invariants":invariants,"checks":checked.records}),
-        ).await?;
+        let decision = self
+            .authorize(
+                actor,
+                Action::Propose,
+                resources,
+                json!({"proposal":proposal,"invariants":invariants,"checks":checked.records}),
+            )
+            .await?;
         sqlx::query("INSERT INTO mer.merons(uid,path,name,kind,subtype,roles,definition,responsibility,release_mode,authority_scope,metadata,spec) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)")
             .bind(uid).bind(&proposal.path).bind(&proposal.name).bind(proposal.classification.kind.as_str()).bind(&proposal.classification.subtype)
             .bind(json!(proposal.classification.roles)).bind(&proposal.semantics.definition).bind(&proposal.semantics.responsibility)
@@ -279,7 +286,8 @@ impl Registry {
             Action::Read,
             vec![resource(&meron)],
             json!({"operation":"get"}),
-        ).await?;
+        )
+        .await?;
         Ok(meron)
     }
     pub async fn snapshot(&self, actor: &Actor) -> Result<Snapshot> {
@@ -310,7 +318,8 @@ impl Registry {
             Action::Read,
             resources,
             json!({"operation":"snapshot"}),
-        ).await?;
+        )
+        .await?;
         let relationships = sqlx::query_as::<_, RelationshipRow>(
             "SELECT * FROM mer.relationships ORDER BY source,predicate,target",
         )
@@ -349,8 +358,13 @@ impl Registry {
         )
         .fetch_all(&mut *conn)
         .await?;
-        let merons = rows.into_iter().map(TryInto::try_into).collect::<Result<_>>()?;
-        let generated_at = sqlx::query_scalar("SELECT now()").fetch_one(&mut *conn).await?;
+        let merons = rows
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<_>>()?;
+        let generated_at = sqlx::query_scalar("SELECT now()")
+            .fetch_one(&mut *conn)
+            .await?;
         Ok(Snapshot {
             schema_version: "inv-registry/0.1.0".into(),
             generated_at,
@@ -367,7 +381,8 @@ impl Registry {
             Action::Read,
             vec![resource(&meron)],
             json!({"operation":"history"}),
-        ).await?;
+        )
+        .await?;
         let rows=sqlx::query_as::<_,EventRow>("SELECT * FROM mer.events WHERE meron_uid=$1 OR payload->'relationship'->>'target'=$1::text ORDER BY sequence").bind(uid).fetch_all(&mut *conn).await?;
         // History can mention other endpoints, consumers and pre-rename locations.
         // A grant on the requested current name must not disclose those implicitly.
@@ -428,7 +443,8 @@ impl Registry {
             Action::Read,
             resources,
             json!({"operation":"history-with-related-resources"}),
-        ).await?;
+        )
+        .await?;
         Ok(rows
             .into_iter()
             .map(|r| Event {
@@ -472,12 +488,14 @@ impl Registry {
         }
         let mut new_resource = resource(&before);
         new_resource.path = path.into();
-        let decision = self.authorize(
-            actor,
-            Action::Rename,
-            vec![resource(&before), new_resource],
-            json!({"before":before,"new_path":path}),
-        ).await?;
+        let decision = self
+            .authorize(
+                actor,
+                Action::Rename,
+                vec![resource(&before), new_resource],
+                json!({"before":before,"new_path":path}),
+            )
+            .await?;
         sqlx::query("INSERT INTO mer.identifiers(path,meron_uid) VALUES($1,$2)")
             .bind(path)
             .bind(uid)
@@ -506,7 +524,14 @@ impl Registry {
     ) -> Result<Meron> {
         let mut tx = self.write().await?;
         let after = self
-            .update_in(tx.as_mut(), actor, uid, expected_revision, proposal, evidence)
+            .update_in(
+                tx.as_mut(),
+                actor,
+                uid,
+                expected_revision,
+                proposal,
+                evidence,
+            )
             .await?;
         tx.commit().await?;
         Ok(after)
@@ -680,12 +705,14 @@ impl Registry {
         let s = load(conn, source).await?;
         let t = load(conn, target).await?;
         validate_relationship(&s, predicate, &t)?;
-        let decision = self.authorize(
-            actor,
-            Action::Relate,
-            vec![resource(&s), resource(&t)],
-            json!({"predicate":predicate}),
-        ).await?;
+        let decision = self
+            .authorize(
+                actor,
+                Action::Relate,
+                vec![resource(&s), resource(&t)],
+                json!({"predicate":predicate}),
+            )
+            .await?;
         let r:Relationship=sqlx::query_as::<_,RelationshipRow>("INSERT INTO mer.relationships(uid,source,predicate,target) VALUES($1,$2,$3,$4) RETURNING *").bind(Uuid::new_v4()).bind(source).bind(predicate.as_str()).bind(target).fetch_one(&mut *conn).await?.try_into()?;
         event(
             conn,
@@ -709,12 +736,14 @@ impl Registry {
                 .try_into()?;
         let s = load(tx.as_mut(), r.source).await?;
         let t = load(tx.as_mut(), r.target).await?;
-        let decision = self.authorize(
-            actor,
-            Action::Unrelate,
-            vec![resource(&s), resource(&t)],
-            json!({"relationship":r}),
-        ).await?;
+        let decision = self
+            .authorize(
+                actor,
+                Action::Unrelate,
+                vec![resource(&s), resource(&t)],
+                json!({"relationship":r}),
+            )
+            .await?;
         sqlx::query("DELETE FROM mer.relationships WHERE uid=$1")
             .bind(uid)
             .execute(tx.as_mut())
@@ -750,12 +779,14 @@ impl Registry {
         let mut tx = self.write().await?;
         let meron = load(tx.as_mut(), uid).await?;
         revision(&meron, expected_revision)?;
-        let decision = self.authorize(
-            actor,
-            Action::Release,
-            vec![resource(&meron)],
-            json!({"generation":generation,"version":version,"justification":justification}),
-        ).await?;
+        let decision = self
+            .authorize(
+                actor,
+                Action::Release,
+                vec![resource(&meron)],
+                json!({"generation":generation,"version":version,"justification":justification}),
+            )
+            .await?;
         sqlx::query("INSERT INTO mer.generations(meron_uid,generation,justification) VALUES($1,$2,$3) ON CONFLICT(meron_uid,generation) DO NOTHING").bind(uid).bind(generation).bind(justification).execute(tx.as_mut()).await?;
         let r:Release=sqlx::query_as::<_,ReleaseRow>("INSERT INTO mer.releases(uid,meron_uid,generation,version,justification) VALUES($1,$2,$3,$4,$5) RETURNING *")
             .bind(Uuid::new_v4()).bind(uid).bind(generation).bind(version).bind(justification).fetch_one(tx.as_mut()).await?.try_into()?;
@@ -796,12 +827,14 @@ impl Registry {
             return Err(ValidationError("invalid release transition".into()).into());
         }
         let owner = load(tx.as_mut(), before.meron_uid).await?;
-        let decision = self.authorize(
-            actor,
-            Action::TransitionRelease,
-            vec![resource(&owner)],
-            json!({"release":before,"target_state":state}),
-        ).await?;
+        let decision = self
+            .authorize(
+                actor,
+                Action::TransitionRelease,
+                vec![resource(&owner)],
+                json!({"release":before,"target_state":state}),
+            )
+            .await?;
         let after: Release = sqlx::query_as::<_, ReleaseRow>(
             "UPDATE mer.releases SET state=$2,revision=revision+1 WHERE uid=$1 RETURNING *",
         )
@@ -878,7 +911,14 @@ async fn load(conn: &mut PgConnection, uid: Uuid) -> Result<Meron> {
         .try_into()
 }
 async fn resolve(conn: &mut PgConnection, path: &str) -> Result<Meron> {
-    sqlx::query_as::<_,MeronRow>("SELECT e.* FROM mer.merons e JOIN mer.identifiers i ON e.uid=i.meron_uid WHERE i.path=$1").bind(path).fetch_optional(conn).await?.ok_or(Error::NotFound)?.try_into()
+    sqlx::query_as::<_, MeronRow>(
+        "SELECT e.* FROM mer.merons e JOIN mer.identifiers i ON e.uid=i.meron_uid WHERE i.path=$1",
+    )
+    .bind(path)
+    .fetch_optional(conn)
+    .await?
+    .ok_or(Error::NotFound)?
+    .try_into()
 }
 async fn event(
     conn: &mut PgConnection,

@@ -1,5 +1,8 @@
 //! Real PostgreSQL integration test. Creates a disposable database; never resets postgres.
 //! Explicit opt-in: NOI_TEST_ADMIN_URL=... cargo test --test postgres -- --ignored
+use noi_gov::*;
+use noi_inv::*;
+use noi_mer::{Change, Error, NewBatch, ProposalState, Registry};
 use serde_json::json;
 use sqlx::{Connection, Executor, PgConnection};
 use std::{
@@ -7,9 +10,6 @@ use std::{
     sync::Arc,
 };
 use uuid::Uuid;
-use noi_inv::*;
-use noi_mer::{Change, Error, NewBatch, ProposalState, Registry};
-use noi_gov::*;
 
 struct Approval;
 impl Authorizer for Approval {
@@ -101,13 +101,40 @@ async fn verify(url: &str) {
     // Health and problems (8 Nov) need no authorizer: the database answers, and a failure is kept,
     // newest first, refused when it is not a failure, and never changed by Mero's own login.
     assert!(denied.database_answers().await);
-    denied.record_problem("req-1", "GET", "/api/registry", 503, "database: pool timed out").await.unwrap();
-    denied.record_problem("req-2", "POST", "/api/review/approve", 500, "approval failed").await.unwrap();
+    denied
+        .record_problem(
+            "req-1",
+            "GET",
+            "/api/registry",
+            503,
+            "database: pool timed out",
+        )
+        .await
+        .unwrap();
+    denied
+        .record_problem(
+            "req-2",
+            "POST",
+            "/api/review/approve",
+            500,
+            "approval failed",
+        )
+        .await
+        .unwrap();
     let problems = denied.problems(None, 1).await.unwrap();
-    assert_eq!((problems.len(), problems[0]["request_id"].as_str()), (1, Some("req-2")));
-    let older = denied.problems(problems[0]["seq"].as_i64(), 10).await.unwrap();
+    assert_eq!(
+        (problems.len(), problems[0]["request_id"].as_str()),
+        (1, Some("req-2"))
+    );
+    let older = denied
+        .problems(problems[0]["seq"].as_i64(), 10)
+        .await
+        .unwrap();
     assert_eq!(older[0]["what"], "database: pool timed out");
-    assert!(denied.record_problem("req-3", "GET", "/", 404, "not a failure").await.is_err());
+    assert!(denied
+        .record_problem("req-3", "GET", "/", 404, "not a failure")
+        .await
+        .is_err());
     let registry = denied.clone().with_authorizer(Arc::new(
         LocalDevelopmentGrant::new(actor.subject.clone(), "noi".into()).unwrap(),
     ));
@@ -423,9 +450,7 @@ async fn verify(url: &str) {
         .is_err());
     assert!(conn.execute("DELETE FROM mer.identifiers").await.is_err());
     assert!(conn
-        .execute(
-            "UPDATE mer.merons SET state='active',revision=revision+1 WHERE path='noi.inv'"
-        )
+        .execute("UPDATE mer.merons SET state='active',revision=revision+1 WHERE path='noi.inv'")
         .await
         .is_err());
     conn.execute("GRANT noi_mer_runtime TO CURRENT_USER WITH SET TRUE")
@@ -702,11 +727,7 @@ async fn verify_invariants(url: &str) {
     eio.release_mode = ReleaseMode::Independent;
     let eio = registry.propose(&actor, eio).await.unwrap();
     let eio_uid = eio.identity.uid;
-    let mut colour = proposal(
-        eio_uid,
-        "noi.eio.color.palette.typo",
-        MeronType::Token,
-    );
+    let mut colour = proposal(eio_uid, "noi.eio.color.palette.typo", MeronType::Token);
     colour.classification.subtype = Some("colour".into());
     assert!(registry.propose(&actor, colour).await.is_err());
 
@@ -716,11 +737,7 @@ async fn verify_invariants(url: &str) {
             "properties":{"colorSpace":{"const":"oklch"},
                 "components":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"number"}},
                 "hex":{"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"}}}}});
-    let mut invariant = proposal(
-        eio_uid,
-        "noi.eio.inv.color-token",
-        MeronType::Invariant,
-    );
+    let mut invariant = proposal(eio_uid, "noi.eio.inv.color-token", MeronType::Invariant);
     invariant.spec = json!({"applies_to":{"type":"invariant"},"schema":color_schema});
     assert!(registry.propose(&actor, invariant.clone()).await.is_err());
     invariant.spec = json!({"applies_to":{"type":"token","subtype":"color"},"schema":color_schema});
@@ -729,11 +746,7 @@ async fn verify_invariants(url: &str) {
 
     let lime_spec =
         json!({"value":{"colorSpace":"oklch","components":[0.896,0.196,119.552],"hex":"#CEEE38"}});
-    let mut lime = proposal(
-        eio_uid,
-        "noi.eio.color.palette.lime",
-        MeronType::Token,
-    );
+    let mut lime = proposal(eio_uid, "noi.eio.color.palette.lime", MeronType::Token);
     lime.classification.subtype = Some("color".into());
     lime.spec = lime_spec.clone();
     // A proposed invariant does not apply yet, so nothing could check lime's spec.
@@ -776,10 +789,7 @@ async fn verify_invariants(url: &str) {
         .await
         .unwrap_err()
         .to_string();
-    assert!(
-        refused.contains("noi.eio.color.palette.lime"),
-        "{refused}"
-    );
+    assert!(refused.contains("noi.eio.color.palette.lime"), "{refused}");
     assert_eq!(
         registry
             .get(&actor, "noi.eio.inv.color-token")
@@ -836,12 +846,7 @@ async fn verify_color_roles(url: &str) {
         .with_authorizer(Arc::new(
             LocalDevelopmentGrant::new(actor.subject.clone(), "noi".into()).unwrap(),
         ));
-    let eio_uid = registry
-        .get(&actor, "noi.eio")
-        .await
-        .unwrap()
-        .identity
-        .uid;
+    let eio_uid = registry.get(&actor, "noi.eio").await.unwrap().identity.uid;
     let token = |path: String, subtype: &str, spec: serde_json::Value| {
         let mut p = proposal(eio_uid, &path, MeronType::Token);
         p.classification.subtype = Some(subtype.into());
@@ -872,11 +877,7 @@ async fn verify_color_roles(url: &str) {
         .await
         .unwrap();
 
-    let mut invariant = proposal(
-        eio_uid,
-        "noi.eio.inv.color-role",
-        MeronType::Invariant,
-    );
+    let mut invariant = proposal(eio_uid, "noi.eio.inv.color-role", MeronType::Invariant);
     invariant.spec = json!({"applies_to":{"type":"token","subtype":"color-role"},
         "schema":{"type":"object","required":["light","dark"]},"checks":[{"name":"eio.unknown"}]});
     assert!(registry.propose(&actor, invariant.clone()).await.is_err());
@@ -1024,10 +1025,7 @@ async fn verify_color_roles(url: &str) {
         .await
         .unwrap_err()
         .to_string();
-    assert!(
-        refused.contains("noi.eio.color.text.primary"),
-        "{refused}"
-    );
+    assert!(refused.contains("noi.eio.color.text.primary"), "{refused}");
     // A role's links follow its references when it changes.
     let mut no_pairs = primary.clone();
     no_pairs.spec = refs("neutral-950", "white");
@@ -1067,12 +1065,7 @@ async fn verify_text_styles(url: &str) {
         .with_authorizer(Arc::new(
             LocalDevelopmentGrant::new(actor.subject.clone(), "noi".into()).unwrap(),
         ));
-    let eio_uid = registry
-        .get(&actor, "noi.eio")
-        .await
-        .unwrap()
-        .identity
-        .uid;
+    let eio_uid = registry.get(&actor, "noi.eio").await.unwrap().identity.uid;
     // The real proposal files, moved into this database's Eidos.
     let file = |name: &str| -> NewMeron {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1242,8 +1235,9 @@ async fn verify_text_styles(url: &str) {
         .unwrap_err()
         .to_string();
     assert!(
-        error.contains(&format!("{T}display (revision 2) would fail this invariant"))
-            && error.contains("at least 1.5 × size (54 px), not 48 px"),
+        error.contains(&format!(
+            "{T}display (revision 2) would fail this invariant"
+        )) && error.contains("at least 1.5 × size (54 px), not 48 px"),
         "{error}"
     );
     // A font a style no longer reads loses the link: the title drops its Devanagari fallback.
@@ -1288,12 +1282,7 @@ async fn verify_spacing(url: &str) {
         .with_authorizer(Arc::new(
             LocalDevelopmentGrant::new(actor.subject.clone(), "noi".into()).unwrap(),
         ));
-    let eio_uid = registry
-        .get(&actor, "noi.eio")
-        .await
-        .unwrap()
-        .identity
-        .uid;
+    let eio_uid = registry.get(&actor, "noi.eio").await.unwrap().identity.uid;
     let file = |name: &str| -> NewMeron {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../data/eio")
@@ -1492,12 +1481,7 @@ async fn verify_layout(url: &str) {
         .with_authorizer(Arc::new(
             LocalDevelopmentGrant::new(actor.subject.clone(), "noi".into()).unwrap(),
         ));
-    let eio_uid = registry
-        .get(&actor, "noi.eio")
-        .await
-        .unwrap()
-        .identity
-        .uid;
+    let eio_uid = registry.get(&actor, "noi.eio").await.unwrap().identity.uid;
     let file = |name: &str| -> NewMeron {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../data/eio")
@@ -1582,10 +1566,7 @@ async fn verify_layout(url: &str) {
     assert_eq!(depends_on(roles["margin.compact"]), HashSet::from([px16]));
     assert_eq!(depends_on(roles["gap.pane"]), HashSet::from([px24]));
     // The raised size limit cannot be lowered again while the content widths need it.
-    let size_invariant = registry
-        .get(&actor, "noi.eio.inv.size")
-        .await
-        .unwrap();
+    let size_invariant = registry.get(&actor, "noi.eio.inv.size").await.unwrap();
     let mut lowered = file("size-invariant.json");
     lowered.spec["schema"]["properties"]["px"]["maximum"] = json!(96);
     let error = registry
@@ -1620,12 +1601,7 @@ async fn verify_shape(url: &str) {
         .with_authorizer(Arc::new(
             LocalDevelopmentGrant::new(actor.subject.clone(), "noi".into()).unwrap(),
         ));
-    let eio_uid = registry
-        .get(&actor, "noi.eio")
-        .await
-        .unwrap()
-        .identity
-        .uid;
+    let eio_uid = registry.get(&actor, "noi.eio").await.unwrap().identity.uid;
     let file = |name: &str| -> NewMeron {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../data/eio")
@@ -1715,20 +1691,35 @@ async fn verify_shape(url: &str) {
 /// Review: proposals wait in batches; Mero holds only what a maintainer approved.
 async fn verify_review(url: &str) {
     const P: &str = "noi.eio.color.palette.";
-    let developer = Actor { subject: "test-developer".into() };
-    let bootstrap = Registry::connect(url).await.unwrap().with_authorizer(Arc::new(
-        LocalDevelopmentGrant::new(developer.subject.clone(), "noi".into()).unwrap(),
-    ));
+    let developer = Actor {
+        subject: "test-developer".into(),
+    };
+    let bootstrap = Registry::connect(url)
+        .await
+        .unwrap()
+        .with_authorizer(Arc::new(
+            LocalDevelopmentGrant::new(developer.subject.clone(), "noi".into()).unwrap(),
+        ));
     let root = bootstrap.get(&developer, "noi").await.unwrap().identity.uid;
     let eio = bootstrap.get(&developer, "noi.eio").await.unwrap();
     let eio_uid = eio.identity.uid;
-    let grant = |subject: &str, role| Grant { subject: subject.into(), scope: root, role };
+    let grant = |subject: &str, role| Grant {
+        subject: subject.into(),
+        scope: root,
+        role,
+    };
     let policy = GovernancePolicy {
         id: "GOV-001-review".into(),
         revision: 1,
         scopes: vec![
-            Scope { uid: root, parent: None },
-            Scope { uid: eio_uid, parent: Some(root) },
+            Scope {
+                uid: root,
+                parent: None,
+            },
+            Scope {
+                uid: eio_uid,
+                parent: Some(root),
+            },
         ],
         grants: vec![
             grant("design-agent", Role::Contributor),
@@ -1737,89 +1728,234 @@ async fn verify_review(url: &str) {
         ],
     };
     let registry = bootstrap.with_authorizer(Arc::new(ScopedAuthorizer::new(policy).unwrap()));
-    let agent = Actor { subject: "design-agent".into() };
-    let human = Actor { subject: "maintainer".into() };
-    let observer = Actor { subject: "observer".into() };
+    let agent = Actor {
+        subject: "design-agent".into(),
+    };
+    let human = Actor {
+        subject: "maintainer".into(),
+    };
+    let observer = Actor {
+        subject: "observer".into(),
+    };
     let token = |path: &str, subtype: &str, spec: serde_json::Value| {
         let mut p = proposal(eio_uid, path, MeronType::Token);
         p.classification.subtype = Some(subtype.into());
         p.spec = spec;
         p
     };
-    let grey = |l: f64, hex: &str| json!({"value":{"colorSpace":"oklch","components":[l,0,0],"hex":hex}});
+    let grey =
+        |l: f64, hex: &str| json!({"value":{"colorSpace":"oklch","components":[l,0,0],"hex":hex}});
     let role = |path: &str, color: &str| {
-        token(path, "color-role", json!({"light":{"ref":format!("{P}{color}")},"dark":{"ref":format!("{P}{color}")}}))
+        token(
+            path,
+            "color-role",
+            json!({"light":{"ref":format!("{P}{color}")},"dark":{"ref":format!("{P}{color}")}}),
+        )
     };
-    let add = |meron: NewMeron| Change::Add { meron, container: None };
-    let batch = |title: &str, changes: Vec<Change>| NewBatch { title: title.into(), note: Some("From the review test".into()), changes };
+    let add = |meron: NewMeron| Change::Add {
+        meron,
+        container: None,
+    };
+    let batch = |title: &str, changes: Vec<Change>| NewBatch {
+        title: title.into(),
+        note: Some("From the review test".into()),
+        changes,
+    };
 
     // Order inside a batch does not matter: the role comes before the color it reads.
     let first = registry
-        .propose_batch(&agent, batch("Ink", vec![
-            add(role("noi.eio.color.text.review-ink", "review-ink")),
-            add(token(&format!("{P}review-ink"), "color", grey(0.145, "#0A0A0A"))),
-        ]))
+        .propose_batch(
+            &agent,
+            batch(
+                "Ink",
+                vec![
+                    add(role("noi.eio.color.text.review-ink", "review-ink")),
+                    add(token(
+                        &format!("{P}review-ink"),
+                        "color",
+                        grey(0.145, "#0A0A0A"),
+                    )),
+                ],
+            ),
+        )
         .await
         .unwrap();
     assert_eq!(first.proposals.len(), 2);
-    assert!(first.proposals.iter().all(|p| p.outcome["ok"] == json!(true) && p.state == ProposalState::Waiting && !p.stale), "{:#?}", first.proposals);
+    assert!(
+        first
+            .proposals
+            .iter()
+            .all(|p| p.outcome["ok"] == json!(true)
+                && p.state == ProposalState::Waiting
+                && !p.stale),
+        "{:#?}",
+        first.proposals
+    );
     // The test run left nothing behind: Mero holds only what was approved.
-    assert!(matches!(registry.get(&human, &format!("{P}review-ink")).await, Err(Error::NotFound)));
-    assert!(matches!(registry.get(&human, "noi.eio.color.text.review-ink").await, Err(Error::NotFound)));
+    assert!(matches!(
+        registry.get(&human, &format!("{P}review-ink")).await,
+        Err(Error::NotFound)
+    ));
+    assert!(matches!(
+        registry.get(&human, "noi.eio.color.text.review-ink").await,
+        Err(Error::NotFound)
+    ));
     assert_eq!(first.events.len(), 1);
-    assert_eq!(first.events[0].note.as_deref(), Some("From the review test"));
+    assert_eq!(
+        first.events[0].note.as_deref(),
+        Some("From the review test")
+    );
 
     // Observers cannot propose; contributors cannot approve, not even their own work.
     assert!(matches!(
-        registry.propose_batch(&observer, batch("No", vec![add(token(&format!("{P}review-no"), "color", grey(0.5, "#636363")))])).await,
+        registry
+            .propose_batch(
+                &observer,
+                batch(
+                    "No",
+                    vec![add(token(
+                        &format!("{P}review-no"),
+                        "color",
+                        grey(0.5, "#636363")
+                    ))]
+                )
+            )
+            .await,
         Err(Error::Denied(_))
     ));
     assert!(registry.approve(&agent, &[first.uid]).await.is_err());
-    assert!(registry.send_back(&agent, first.proposals[0].uid, "no").await.is_err());
-    assert!(registry.review(&observer).await.unwrap().iter().any(|b| b.uid == first.uid));
+    assert!(registry
+        .send_back(&agent, first.proposals[0].uid, "no")
+        .await
+        .is_err());
+    assert!(registry
+        .review(&observer)
+        .await
+        .unwrap()
+        .iter()
+        .any(|b| b.uid == first.uid));
 
     // A failing change shows in the test run, and approving its batch changes nothing.
     let second = registry
-        .propose_batch(&agent, batch("Paper", vec![
-            add(token(&format!("{P}review-paper"), "color", grey(1.0, "#FFFFFF"))),
-            add(role("noi.eio.color.surface.review-paper", "missing")),
-        ]))
+        .propose_batch(
+            &agent,
+            batch(
+                "Paper",
+                vec![
+                    add(token(
+                        &format!("{P}review-paper"),
+                        "color",
+                        grey(1.0, "#FFFFFF"),
+                    )),
+                    add(role("noi.eio.color.surface.review-paper", "missing")),
+                ],
+            ),
+        )
         .await
         .unwrap();
     assert_eq!(second.proposals[0].outcome["ok"], json!(true));
     assert_eq!(second.proposals[1].outcome["ok"], json!(false));
-    let refused = registry.approve(&human, &[second.uid]).await.unwrap_err().to_string();
-    assert!(refused.contains("nothing was approved") && refused.contains("noi.eio.color.surface.review-paper"), "{refused}");
-    assert!(matches!(registry.get(&human, &format!("{P}review-paper")).await, Err(Error::NotFound)));
+    let refused = registry
+        .approve(&human, &[second.uid])
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        refused.contains("nothing was approved")
+            && refused.contains("noi.eio.color.surface.review-paper"),
+        "{refused}"
+    );
+    assert!(matches!(
+        registry.get(&human, &format!("{P}review-paper")).await,
+        Err(Error::NotFound)
+    ));
 
     // Send back with a note; only the proposer revises; the revision is checked again and waits.
     let bad = second.proposals[1].uid;
-    assert!(registry.send_back(&human, bad, "  ").await.is_err(), "a note is required");
-    let sent = registry.send_back(&human, bad, "Read Paper, not a missing color").await.unwrap();
+    assert!(
+        registry.send_back(&human, bad, "  ").await.is_err(),
+        "a note is required"
+    );
+    let sent = registry
+        .send_back(&human, bad, "Read Paper, not a missing color")
+        .await
+        .unwrap();
     assert_eq!(sent.state, ProposalState::SentBack);
-    assert!(registry.approve(&human, &[bad]).await.is_err(), "a sent-back proposal waits for its proposer");
+    assert!(
+        registry.approve(&human, &[bad]).await.is_err(),
+        "a sent-back proposal waits for its proposer"
+    );
     let fixed = add(role("noi.eio.color.surface.review-paper", "review-paper"));
-    assert!(matches!(registry.revise(&human, bad, fixed.clone(), None).await, Err(Error::Denied(_))));
-    let revised = registry.revise(&agent, bad, fixed, Some("Now reads Paper")).await.unwrap();
+    assert!(matches!(
+        registry.revise(&human, bad, fixed.clone(), None).await,
+        Err(Error::Denied(_))
+    ));
+    let revised = registry
+        .revise(&agent, bad, fixed, Some("Now reads Paper"))
+        .await
+        .unwrap();
     let again = revised.proposals.iter().find(|p| p.uid == bad).unwrap();
-    assert_eq!((again.state, again.revision, again.outcome["ok"].clone()), (ProposalState::Waiting, 2, json!(true)));
+    assert_eq!(
+        (again.state, again.revision, again.outcome["ok"].clone()),
+        (ProposalState::Waiting, 2, json!(true))
+    );
 
     // Approving runs it for real: added, filed under its system, registered and activated.
-    let approved = registry.approve(&human, &[second.uid, first.uid]).await.unwrap();
+    let approved = registry
+        .approve(&human, &[second.uid, first.uid])
+        .await
+        .unwrap();
     assert_eq!(approved.len(), 4);
-    assert!(approved.iter().all(|p| p.state == ProposalState::Approved && p.decided_by.as_deref() == Some("maintainer")));
-    let ink_role = registry.get(&human, "noi.eio.color.text.review-ink").await.unwrap();
+    assert!(approved.iter().all(
+        |p| p.state == ProposalState::Approved && p.decided_by.as_deref() == Some("maintainer")
+    ));
+    let ink_role = registry
+        .get(&human, "noi.eio.color.text.review-ink")
+        .await
+        .unwrap();
     assert_eq!(ink_role.lifecycle.state, MeronState::Active);
     let snapshot = registry.snapshot(&human).await.unwrap();
-    let ink = snapshot.merons.iter().find(|m| m.identity.path == format!("{P}review-ink")).unwrap();
-    assert!(snapshot.relationships.iter().any(|r| r.source == eio_uid && r.predicate == Predicate::Contains && r.target == ink.identity.uid));
-    assert!(snapshot.relationships.iter().any(|r| r.source == ink_role.identity.uid && r.predicate == Predicate::DependsOn && r.target == ink.identity.uid));
+    let ink = snapshot
+        .merons
+        .iter()
+        .find(|m| m.identity.path == format!("{P}review-ink"))
+        .unwrap();
+    assert!(snapshot.relationships.iter().any(|r| r.source == eio_uid
+        && r.predicate == Predicate::Contains
+        && r.target == ink.identity.uid));
+    assert!(snapshot
+        .relationships
+        .iter()
+        .any(|r| r.source == ink_role.identity.uid
+            && r.predicate == Predicate::DependsOn
+            && r.target == ink.identity.uid));
     // Mero's own history says who proposed and who admitted it.
-    let history = registry.history(&human, ink_role.identity.uid).await.unwrap();
-    let steps: Vec<(&str, &str)> = history.iter().filter(|e| e.meron_uid == ink_role.identity.uid).map(|e| (e.action.as_str(), e.actor.as_str())).collect();
+    let history = registry
+        .history(&human, ink_role.identity.uid)
+        .await
+        .unwrap();
+    let steps: Vec<(&str, &str)> = history
+        .iter()
+        .filter(|e| e.meron_uid == ink_role.identity.uid)
+        .map(|e| (e.action.as_str(), e.actor.as_str()))
+        .collect();
     // Registering it also records what it reads (depends-on Ink).
-    assert_eq!(steps, vec![("meron.propose", "design-agent"), ("relationship.add", "maintainer"), ("meron.transition", "maintainer"), ("meron.transition", "maintainer")]);
-    assert!(registry.approve(&human, &[first.proposals[0].uid]).await.is_err(), "approved is final");
+    assert_eq!(
+        steps,
+        vec![
+            ("meron.propose", "design-agent"),
+            ("relationship.add", "maintainer"),
+            ("meron.transition", "maintainer"),
+            ("meron.transition", "maintainer")
+        ]
+    );
+    assert!(
+        registry
+            .approve(&human, &[first.proposals[0].uid])
+            .await
+            .is_err(),
+        "approved is final"
+    );
 
     // Two changes to the same meron: once one is approved, the other is stale and cannot apply.
     let renamed = |definition: &str| {
@@ -1837,60 +1973,175 @@ async fn verify_review(url: &str) {
             },
         }
     };
-    let a = registry.propose_batch(&human, batch("Words A", vec![renamed("Ink for review tests")])).await.unwrap();
-    let b = registry.propose_batch(&agent, batch("Words B", vec![renamed("Ink, but other words")])).await.unwrap();
+    let a = registry
+        .propose_batch(
+            &human,
+            batch("Words A", vec![renamed("Ink for review tests")]),
+        )
+        .await
+        .unwrap();
+    let b = registry
+        .propose_batch(
+            &agent,
+            batch("Words B", vec![renamed("Ink, but other words")]),
+        )
+        .await
+        .unwrap();
     let approved_a = registry.approve(&human, &[a.uid]).await.unwrap();
     // The record keeps the meron as it was, so the change still reads as a change afterwards.
-    assert_eq!(approved_a[0].outcome["before"]["semantics"]["definition"], json!(ink.semantics.definition));
-    assert_eq!(approved_a[0].outcome["meron"]["semantics"]["definition"], json!("Ink for review tests"));
-    let b = registry.review(&human).await.unwrap().into_iter().find(|x| x.uid == b.uid).unwrap();
+    assert_eq!(
+        approved_a[0].outcome["before"]["semantics"]["definition"],
+        json!(ink.semantics.definition)
+    );
+    assert_eq!(
+        approved_a[0].outcome["meron"]["semantics"]["definition"],
+        json!("Ink for review tests")
+    );
+    let b = registry
+        .review(&human)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|x| x.uid == b.uid)
+        .unwrap();
     assert!(b.proposals[0].stale);
-    assert!(registry.approve(&human, &[b.uid]).await.unwrap_err().to_string().contains("revision conflict"));
-    let closed = registry.reject(&human, b.proposals[0].uid, "Superseded by Words A").await.unwrap();
+    assert!(registry
+        .approve(&human, &[b.uid])
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("revision conflict"));
+    let closed = registry
+        .reject(&human, b.proposals[0].uid, "Superseded by Words A")
+        .await
+        .unwrap();
     assert_eq!(closed.state, ProposalState::Rejected);
-    assert!(registry.reject(&human, b.proposals[0].uid, "again").await.is_err(), "rejected is final");
-    assert_eq!(registry.get(&human, &format!("{P}review-ink")).await.unwrap().semantics.definition, "Ink for review tests");
+    assert!(
+        registry
+            .reject(&human, b.proposals[0].uid, "again")
+            .await
+            .is_err(),
+        "rejected is final"
+    );
+    assert_eq!(
+        registry
+            .get(&human, &format!("{P}review-ink"))
+            .await
+            .unwrap()
+            .semantics
+            .definition,
+        "Ink for review tests"
+    );
 
     // Nothing is deleted, and decided proposals cannot be edited, even with direct SQL.
     let mut sql = PgConnection::connect(url).await.unwrap();
-    assert!(sql.execute("DELETE FROM mer.proposal_events").await.is_err());
-    assert!(sql.execute(format!("UPDATE mer.proposals SET state='waiting' WHERE uid='{}'", b.proposals[0].uid).as_str()).await.is_err());
-    let actions: Vec<String> = sqlx::query_scalar("SELECT action FROM mer.proposal_events WHERE batch=$1 ORDER BY sequence")
-        .bind(second.uid).fetch_all(&mut sql).await.unwrap();
-    assert_eq!(actions, ["proposal.submit", "proposal.send-back", "proposal.revise", "proposal.approve", "proposal.approve"]);
+    assert!(sql
+        .execute("DELETE FROM mer.proposal_events")
+        .await
+        .is_err());
+    assert!(sql
+        .execute(
+            format!(
+                "UPDATE mer.proposals SET state='waiting' WHERE uid='{}'",
+                b.proposals[0].uid
+            )
+            .as_str()
+        )
+        .await
+        .is_err());
+    let actions: Vec<String> = sqlx::query_scalar(
+        "SELECT action FROM mer.proposal_events WHERE batch=$1 ORDER BY sequence",
+    )
+    .bind(second.uid)
+    .fetch_all(&mut sql)
+    .await
+    .unwrap();
+    assert_eq!(
+        actions,
+        [
+            "proposal.submit",
+            "proposal.send-back",
+            "proposal.revise",
+            "proposal.approve",
+            "proposal.approve"
+        ]
+    );
 }
 
 /// Governance's roles and rules come in through Review, checked as Cedar against the actions each
 /// system declares.
 async fn verify_governance(url: &str) {
-    let developer = Actor { subject: "test-developer".into() };
-    let bootstrap = Registry::connect(url).await.unwrap().with_authorizer(Arc::new(
-        LocalDevelopmentGrant::new(developer.subject.clone(), "noi".into()).unwrap(),
-    ));
+    let developer = Actor {
+        subject: "test-developer".into(),
+    };
+    let bootstrap = Registry::connect(url)
+        .await
+        .unwrap()
+        .with_authorizer(Arc::new(
+            LocalDevelopmentGrant::new(developer.subject.clone(), "noi".into()).unwrap(),
+        ));
     let root = bootstrap.get(&developer, "noi").await.unwrap().identity.uid;
-    let gov = bootstrap.get(&developer, "noi.gov").await.unwrap().identity.uid;
-    let grant = |subject: &str, role| Grant { subject: subject.into(), scope: root, role };
+    let gov = bootstrap
+        .get(&developer, "noi.gov")
+        .await
+        .unwrap()
+        .identity
+        .uid;
+    let grant = |subject: &str, role| Grant {
+        subject: subject.into(),
+        scope: root,
+        role,
+    };
     let policy = GovernancePolicy {
         id: "GOV-001-governance".into(),
         revision: 1,
-        scopes: vec![Scope { uid: root, parent: None }, Scope { uid: gov, parent: Some(root) }],
-        grants: vec![grant("design-agent", Role::Contributor), grant("maintainer", Role::Maintainer)],
+        scopes: vec![
+            Scope {
+                uid: root,
+                parent: None,
+            },
+            Scope {
+                uid: gov,
+                parent: Some(root),
+            },
+        ],
+        grants: vec![
+            grant("design-agent", Role::Contributor),
+            grant("maintainer", Role::Maintainer),
+        ],
     };
     let registry = bootstrap.with_authorizer(Arc::new(ScopedAuthorizer::new(policy).unwrap()));
-    let agent = Actor { subject: "design-agent".into() };
-    let human = Actor { subject: "maintainer".into() };
+    let agent = Actor {
+        subject: "design-agent".into(),
+    };
+    let human = Actor {
+        subject: "maintainer".into(),
+    };
     let file = |name: &str| -> NewMeron {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/gov").join(name);
-        let mut m: NewMeron = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data/gov")
+            .join(name);
+        let mut m: NewMeron =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         m.authority_scope = Some(gov);
         m
     };
-    let add = |meron: NewMeron| Change::Add { meron, container: None };
-    let batch = |title: &str, changes: Vec<Change>| NewBatch { title: title.into(), note: None, changes };
+    let add = |meron: NewMeron| Change::Add {
+        meron,
+        container: None,
+    };
+    let batch = |title: &str, changes: Vec<Change>| NewBatch {
+        title: title.into(),
+        note: None,
+        changes,
+    };
     let names = [
-        "role-invariant.json", "rule-invariant.json",
-        "roles/maintainer.json", "roles/owner.json",
-        "rules/fresh-touch.json", "rules/owners-approve-gov.json",
+        "role-invariant.json",
+        "rule-invariant.json",
+        "roles/maintainer.json",
+        "roles/owner.json",
+        "rules/fresh-touch.json",
+        "rules/owners-approve-gov.json",
     ];
     // The roles come before their invariant in the batch; order does not matter.
     let mut changes: Vec<Change> = names.iter().rev().map(|n| add(file(n))).collect();
@@ -1903,7 +2154,10 @@ async fn verify_governance(url: &str) {
     blank.spec["cedar"] = json!("forbid (principal == ?principal, action, resource);");
     changes.push(add(stray));
     changes.push(add(blank));
-    let sent = registry.propose_batch(&agent, batch("Governance roles and rules", changes)).await.unwrap();
+    let sent = registry
+        .propose_batch(&agent, batch("Governance roles and rules", changes))
+        .await
+        .unwrap();
     let outcome = |path: &str| {
         sent.proposals
             .iter()
@@ -1916,33 +2170,75 @@ async fn verify_governance(url: &str) {
         assert_eq!(p.outcome["ok"], json!(true), "{:#?}", p);
     }
     let stray = outcome("noi.gov.roles.stray");
-    assert!(stray["error"].as_str().unwrap().contains(r#"Action::"governance" is not an action mero declares"#), "{stray}");
+    assert!(
+        stray["error"]
+            .as_str()
+            .unwrap()
+            .contains(r#"Action::"governance" is not an action mero declares"#),
+        "{stray}"
+    );
     let blank = outcome("noi.gov.rules.blank");
-    assert!(blank["error"].as_str().unwrap().contains("is a role"), "{blank}");
-    assert!(registry.approve(&human, &[sent.uid]).await.is_err(), "nothing is approved while two fail");
+    assert!(
+        blank["error"].as_str().unwrap().contains("is a role"),
+        "{blank}"
+    );
+    assert!(
+        registry.approve(&human, &[sent.uid]).await.is_err(),
+        "nothing is approved while two fail"
+    );
     for p in &sent.proposals[names.len()..] {
-        registry.reject(&human, p.uid, "Not a role or rule we agreed").await.unwrap();
+        registry
+            .reject(&human, p.uid, "Not a role or rule we agreed")
+            .await
+            .unwrap();
     }
     let approved = registry.approve(&human, &[sent.uid]).await.unwrap();
     assert_eq!(approved.len(), names.len());
     // The whole test database spans scopes this policy does not list, so read it as the developer.
-    let reader = Registry::connect(url).await.unwrap().with_authorizer(Arc::new(
-        LocalDevelopmentGrant::new(developer.subject.clone(), "noi".into()).unwrap(),
-    ));
+    let reader = Registry::connect(url)
+        .await
+        .unwrap()
+        .with_authorizer(Arc::new(
+            LocalDevelopmentGrant::new(developer.subject.clone(), "noi".into()).unwrap(),
+        ));
     let snapshot = reader.snapshot(&developer).await.unwrap();
     for path in [
-        "noi.gov.inv.role", "noi.gov.inv.rule",
-        "noi.gov.roles.maintainer", "noi.gov.roles.owner",
-        "noi.gov.rules.fresh-touch", "noi.gov.rules.owners-approve-gov",
+        "noi.gov.inv.role",
+        "noi.gov.inv.rule",
+        "noi.gov.roles.maintainer",
+        "noi.gov.roles.owner",
+        "noi.gov.rules.fresh-touch",
+        "noi.gov.rules.owners-approve-gov",
     ] {
-        let m = snapshot.merons.iter().find(|m| m.identity.path == path).unwrap_or_else(|| panic!("{path}"));
+        let m = snapshot
+            .merons
+            .iter()
+            .find(|m| m.identity.path == path)
+            .unwrap_or_else(|| panic!("{path}"));
         assert_eq!(m.lifecycle.state, MeronState::Active, "{path}");
-        assert!(snapshot.relationships.iter().any(|r| r.source == gov && r.predicate == Predicate::Contains && r.target == m.identity.uid), "{path}");
+        assert!(
+            snapshot.relationships.iter().any(|r| r.source == gov
+                && r.predicate == Predicate::Contains
+                && r.target == m.identity.uid),
+            "{path}"
+        );
     }
     // Once admitted, the role invariant refuses a role naming an action nobody declares.
     let mut unknown = file("roles/maintainer.json");
     unknown.path = "noi.gov.roles.unknown".into();
-    unknown.spec["cedar"] = json!(r#"permit (principal == ?principal, action == Action::"delete", resource in ?resource);"#);
-    let later = registry.propose_batch(&agent, batch("Unknown action", vec![add(unknown)])).await.unwrap();
-    assert!(later.proposals[0].outcome["error"].as_str().unwrap().contains("noi.gov.inv.role"), "{:#?}", later.proposals[0]);
+    unknown.spec["cedar"] = json!(
+        r#"permit (principal == ?principal, action == Action::"delete", resource in ?resource);"#
+    );
+    let later = registry
+        .propose_batch(&agent, batch("Unknown action", vec![add(unknown)]))
+        .await
+        .unwrap();
+    assert!(
+        later.proposals[0].outcome["error"]
+            .as_str()
+            .unwrap()
+            .contains("noi.gov.inv.role"),
+        "{:#?}",
+        later.proposals[0]
+    );
 }

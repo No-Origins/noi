@@ -41,7 +41,9 @@ pub fn init() {
     let _ = install(subscriber(&filter, json, std::io::stderr));
 }
 
-fn install(s: Box<dyn tracing::Subscriber + Send + Sync>) -> Result<(), tracing::subscriber::SetGlobalDefaultError> {
+fn install(
+    s: Box<dyn tracing::Subscriber + Send + Sync>,
+) -> Result<(), tracing::subscriber::SetGlobalDefaultError> {
     tracing::subscriber::set_global_default(s)
 }
 
@@ -51,9 +53,18 @@ where
     W: for<'a> MakeWriter<'a> + Send + Sync + 'static,
 {
     let filter = EnvFilter::try_new(filter).unwrap_or_else(|_| EnvFilter::new(DEFAULT_FILTER));
-    let fmt = tracing_subscriber::fmt().with_env_filter(filter).with_writer(writer).with_ansi(false).with_target(false);
+    let fmt = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(writer)
+        .with_ansi(false)
+        .with_target(false);
     if json {
-        Box::new(fmt.json().with_current_span(true).with_span_list(false).finish())
+        Box::new(
+            fmt.json()
+                .with_current_span(true)
+                .with_span_list(false)
+                .finish(),
+        )
     } else {
         Box::new(fmt.finish())
     }
@@ -61,13 +72,25 @@ where
 
 /// Logs every request this router answers, refusals included.
 pub fn around(service: &'static str, router: Router) -> Router {
-    router.layer(middleware::from_fn_with_state(Logged { service, report: None }, log_request))
+    router.layer(middleware::from_fn_with_state(
+        Logged {
+            service,
+            report: None,
+        },
+        log_request,
+    ))
 }
 
 /// As `around`, and every failure (an answer of 500 or more, health checks aside) is also handed to
 /// `report`, which keeps it where owners see it: the Problems page (agreed 8 Nov).
 pub fn around_reporting(service: &'static str, router: Router, report: Report) -> Router {
-    router.layer(middleware::from_fn_with_state(Logged { service, report: Some(report) }, log_request))
+    router.layer(middleware::from_fn_with_state(
+        Logged {
+            service,
+            report: Some(report),
+        },
+        log_request,
+    ))
 }
 
 /// A failure, with the request it was: never a header, a body, a query or a token.
@@ -142,16 +165,32 @@ async fn log_request(State(logged): State<Logged>, mut request: Request, next: N
         if let Ok(v) = HeaderValue::from_str(&id) {
             response.headers_mut().insert(REQUEST_ID, v);
         }
-        let (status, ms) = (response.status().as_u16(), started.elapsed().as_millis() as u64);
+        let (status, ms) = (
+            response.status().as_u16(),
+            started.elapsed().as_millis() as u64,
+        );
         if health && status < 500 {
             tracing::debug!(status, ms, "answered");
         } else if status >= 500 {
-            let what = response.extensions().get::<Why>().map(|w| w.0.clone()).unwrap_or_else(|| {
-                format!("answered {status} {}", response.status().canonical_reason().unwrap_or(""))
-            });
+            let what = response
+                .extensions()
+                .get::<Why>()
+                .map(|w| w.0.clone())
+                .unwrap_or_else(|| {
+                    format!(
+                        "answered {status} {}",
+                        response.status().canonical_reason().unwrap_or("")
+                    )
+                });
             tracing::error!(status, ms, what = %what, "failed");
             if let (Some(report), false) = (&logged.report, health) {
-                report(Problem { request_id: id.clone(), method, path, status, what: what.chars().take(1000).collect() });
+                report(Problem {
+                    request_id: id.clone(),
+                    method,
+                    path,
+                    status,
+                    what: what.chars().take(1000).collect(),
+                });
             }
         } else {
             tracing::info!(status, ms, "answered");
@@ -236,7 +275,10 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let response = app.clone().oneshot(request).await.unwrap();
-        assert!(response.headers().get(&REQUEST_ID).is_some(), "the answer names its request");
+        assert!(
+            response.headers().get(&REQUEST_ID).is_some(),
+            "the answer names its request"
+        );
         let request = Request::builder()
             .uri("/api/registry")
             .header("x-request-id", "from-mero-1234")
@@ -244,15 +286,36 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let response = app.oneshot(request).await.unwrap();
-        assert_eq!(response.headers().get(&REQUEST_ID).unwrap(), "from-mero-1234", "a caller's ID is kept");
+        assert_eq!(
+            response.headers().get(&REQUEST_ID).unwrap(),
+            "from-mero-1234",
+            "a caller's ID is kept"
+        );
 
         let text = lines.text();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 3, "{text}");
-        assert!(lines[0].contains(r#"service="mero""#) && lines[0].contains("method=GET") && lines[0].contains("path=/link/…") && lines[0].contains("status=200"), "{}", lines[0]);
+        assert!(
+            lines[0].contains(r#"service="mero""#)
+                && lines[0].contains("method=GET")
+                && lines[0].contains("path=/link/…")
+                && lines[0].contains("status=200"),
+            "{}",
+            lines[0]
+        );
         // A decision during the request, and the request's own line, both carry its ID and who asked.
-        assert!(lines[1].contains("id=from-mero-1234") && lines[1].contains(r#"who="hiddenstack""#) && lines[1].contains("may"), "{}", lines[1]);
-        assert!(lines[2].contains("id=from-mero-1234") && lines[2].contains("status=403"), "{}", lines[2]);
+        assert!(
+            lines[1].contains("id=from-mero-1234")
+                && lines[1].contains(r#"who="hiddenstack""#)
+                && lines[1].contains("may"),
+            "{}",
+            lines[1]
+        );
+        assert!(
+            lines[2].contains("id=from-mero-1234") && lines[2].contains("status=403"),
+            "{}",
+            lines[2]
+        );
         assert!(!text.contains("SECRET"), "a secret reached the log: {text}");
     }
 
@@ -260,8 +323,17 @@ mod tests {
     async fn json_lines_for_a_host() {
         let lines = Lines::default();
         let _quiet = tracing::subscriber::set_default(subscriber("info", true, lines.clone()));
-        around("governance", app()).oneshot(Request::builder().uri("/link/x").body(Body::empty()).unwrap()).await.unwrap();
-        let v: serde_json::Value = serde_json::from_str(lines.text().lines().next().unwrap()).unwrap();
+        around("governance", app())
+            .oneshot(
+                Request::builder()
+                    .uri("/link/x")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(lines.text().lines().next().unwrap()).unwrap();
         assert_eq!(v["span"]["service"], "governance");
         assert_eq!(v["fields"]["status"], 200);
         assert!(v["span"]["id"].as_str().is_some_and(|id| id.len() == 36));
@@ -271,7 +343,15 @@ mod tests {
     async fn a_hosts_health_checks_stay_out_of_the_log() {
         let lines = Lines::default();
         let _quiet = tracing::subscriber::set_default(subscriber("info", false, lines.clone()));
-        let response = around("mero", app()).oneshot(Request::builder().uri("/health/alive").body(Body::empty()).unwrap()).await.unwrap();
+        let response = around("mero", app())
+            .oneshot(
+                Request::builder()
+                    .uri("/health/alive")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(lines.text(), "", "a health check at info");
     }
@@ -282,33 +362,63 @@ mod tests {
         let keep = got.clone();
         let report: Report = Arc::new(move |p| keep.lock().unwrap().push(p));
         let app = Router::new()
-            .route("/api/fails/{token}", get(|| async {
-                let mut r = axum::response::IntoResponse::into_response((StatusCode::SERVICE_UNAVAILABLE, "Mero could not answer"));
-                r.extensions_mut().insert(Why("database: pool timed out".into()));
-                r
-            }))
-            .route("/health/ready", get(|| async { StatusCode::SERVICE_UNAVAILABLE }))
+            .route(
+                "/api/fails/{token}",
+                get(|| async {
+                    let mut r = axum::response::IntoResponse::into_response((
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "Mero could not answer",
+                    ));
+                    r.extensions_mut()
+                        .insert(Why("database: pool timed out".into()));
+                    r
+                }),
+            )
+            .route(
+                "/health/ready",
+                get(|| async { StatusCode::SERVICE_UNAVAILABLE }),
+            )
             .route("/fine", get(|| async { "ok" }));
         let app = around_reporting("mero", app, report);
         let _quiet = tracing::subscriber::set_default(subscriber("off", false, Lines::default()));
         for uri in ["/api/fails/SECRET?q=SECRET", "/health/ready", "/fine"] {
-            app.clone().oneshot(Request::builder().uri(uri).header("x-request-id", "req-1").body(Body::empty()).unwrap()).await.unwrap();
+            app.clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .header("x-request-id", "req-1")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
         }
         let got = got.lock().unwrap().clone();
-        assert_eq!(got, vec![Problem {
-            request_id: "req-1".into(),
-            method: "GET".into(),
-            path: "/api/fails/SECRET".into(),
-            status: 503,
-            what: "database: pool timed out".into(),
-        }]);
+        assert_eq!(
+            got,
+            vec![Problem {
+                request_id: "req-1".into(),
+                method: "GET".into(),
+                path: "/api/fails/SECRET".into(),
+                status: 503,
+                what: "database: pool timed out".into(),
+            }]
+        );
     }
 
     #[tokio::test]
     async fn noi_log_sets_how_much() {
         let lines = Lines::default();
         let _quiet = tracing::subscriber::set_default(subscriber("warn", false, lines.clone()));
-        around("mero", app()).oneshot(Request::builder().uri("/link/x").body(Body::empty()).unwrap()).await.unwrap();
+        around("mero", app())
+            .oneshot(
+                Request::builder()
+                    .uri("/link/x")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(lines.text(), "", "nothing below a warning");
     }
 }

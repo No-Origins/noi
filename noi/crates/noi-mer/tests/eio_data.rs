@@ -1,9 +1,11 @@
 //! The Eidos proposal files in `data/eio` pass their invariants before anyone proposes them.
 //! No database: invariants and checks run directly on the files.
+use noi_eio::{
+    export_tokens, FontSpec, Oklch, Resolved, RoleSpec, SizeSpec, TokenSource, TypeResolved,
+};
+use noi_inv::{InvariantSpec, NewMeron};
 use serde_json::{json, Value};
 use std::{collections::HashMap, fs, path::Path};
-use noi_inv::{InvariantSpec, NewMeron};
-use noi_eio::{export_tokens, FontSpec, Oklch, Resolved, RoleSpec, SizeSpec, TokenSource, TypeResolved};
 
 fn data(dir: &str) -> Vec<NewMeron> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -32,8 +34,7 @@ fn invariant(file: &str) -> InvariantSpec {
 fn eio_palette_and_roles_pass_their_invariants() {
     let token = invariant("color-token-invariant.json");
     let role = invariant("color-role-invariant.json");
-    let lime: NewMeron =
-        serde_json::from_str(include_str!("../../../data/eio/lime.json")).unwrap();
+    let lime: NewMeron = serde_json::from_str(include_str!("../../../data/eio/lime.json")).unwrap();
     let mut palette = data("palette");
     palette.push(lime);
     let mut colors = HashMap::new();
@@ -52,7 +53,11 @@ fn eio_palette_and_roles_pass_their_invariants() {
             Oklch::from_palette_spec(&color.spec).unwrap(),
         );
     }
-    assert_eq!(colors.len(), 17, "lime, violet, 9 greys and 6 status colors");
+    assert_eq!(
+        colors.len(),
+        17,
+        "lime, violet, 9 greys and 6 status colors"
+    );
 
     let roles = data("roles");
     assert_eq!(roles.len(), 19);
@@ -252,7 +257,9 @@ fn eio_motion_passes_its_invariants() {
     for d in &durations {
         d.validate().unwrap();
         assert!(duration.applies_to.covers(&d.classification), "{}", d.path);
-        duration.check(&d.spec).unwrap_or_else(|e| panic!("{}: {e}", d.path));
+        duration
+            .check(&d.spec)
+            .unwrap_or_else(|e| panic!("{}: {e}", d.path));
         found.push(d.spec["ms"].as_i64().unwrap());
     }
     found.sort();
@@ -262,20 +269,38 @@ fn eio_motion_passes_its_invariants() {
     for c in &curves {
         c.validate().unwrap();
         assert!(easing.applies_to.covers(&c.classification), "{}", c.path);
-        easing.check(&c.spec).unwrap_or_else(|e| panic!("{}: {e}", c.path));
+        easing
+            .check(&c.spec)
+            .unwrap_or_else(|e| panic!("{}: {e}", c.path));
     }
     // What the schemas refuse: longer than 300 ms, off the 50 ms step, a curve that overshoots.
     assert!(duration.check(&json!({"ms": 400})).is_err());
     assert!(duration.check(&json!({"ms": 120})).is_err());
     assert!(duration.check(&json!({"ms": 0})).is_err());
-    assert!(easing.check(&json!({"bezier": [0.3, 1.4, 0.6, 1]})).is_err());
+    assert!(easing
+        .check(&json!({"bezier": [0.3, 1.4, 0.6, 1]}))
+        .is_err());
     assert!(easing.check(&json!({"bezier": [0.2, 0, 1]})).is_err());
 }
 
 #[test]
 fn eio_files_export_to_tokens() {
     let mut merons = vec![];
-    for dir in ["palette", "roles", "type/fonts", "type/sizes", "type/styles", "space/scale", "space/roles", "size", "layout/window", "radius", "border", "motion/duration", "motion/easing"] {
+    for dir in [
+        "palette",
+        "roles",
+        "type/fonts",
+        "type/sizes",
+        "type/styles",
+        "space/scale",
+        "space/roles",
+        "size",
+        "layout/window",
+        "radius",
+        "border",
+        "motion/duration",
+        "motion/easing",
+    ] {
         merons.extend(data(dir));
     }
     let lime = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/eio/lime.json");
@@ -289,13 +314,22 @@ fn eio_files_export_to_tokens() {
         })
         .collect();
     let files = export_tokens(&sources).unwrap();
-    assert_eq!(files.css.matches("--eio-color-").count(), 19 * 4, "every role: the default, the system dark, and both chosen themes");
+    assert_eq!(
+        files.css.matches("--eio-color-").count(),
+        19 * 4,
+        "every role: the default, the system dark, and both chosen themes"
+    );
     assert_eq!(files.css.matches(".eio-type-style-").count(), 8);
     let tree: Value = serde_json::from_str(&files.json).unwrap();
     assert_eq!(tree["color"]["palette"].as_object().unwrap().len(), 17);
     assert_eq!(tree["layout"]["window"].as_object().unwrap().len(), 3);
-    assert_eq!(tree["color"]["text"]["danger"], json!({"light": "#E7000B", "dark": "#FF6467"}));
+    assert_eq!(
+        tree["color"]["text"]["danger"],
+        json!({"light": "#E7000B", "dark": "#FF6467"})
+    );
     assert!(files.css.contains("  --eio-motion-duration-ms300: 300ms;"));
-    assert!(files.css.contains("  --eio-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);"));
+    assert!(files
+        .css
+        .contains("  --eio-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);"));
     assert_eq!(tree["motion"]["easing"]["standard"], json!([0.2, 0, 0, 1]));
 }

@@ -89,25 +89,34 @@ pub type RoleForm = Doing;
 
 /// Each system and the verbs it declares, for the form's checkboxes.
 pub fn verbs() -> Vec<(&'static str, Vec<&'static str>)> {
-    SYSTEMS.iter().map(|s| (*s, declared(s).unwrap_or_default())).collect()
+    SYSTEMS
+        .iter()
+        .map(|s| (*s, declared(s).unwrap_or_default()))
+        .collect()
 }
 
 fn system_of(verb: &str) -> Option<&'static str> {
-    SYSTEMS.into_iter().find(|s| declared(s).is_some_and(|v| v.contains(&verb)))
+    SYSTEMS
+        .into_iter()
+        .find(|s| declared(s).is_some_and(|v| v.contains(&verb)))
 }
 
 /// A role's, place's or account's name goes inside Cedar quotes, so only plain names pass.
 fn plain(what: &str, name: &str) -> Result<(), String> {
     let ok = !name.is_empty()
         && name.len() <= 200
-        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '-')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '-')
         && !name.starts_with(['.', '-'])
         && !name.ends_with('.')
         && !name.contains("..");
     if ok {
         Ok(())
     } else {
-        Err(format!("{what} \"{name}\" is not a plain name: lowercase letters, digits, dots and dashes"))
+        Err(format!(
+            "{what} \"{name}\" is not a plain name: lowercase letters, digits, dots and dashes"
+        ))
     }
 }
 
@@ -119,8 +128,13 @@ fn actions(doing: &[Doing], role: bool) -> Result<(Vec<String>, Vec<String>), St
     }
     let (mut entries, mut excepted) = (vec![], vec![]);
     for (i, d) in doing.iter().enumerate() {
-        let declared = declared(&d.system)
-            .ok_or_else(|| format!("{} is not a system that declares actions; use {}", d.system, SYSTEMS.join(" or ")))?;
+        let declared = declared(&d.system).ok_or_else(|| {
+            format!(
+                "{} is not a system that declares actions; use {}",
+                d.system,
+                SYSTEMS.join(" or ")
+            )
+        })?;
         if doing[..i].iter().any(|e| e.system == d.system) {
             return Err(format!("{} appears twice; pick its actions once", d.system));
         }
@@ -143,14 +157,20 @@ fn actions(doing: &[Doing], role: bool) -> Result<(Vec<String>, Vec<String>), St
                     }
                 }
                 if except.len() >= declared.len() {
-                    return Err(format!("every {} action is excepted, so nothing is left", d.system));
+                    return Err(format!(
+                        "every {} action is excepted, so nothing is left",
+                        d.system
+                    ));
                 }
                 entries.push(d.system.clone());
                 excepted.extend(except.iter().cloned());
             }
             Pick::These { verbs } => {
                 if verbs.is_empty() {
-                    return Err(format!("tick at least one {} action, or leave {} out", d.system, d.system));
+                    return Err(format!(
+                        "tick at least one {} action, or leave {} out",
+                        d.system, d.system
+                    ));
                 }
                 for (j, v) in verbs.iter().enumerate() {
                     known(v)?;
@@ -171,7 +191,13 @@ fn action_scope(entries: &[String]) -> String {
     match entries {
         [one] if SYSTEMS.contains(&one.as_str()) => format!("action in {}", quoted(one)),
         [one] => format!("action == {}", quoted(one)),
-        many => format!("action in [{}]", many.iter().map(quoted).collect::<Vec<_>>().join(",\n             ")),
+        many => format!(
+            "action in [{}]",
+            many.iter()
+                .map(quoted)
+                .collect::<Vec<_>>()
+                .join(",\n             ")
+        ),
     }
 }
 
@@ -209,13 +235,24 @@ pub fn write_rule(form: &RuleForm) -> Result<String, String> {
             }
         });
     }
-    conditions.extend(excepted.iter().map(|v| format!("action == Action::\"{v}\"")));
+    conditions.extend(
+        excepted
+            .iter()
+            .map(|v| format!("action == Action::\"{v}\"")),
+    );
     let effect = match form.effect {
         Effect::Forbid => "forbid",
         Effect::Permit => "permit",
     };
-    let unless = if conditions.is_empty() { String::new() } else { format!(" unless {{ {} }}", conditions.join(" || ")) };
-    let cedar = format!("{effect} (\n  {principal},\n  {},\n  {resource}\n){unless};", action_scope(&entries));
+    let unless = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!(" unless {{ {} }}", conditions.join(" || "))
+    };
+    let cedar = format!(
+        "{effect} (\n  {principal},\n  {},\n  {resource}\n){unless};",
+        action_scope(&entries)
+    );
     check_rule(&json!({ "cedar": cedar }))?;
     Ok(cedar)
 }
@@ -223,7 +260,10 @@ pub fn write_rule(form: &RuleForm) -> Result<String, String> {
 /// The Cedar for a role, checked as Mero checks roles.
 pub fn write_role(form: &RoleForm) -> Result<String, String> {
     let (entries, _) = actions(std::slice::from_ref(form), true)?;
-    let cedar = format!("permit (\n  principal == ?principal,\n  {},\n  resource in ?resource\n);", action_scope(&entries));
+    let cedar = format!(
+        "permit (\n  principal == ?principal,\n  {},\n  resource in ?resource\n);",
+        action_scope(&entries)
+    );
     check_role(&json!({ "system": form.system, "cedar": cedar }))?;
     Ok(cedar)
 }
@@ -240,11 +280,17 @@ fn named_actions(est: &Value) -> Result<Vec<String>, String> {
     let list: Vec<&Value> = match (a["op"].as_str(), a.get("entity"), a.get("entities")) {
         (Some("==" | "in"), Some(e), _) => vec![e],
         (Some("in"), _, Some(Value::Array(es))) => es.iter().collect(),
-        (Some("All"), ..) => return Err("it names no actions, so it is about every action there is".into()),
+        (Some("All"), ..) => {
+            return Err("it names no actions, so it is about every action there is".into())
+        }
         _ => return Err("its actions are not a plain list".into()),
     };
     list.into_iter()
-        .map(|e| entity(e, "Action").map(String::from).ok_or_else(|| "it names something other than an action".to_string()))
+        .map(|e| {
+            entity(e, "Action")
+                .map(String::from)
+                .ok_or_else(|| "it names something other than an action".to_string())
+        })
         .collect()
 }
 
@@ -267,9 +313,16 @@ fn canonical(mut est: Value) -> Value {
         if let Some(Value::Array(es)) = a.get("entities").cloned() {
             let mut es = es;
             es.sort_by_key(|e| e.to_string());
-            *a = if es.len() == 1 { json!({"op": "in", "entity": es[0]}) } else { json!({"op": "in", "entities": es}) };
+            *a = if es.len() == 1 {
+                json!({"op": "in", "entity": es[0]})
+            } else {
+                json!({"op": "in", "entities": es})
+            };
         }
-        let leaf = a.get("entity").and_then(|e| entity(e, "Action")).is_some_and(|id| !SYSTEMS.contains(&id));
+        let leaf = a
+            .get("entity")
+            .and_then(|e| entity(e, "Action"))
+            .is_some_and(|id| !SYSTEMS.contains(&id));
         if a["op"] == "in" && leaf {
             a["op"] = json!("==");
         }
@@ -286,7 +339,8 @@ fn canonical(mut est: Value) -> Value {
 }
 
 fn est_of_policy(cedar: &str) -> Result<Value, String> {
-    let policy = Policy::parse(Some(PolicyId::new("rule")), cedar).map_err(|e| format!("it is not one Cedar policy: {e}"))?;
+    let policy = Policy::parse(Some(PolicyId::new("rule")), cedar)
+        .map_err(|e| format!("it is not one Cedar policy: {e}"))?;
     policy.to_json().map_err(|e| e.to_string())
 }
 
@@ -296,7 +350,10 @@ pub fn read_rule(cedar: &str) -> Result<RuleForm, String> {
         return Err("it has blanks, like a role".into());
     }
     let est = est_of_policy(cedar)?;
-    if est.get("annotations").is_some_and(|a| a.as_object().is_some_and(|o| !o.is_empty())) {
+    if est
+        .get("annotations")
+        .is_some_and(|a| a.as_object().is_some_and(|o| !o.is_empty()))
+    {
         return Err("it has annotations, which the form doesn't show".into());
     }
     let effect = match est["effect"].as_str() {
@@ -307,14 +364,20 @@ pub fn read_rule(cedar: &str) -> Result<RuleForm, String> {
     let p = &est["principal"];
     let who = match (p["op"].as_str(), p.get("entity")) {
         (Some("All"), _) => Who::Anyone,
-        (Some("in"), Some(e)) if entity(e, "Role").is_some() => Who::Role(entity(e, "Role").unwrap().into()),
-        (Some("=="), Some(e)) if entity(e, "Account").is_some() => Who::Account(entity(e, "Account").unwrap().into()),
+        (Some("in"), Some(e)) if entity(e, "Role").is_some() => {
+            Who::Role(entity(e, "Role").unwrap().into())
+        }
+        (Some("=="), Some(e)) if entity(e, "Account").is_some() => {
+            Who::Account(entity(e, "Account").unwrap().into())
+        }
         _ => return Err("its who is not anyone, a role's holders or one account".into()),
     };
     let r = &est["resource"];
     let place = match (r["op"].as_str(), r.get("entity")) {
         (Some("All"), _) => Where::Everywhere,
-        (Some("in"), Some(e)) if entity(e, "Scope").is_some() => Where::Place(entity(e, "Scope").unwrap().into()),
+        (Some("in"), Some(e)) if entity(e, "Scope").is_some() => {
+            Where::Place(entity(e, "Scope").unwrap().into())
+        }
         _ => return Err("its where is not everywhere or one place".into()),
     };
     // What it is about, grouped by system in the order first named.
@@ -323,13 +386,34 @@ pub fn read_rule(cedar: &str) -> Result<RuleForm, String> {
         let (system, every) = if SYSTEMS.contains(&a.as_str()) {
             (a.clone(), true)
         } else {
-            (system_of(&a).ok_or_else(|| format!("{a} is not an action any system declares"))?.to_string(), false)
+            (
+                system_of(&a)
+                    .ok_or_else(|| format!("{a} is not an action any system declares"))?
+                    .to_string(),
+                false,
+            )
         };
         match (doing.iter_mut().find(|d| d.system == system), every) {
-            (None, true) => doing.push(Doing { system, pick: Pick::Every { except: vec![] } }),
-            (None, false) => doing.push(Doing { system, pick: Pick::These { verbs: vec![a] } }),
-            (Some(Doing { pick: Pick::These { verbs }, .. }), false) => verbs.push(a),
-            (Some(_), _) => return Err(format!("it names every {system} action and some of them as well")),
+            (None, true) => doing.push(Doing {
+                system,
+                pick: Pick::Every { except: vec![] },
+            }),
+            (None, false) => doing.push(Doing {
+                system,
+                pick: Pick::These { verbs: vec![a] },
+            }),
+            (
+                Some(Doing {
+                    pick: Pick::These { verbs },
+                    ..
+                }),
+                false,
+            ) => verbs.push(a),
+            (Some(_), _) => {
+                return Err(format!(
+                    "it names every {system} action and some of them as well"
+                ))
+            }
         }
     }
     let mut unless = vec![];
@@ -340,9 +424,18 @@ pub fn read_rule(cedar: &str) -> Result<RuleForm, String> {
             let mut parts = vec![];
             ors(&c["body"], &mut parts);
             for part in parts {
-                let context_field = part.get(".").filter(|d| d["left"]["Var"] == "context").and_then(|d| d["attr"].as_str());
-                let principal_in = part.get("in").filter(|d| d["left"]["Var"] == "principal").and_then(|d| entity(&d["right"]["Value"]["__entity"], "Role"));
-                let action_is = part.get("==").filter(|d| d["left"]["Var"] == "action").and_then(|d| entity(&d["right"]["Value"]["__entity"], "Action"));
+                let context_field = part
+                    .get(".")
+                    .filter(|d| d["left"]["Var"] == "context")
+                    .and_then(|d| d["attr"].as_str());
+                let principal_in = part
+                    .get("in")
+                    .filter(|d| d["left"]["Var"] == "principal")
+                    .and_then(|d| entity(&d["right"]["Value"]["__entity"], "Role"));
+                let action_is = part
+                    .get("==")
+                    .filter(|d| d["left"]["Var"] == "action")
+                    .and_then(|d| entity(&d["right"]["Value"]["__entity"], "Action"));
                 match (context_field, principal_in, action_is) {
                     (Some("fresh_signature"), ..) => unless.push(Condition::FreshTouch),
                     (_, Some(role), _) => unless.push(Condition::Holds(role.into())),
@@ -360,7 +453,13 @@ pub fn read_rule(cedar: &str) -> Result<RuleForm, String> {
         [_] => return Err("it has a \"when\", which the form doesn't show".into()),
         _ => return Err("it has more than one condition".into()),
     }
-    let form = RuleForm { effect, who, doing, place, unless };
+    let form = RuleForm {
+        effect,
+        who,
+        doing,
+        place,
+        unless,
+    };
     // The proof: the Cedar written from the form means exactly what is stored.
     let written = write_rule(&form).map_err(|e| format!("the form can't write it again: {e}"))?;
     if canonical(est_of_policy(&written)?) != canonical(est) {
@@ -371,13 +470,16 @@ pub fn read_rule(cedar: &str) -> Result<RuleForm, String> {
 
 /// Reads a role into the form. `Err` says why it is written by hand.
 pub fn read_role(system: &str, cedar: &str) -> Result<RoleForm, String> {
-    let template = Template::parse(Some(PolicyId::new("role")), cedar).map_err(|e| format!("it is not one Cedar template: {e}"))?;
+    let template = Template::parse(Some(PolicyId::new("role")), cedar)
+        .map_err(|e| format!("it is not one Cedar template: {e}"))?;
     let est = template.to_json().map_err(|e| e.to_string())?;
     let plain_role = est["effect"] == "permit"
         && est["principal"] == json!({"op": "==", "slot": "?principal"})
         && est["resource"] == json!({"op": "in", "slot": "?resource"})
         && est["conditions"].as_array().is_none_or(|c| c.is_empty())
-        && est.get("annotations").is_none_or(|a| a.as_object().is_some_and(|o| o.is_empty()));
+        && est
+            .get("annotations")
+            .is_none_or(|a| a.as_object().is_some_and(|o| o.is_empty()));
     if !plain_role {
         return Err("it is more than a list of actions with blanks for who and where".into());
     }
@@ -387,9 +489,15 @@ pub fn read_role(system: &str, cedar: &str) -> Result<RoleForm, String> {
     } else {
         Pick::These { verbs: named }
     };
-    let form = Doing { system: system.into(), pick };
+    let form = Doing {
+        system: system.into(),
+        pick,
+    };
     let written = write_role(&form).map_err(|e| format!("the form can't write it again: {e}"))?;
-    let again = Template::parse(Some(PolicyId::new("role")), &written).map_err(|e| e.to_string())?.to_json().map_err(|e| e.to_string())?;
+    let again = Template::parse(Some(PolicyId::new("role")), &written)
+        .map_err(|e| e.to_string())?
+        .to_json()
+        .map_err(|e| e.to_string())?;
     if canonical(again) != canonical(est) {
         return Err("the form would change what it means".into());
     }
@@ -414,7 +522,10 @@ mod tests {
         }
         for role in ["roles/maintainer.json", "roles/owner.json"] {
             let spec = data(role)["spec"].clone();
-            let (system, cedar) = (spec["system"].as_str().unwrap(), spec["cedar"].as_str().unwrap());
+            let (system, cedar) = (
+                spec["system"].as_str().unwrap(),
+                spec["cedar"].as_str().unwrap(),
+            );
             let form = read_role(system, cedar).unwrap_or_else(|e| panic!("{role}: {e}"));
             assert_eq!(form.pick, Pick::Every { except: vec![] });
             assert_eq!(write_role(&form).unwrap(), cedar, "{role}");
@@ -423,7 +534,12 @@ mod tests {
 
     #[test]
     fn the_fresh_touch_rule_reads_as_its_five_parts() {
-        let form = read_rule(data("rules/fresh-touch.json")["spec"]["cedar"].as_str().unwrap()).unwrap();
+        let form = read_rule(
+            data("rules/fresh-touch.json")["spec"]["cedar"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(
             serde_json::to_value(&form).unwrap(),
             json!({
@@ -437,7 +553,12 @@ mod tests {
                 "unless": ["fresh-touch"],
             })
         );
-        let owners = read_rule(data("rules/owners-approve-gov.json")["spec"]["cedar"].as_str().unwrap()).unwrap();
+        let owners = read_rule(
+            data("rules/owners-approve-gov.json")["spec"]["cedar"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(owners.place, Where::Place("noi.gov".into()));
         assert_eq!(owners.unless, vec![Condition::Holds("owner".into())]);
     }
@@ -450,22 +571,56 @@ mod tests {
         )
         .unwrap();
         assert_eq!(form.unless, vec![Condition::FreshTouch]);
-        assert!(form.doing.contains(&Doing { system: "governance".into(), pick: Pick::Every { except: vec!["view".into()] } }));
+        assert!(form.doing.contains(&Doing {
+            system: "governance".into(),
+            pick: Pick::Every {
+                except: vec!["view".into()]
+            }
+        }));
         let one = read_rule(r#"permit (principal in Role::"owner", action in [Action::"read"], resource in Scope::"noi.eio");"#).unwrap();
-        assert_eq!(one.doing, vec![Doing { system: "mero".into(), pick: Pick::These { verbs: vec!["read".into()] } }]);
+        assert_eq!(
+            one.doing,
+            vec![Doing {
+                system: "mero".into(),
+                pick: Pick::These {
+                    verbs: vec!["read".into()]
+                }
+            }]
+        );
         assert_eq!(one.who, Who::Role("owner".into()));
     }
 
     #[test]
     fn what_the_form_cannot_say_is_written_by_hand() {
         for (cedar, why) in [
-            (r#"forbid (principal, action, resource);"#, "names no actions"),
-            (r#"forbid (principal, action == Action::"review", resource) when { context.fresh_signature };"#, "when"),
-            (r#"forbid (principal, action == Action::"review", resource) unless { !context.fresh_signature };"#, "can't"),
-            (r#"forbid (principal, action == Action::"review", resource) unless { action == Action::"read" };"#, "not about every mero action"),
-            (r#"@id("x") forbid (principal, action == Action::"review", resource);"#, "annotations"),
-            (r#"forbid (principal is Account, action == Action::"review", resource);"#, "who"),
-            (r#"permit (principal == ?principal, action == Action::"read", resource in ?resource);"#, "blanks"),
+            (
+                r#"forbid (principal, action, resource);"#,
+                "names no actions",
+            ),
+            (
+                r#"forbid (principal, action == Action::"review", resource) when { context.fresh_signature };"#,
+                "when",
+            ),
+            (
+                r#"forbid (principal, action == Action::"review", resource) unless { !context.fresh_signature };"#,
+                "can't",
+            ),
+            (
+                r#"forbid (principal, action == Action::"review", resource) unless { action == Action::"read" };"#,
+                "not about every mero action",
+            ),
+            (
+                r#"@id("x") forbid (principal, action == Action::"review", resource);"#,
+                "annotations",
+            ),
+            (
+                r#"forbid (principal is Account, action == Action::"review", resource);"#,
+                "who",
+            ),
+            (
+                r#"permit (principal == ?principal, action == Action::"read", resource in ?resource);"#,
+                "blanks",
+            ),
             ("not cedar", "not one Cedar policy"),
         ] {
             let e = read_rule(cedar).unwrap_err();
@@ -476,26 +631,99 @@ mod tests {
 
     #[test]
     fn the_form_refuses_what_makes_no_sense() {
-        let rule = |doing: Vec<Doing>, who: Who, place: Where| RuleForm { effect: Effect::Forbid, who, doing, place, unless: vec![] };
-        let review = || Doing { system: "mero".into(), pick: Pick::These { verbs: vec!["review".into()] } };
-        assert!(write_rule(&rule(vec![], Who::Anyone, Where::Everywhere)).unwrap_err().contains("at least one action"));
-        let made_up = Doing { system: "mero".into(), pick: Pick::These { verbs: vec!["fly".into()] } };
-        assert!(write_rule(&rule(vec![made_up], Who::Anyone, Where::Everywhere)).unwrap_err().contains("fly is not an action mero declares"));
-        assert!(write_rule(&rule(vec![review()], Who::Role("owner\" || true".into()), Where::Everywhere)).unwrap_err().contains("plain name"));
-        assert!(write_rule(&rule(vec![review()], Who::Anyone, Where::Place("noi\"".into()))).unwrap_err().contains("plain name"));
-        assert!(write_rule(&rule(vec![review()], Who::Account("hiddenstack".into()), Where::Everywhere)).unwrap_err().contains("account's ID"));
-        assert!(write_rule(&rule(vec![review(), review()], Who::Anyone, Where::Everywhere)).unwrap_err().contains("twice"));
-        let all_but_nothing = Doing { system: "governance".into(), pick: Pick::Every { except: crate::GOVERNANCE_ACTIONS.iter().map(|s| s.to_string()).collect() } };
-        assert!(write_rule(&rule(vec![all_but_nothing], Who::Anyone, Where::Everywhere)).unwrap_err().contains("nothing is left"));
-        let role = Doing { system: "governance".into(), pick: Pick::Every { except: vec!["view".into()] } };
+        let rule = |doing: Vec<Doing>, who: Who, place: Where| RuleForm {
+            effect: Effect::Forbid,
+            who,
+            doing,
+            place,
+            unless: vec![],
+        };
+        let review = || Doing {
+            system: "mero".into(),
+            pick: Pick::These {
+                verbs: vec!["review".into()],
+            },
+        };
+        assert!(write_rule(&rule(vec![], Who::Anyone, Where::Everywhere))
+            .unwrap_err()
+            .contains("at least one action"));
+        let made_up = Doing {
+            system: "mero".into(),
+            pick: Pick::These {
+                verbs: vec!["fly".into()],
+            },
+        };
+        assert!(
+            write_rule(&rule(vec![made_up], Who::Anyone, Where::Everywhere))
+                .unwrap_err()
+                .contains("fly is not an action mero declares")
+        );
+        assert!(write_rule(&rule(
+            vec![review()],
+            Who::Role("owner\" || true".into()),
+            Where::Everywhere
+        ))
+        .unwrap_err()
+        .contains("plain name"));
+        assert!(write_rule(&rule(
+            vec![review()],
+            Who::Anyone,
+            Where::Place("noi\"".into())
+        ))
+        .unwrap_err()
+        .contains("plain name"));
+        assert!(write_rule(&rule(
+            vec![review()],
+            Who::Account("hiddenstack".into()),
+            Where::Everywhere
+        ))
+        .unwrap_err()
+        .contains("account's ID"));
+        assert!(write_rule(&rule(
+            vec![review(), review()],
+            Who::Anyone,
+            Where::Everywhere
+        ))
+        .unwrap_err()
+        .contains("twice"));
+        let all_but_nothing = Doing {
+            system: "governance".into(),
+            pick: Pick::Every {
+                except: crate::GOVERNANCE_ACTIONS
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+            },
+        };
+        assert!(
+            write_rule(&rule(vec![all_but_nothing], Who::Anyone, Where::Everywhere))
+                .unwrap_err()
+                .contains("nothing is left")
+        );
+        let role = Doing {
+            system: "governance".into(),
+            pick: Pick::Every {
+                except: vec!["view".into()],
+            },
+        };
         assert!(write_role(&role).unwrap_err().contains("untick"));
-        let some = Doing { system: "mero".into(), pick: Pick::These { verbs: vec!["read".into(), "propose".into()] } };
+        let some = Doing {
+            system: "mero".into(),
+            pick: Pick::These {
+                verbs: vec!["read".into(), "propose".into()],
+            },
+        };
         assert_eq!(
             write_role(&some).unwrap(),
             "permit (\n  principal == ?principal,\n  action in [Action::\"read\",\n             Action::\"propose\"],\n  resource in ?resource\n);"
         );
         let account = Uuid::new_v4().to_string();
-        let one = write_rule(&rule(vec![review()], Who::Account(account.clone()), Where::Everywhere)).unwrap();
+        let one = write_rule(&rule(
+            vec![review()],
+            Who::Account(account.clone()),
+            Where::Everywhere,
+        ))
+        .unwrap();
         assert_eq!(read_rule(&one).unwrap().who, Who::Account(account));
     }
 
@@ -505,7 +733,14 @@ mod tests {
         let mut unique = all.clone();
         unique.sort();
         unique.dedup();
-        assert_eq!(all.len(), unique.len(), "a verb in two systems would make reading a rule ambiguous");
-        assert!(SYSTEMS.iter().all(|s| !all.contains(s)), "a system's name is not a verb");
+        assert_eq!(
+            all.len(),
+            unique.len(),
+            "a verb in two systems would make reading a rule ambiguous"
+        );
+        assert!(
+            SYSTEMS.iter().all(|s| !all.contains(s)),
+            "a system's name is not a verb"
+        );
     }
 }

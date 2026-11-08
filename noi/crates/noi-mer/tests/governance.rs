@@ -398,21 +398,44 @@ async fn verify(url: &str) {
         invariant_checks: vec!["none".into()],
         migration_plan: None,
     };
-    let nothing = Change::Update { uid: m.identity.uid, expected_revision: m.revision, meron: same.clone(), compatibility: evidence.clone() };
-    match with(you.clone(), None).propose_batch(&me, batch("Nothing", vec![nothing])).await {
+    let nothing = Change::Update {
+        uid: m.identity.uid,
+        expected_revision: m.revision,
+        meron: same.clone(),
+        compatibility: evidence.clone(),
+    };
+    match with(you.clone(), None)
+        .propose_batch(&me, batch("Nothing", vec![nothing]))
+        .await
+    {
         Err(Error::Validation(e)) => assert!(e.to_string().contains("changes nothing"), "{e}"),
         other => panic!("a change that changes nothing was not refused: {other:?}"),
     }
-    let in_place = Change::Rename { uid: m.identity.uid, expected_revision: m.revision, path: m.identity.path.clone() };
-    match with(you.clone(), None).propose_batch(&me, batch("Same path", vec![in_place])).await {
+    let in_place = Change::Rename {
+        uid: m.identity.uid,
+        expected_revision: m.revision,
+        path: m.identity.path.clone(),
+    };
+    match with(you.clone(), None)
+        .propose_batch(&me, batch("Same path", vec![in_place]))
+        .await
+    {
         Err(Error::Validation(e)) => assert!(e.to_string().contains("already at this path"), "{e}"),
         other => panic!("a rename to the same path was not refused: {other:?}"),
     }
     // One real difference is enough.
     let mut renamed = same;
     renamed.name = "Step 3 meron, renamed".into();
-    let real = Change::Update { uid: m.identity.uid, expected_revision: m.revision, meron: renamed, compatibility: evidence };
-    with(you.clone(), None).propose_batch(&me, batch("Something", vec![real])).await.unwrap();
+    let real = Change::Update {
+        uid: m.identity.uid,
+        expected_revision: m.revision,
+        meron: renamed,
+        compatibility: evidence,
+    };
+    with(you.clone(), None)
+        .propose_batch(&me, batch("Something", vec![real]))
+        .await
+        .unwrap();
 
     // The touch counted once.
     let again = as_agent

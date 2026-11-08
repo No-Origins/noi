@@ -437,14 +437,7 @@ mod tests {
             validate_path(path).unwrap();
         }
         for path in [
-            "no",
-            "noivil",
-            "noi.",
-            "noi.Inv",
-            "noi.a--b",
-            "noi.a-",
-            "noi._a",
-            "noi.1a",
+            "no", "noivil", "noi.", "noi.Inv", "noi.a--b", "noi.a-", "noi._a", "noi.1a",
         ] {
             assert!(validate_path(path).is_err(), "{path}");
         }

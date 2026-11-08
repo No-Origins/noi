@@ -32,13 +32,17 @@ impl IntoResponse for Error {
         };
         // Internal failures stay in Governance's log; the asker learns only that it said no.
         let message = match &self {
-            Error::Database(_) | Error::Migration(_) => "Governance could not answer, so no".to_string(),
+            Error::Database(_) | Error::Migration(_) => {
+                "Governance could not answer, so no".to_string()
+            }
             other => other.to_string(),
         };
         let mut response = (status, Json(json!({"error": message}))).into_response();
         // The inner reason goes to the log and the Problems page; never to the asker.
         if status.is_server_error() {
-            response.extensions_mut().insert(noi_log::Why(self.to_string()));
+            response
+                .extensions_mut()
+                .insert(noi_log::Why(self.to_string()));
         }
         response
     }
@@ -50,7 +54,10 @@ pub fn router(gov: Governance) -> Router {
     Router::new()
         .route("/", get(|| async { page("Governance", INDEX) }))
         .route("/sign-in", get(|| async { page("Sign in", SIGN_IN) }))
-        .route("/link/{token}", get(|| async { page("Add your passkey", LINK) }))
+        .route(
+            "/link/{token}",
+            get(|| async { page("Add your passkey", LINK) }),
+        )
         .route("/health/alive", get(|| async { noi_log::health::alive() }))
         .route("/health/ready", get(ready))
         .route("/api/me", get(me))
@@ -64,7 +71,10 @@ pub fn router(gov: Governance) -> Router {
         .route("/api/may", post(may))
         .route("/api/profile", get(profile))
         .route("/api/profile/sign-out", post(profile_sign_out))
-        .route("/api/profile/sign-out-everywhere", post(sign_out_everywhere))
+        .route(
+            "/api/profile/sign-out-everywhere",
+            post(sign_out_everywhere),
+        )
         .route("/api/accounts", get(accounts))
         .route("/api/accounts/{handle}", get(account))
         .route("/api/roles", get(roles))
@@ -78,7 +88,10 @@ pub fn router(gov: Governance) -> Router {
         .route("/api/agents", post(add_agent))
         .route("/api/sessions/end", post(end_sessions))
         .route("/api/copy", post(copy))
-        .layer(middleware::from_fn_with_state((gov.clone(), Tries::new()), limit_starts))
+        .layer(middleware::from_fn_with_state(
+            (gov.clone(), Tries::new()),
+            limit_starts,
+        ))
         .layer(middleware::from_fn_with_state(gov.clone(), same_machine))
         .with_state(gov)
 }
@@ -96,7 +109,10 @@ struct Tries {
 }
 impl Tries {
     fn new() -> Self {
-        Self { starts: Window::new(STARTS_PER_MINUTE, Duration::from_secs(60)), noted: Window::new(1, Duration::from_secs(60)) }
+        Self {
+            starts: Window::new(STARTS_PER_MINUTE, Duration::from_secs(60)),
+            noted: Window::new(1, Duration::from_secs(60)),
+        }
     }
 }
 
@@ -104,22 +120,48 @@ impl Tries {
 fn start_key(req: &Request) -> Option<(String, &'static str)> {
     match req.uri().path() {
         "/api/sign-in/start" | "/api/link/start" => {
-            let address = req.extensions().get::<ConnectInfo<SocketAddr>>().map(|c| c.0.ip().to_string()).unwrap_or_else(|| "unknown".into());
+            let address = req
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|c| c.0.ip().to_string())
+                .unwrap_or_else(|| "unknown".into());
             Some((format!("address:{address}"), "address"))
         }
-        "/api/touch/start" => cookie_session(req.headers()).map(|token| (format!("sign-in:{}", hex(&super::digest(&token)[..8])), "sign-in")),
+        "/api/touch/start" => cookie_session(req.headers()).map(|token| {
+            (
+                format!("sign-in:{}", hex(&super::digest(&token)[..8])),
+                "sign-in",
+            )
+        }),
         _ => None,
     }
 }
 
-async fn limit_starts(State((gov, tries)): State<(Governance, Tries)>, req: Request, next: Next) -> Response {
-    let Some((key, per)) = start_key(&req) else { return next.run(req).await };
-    let Err(wait) = tries.starts.allow(&key) else { return next.run(req).await };
+async fn limit_starts(
+    State((gov, tries)): State<(Governance, Tries)>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let Some((key, per)) = start_key(&req) else {
+        return next.run(req).await;
+    };
+    let Err(wait) = tries.starts.allow(&key) else {
+        return next.run(req).await;
+    };
     if tries.noted.allow(&key).is_ok() {
         let path = req.uri().path().to_string();
-        gov.note_limit(None, &format!("more than {STARTS_PER_MINUTE} starts a minute from one {per}"), json!({ "path": path })).await;
+        gov.note_limit(
+            None,
+            &format!("more than {STARTS_PER_MINUTE} starts a minute from one {per}"),
+            json!({ "path": path }),
+        )
+        .await;
     }
-    Error::TooMany(format!("too many tries: wait {} seconds, then try again", wait.as_secs().max(1))).into_response()
+    Error::TooMany(format!(
+        "too many tries: wait {} seconds, then try again",
+        wait.as_secs().max(1)
+    ))
+    .into_response()
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -129,7 +171,11 @@ fn hex(bytes: &[u8]) -> String {
 /// Only this machine, by its own names, and never a request sent from another site.
 async fn same_machine(State(gov): State<Governance>, req: Request, next: Next) -> Response {
     let port = gov.config().origin.port_or_known_default().unwrap_or(80);
-    let host = req.headers().get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or("");
+    let host = req
+        .headers()
+        .get(header::HOST)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("");
     let local = |h: &str| h == format!("localhost:{port}") || h == format!("127.0.0.1:{port}");
     if !local(host) {
         return Error::Refused("Governance answers only on this machine".into()).into_response();
@@ -139,7 +185,10 @@ async fn same_machine(State(gov): State<Governance>, req: Request, next: Next) -
             .to_str()
             .ok()
             .and_then(|o| url::Url::parse(o).ok())
-            .is_some_and(|u| u.scheme() == "http" && matches!(u.host_str(), Some("localhost") | Some("127.0.0.1")));
+            .is_some_and(|u| {
+                u.scheme() == "http"
+                    && matches!(u.host_str(), Some("localhost") | Some("127.0.0.1"))
+            });
         if !ok {
             return Error::Refused("requests from other sites are refused".into()).into_response();
         }
@@ -177,7 +226,11 @@ fn set_session(token: &str) -> HeaderValue {
     .expect("a cookie")
 }
 fn signed_in(token: &str) -> Response {
-    ([(header::SET_COOKIE, set_session(token))], Json(json!({"ok": true}))).into_response()
+    (
+        [(header::SET_COOKIE, set_session(token))],
+        Json(json!({"ok": true})),
+    )
+        .into_response()
 }
 
 /// Who holds this credential: what a system asks before it acts for someone. A credential that
@@ -196,7 +249,9 @@ async fn who(State(gov): State<Governance>, Json(b): Json<WhoIs>) -> Result<Json
 
 /// Who is signed in, or null when no one is.
 async fn me(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Value>> {
-    let Some(token) = cookie_session(&headers) else { return Ok(Json(Value::Null)) };
+    let Some(token) = cookie_session(&headers) else {
+        return Ok(Json(Value::Null));
+    };
     match gov.me(&Credential::Session(token)).await {
         Ok(me) => Ok(Json(me)),
         Err(Error::Refused(_)) => Ok(Json(Value::Null)),
@@ -208,7 +263,10 @@ async fn me(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Va
 struct LinkStart {
     token: String,
 }
-async fn link_start(State(gov): State<Governance>, Json(b): Json<LinkStart>) -> Result<impl IntoResponse> {
+async fn link_start(
+    State(gov): State<Governance>,
+    Json(b): Json<LinkStart>,
+) -> Result<impl IntoResponse> {
     Ok(Json(gov.link_start(&b.token).await?))
 }
 #[derive(Deserialize)]
@@ -220,17 +278,35 @@ struct LinkFinish {
 }
 /// The browser and device a new session is made on, as a label for Profile.
 fn device(headers: &HeaderMap) -> Option<String> {
-    headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()).map(super::device_label)
+    headers
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(super::device_label)
 }
-async fn link_finish(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<LinkFinish>) -> Result<Response> {
-    Ok(signed_in(&gov.link_finish_on(b.ceremony, &b.credential, &b.name, device(&headers).as_deref()).await?))
+async fn link_finish(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<LinkFinish>,
+) -> Result<Response> {
+    Ok(signed_in(
+        &gov.link_finish_on(
+            b.ceremony,
+            &b.credential,
+            &b.name,
+            device(&headers).as_deref(),
+        )
+        .await?,
+    ))
 }
 
 #[derive(Deserialize)]
 struct SignInStart {
     handle: String,
 }
-async fn sign_in_start(State(gov): State<Governance>, Json(b): Json<SignInStart>) -> Result<impl IntoResponse> {
+async fn sign_in_start(
+    State(gov): State<Governance>,
+    Json(b): Json<SignInStart>,
+) -> Result<impl IntoResponse> {
     Ok(Json(gov.sign_in_start(b.handle.trim()).await?))
 }
 #[derive(Deserialize)]
@@ -238,8 +314,15 @@ struct Finish {
     ceremony: Uuid,
     credential: PublicKeyCredential,
 }
-async fn sign_in_finish(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<Finish>) -> Result<Response> {
-    Ok(signed_in(&gov.sign_in_finish_on(b.ceremony, &b.credential, device(&headers).as_deref()).await?))
+async fn sign_in_finish(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<Finish>,
+) -> Result<Response> {
+    Ok(signed_in(
+        &gov.sign_in_finish_on(b.ceremony, &b.credential, device(&headers).as_deref())
+            .await?,
+    ))
 }
 
 /// Your own Profile: who you are, your roles, passkeys and sign-ins.
@@ -250,30 +333,48 @@ async fn profile(State(gov): State<Governance>, headers: HeaderMap) -> Result<Js
 struct SignOutOne {
     session: Uuid,
 }
-async fn profile_sign_out(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<SignOutOne>) -> Result<Json<Value>> {
+async fn profile_sign_out(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<SignOutOne>,
+) -> Result<Json<Value>> {
     gov.sign_out_session(&session(&headers)?, b.session).await?;
     Ok(Json(json!({"ok": true})))
 }
-async fn sign_out_everywhere(State(gov): State<Governance>, headers: HeaderMap) -> Result<Response> {
+async fn sign_out_everywhere(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+) -> Result<Response> {
     let ended = gov.sign_out_everywhere(&session(&headers)?).await?;
-    let clear = HeaderValue::from_static("noi_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
+    let clear =
+        HeaderValue::from_static("noi_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
     Ok(([(header::SET_COOKIE, clear)], Json(json!({"ended": ended}))).into_response())
 }
 
 /// Who is looking at Governance's data: the signed-in person, or a visitor.
 fn viewer(headers: &HeaderMap) -> Credential {
-    cookie_session(headers).map(Credential::Session).unwrap_or(Credential::Visitor)
+    cookie_session(headers)
+        .map(Credential::Session)
+        .unwrap_or(Credential::Visitor)
 }
 async fn accounts(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Value>> {
     Ok(Json(gov.accounts(&viewer(&headers)).await?))
 }
-async fn account(State(gov): State<Governance>, headers: HeaderMap, Path(handle): Path<String>) -> Result<Json<Value>> {
+async fn account(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Path(handle): Path<String>,
+) -> Result<Json<Value>> {
     Ok(Json(gov.account(&viewer(&headers), &handle).await?))
 }
 async fn roles(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Value>> {
     Ok(Json(gov.roles(&viewer(&headers)).await?))
 }
-async fn record_page(State(gov): State<Governance>, headers: HeaderMap, Query(f): Query<super::RecordFilter>) -> Result<Json<Value>> {
+async fn record_page(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Query(f): Query<super::RecordFilter>,
+) -> Result<Json<Value>> {
     Ok(Json(gov.record_page(&viewer(&headers), &f).await?))
 }
 #[derive(Deserialize)]
@@ -282,14 +383,21 @@ struct ProblemsQuery {
     before: Option<i64>,
     limit: Option<i64>,
 }
-async fn problems(State(gov): State<Governance>, headers: HeaderMap, Query(q): Query<ProblemsQuery>) -> Result<Json<Value>> {
-    Ok(Json(gov.problems(&viewer(&headers), q.before, q.limit).await?))
+async fn problems(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Query(q): Query<ProblemsQuery>,
+) -> Result<Json<Value>> {
+    Ok(Json(
+        gov.problems(&viewer(&headers), q.before, q.limit).await?,
+    ))
 }
 async fn sign_out(State(gov): State<Governance>, headers: HeaderMap) -> Result<Response> {
     if let Some(token) = cookie_session(&headers) {
         gov.sign_out(&token).await?;
     }
-    let clear = HeaderValue::from_static("noi_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
+    let clear =
+        HeaderValue::from_static("noi_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
     Ok(([(header::SET_COOKIE, clear)], Json(json!({"ok": true}))).into_response())
 }
 
@@ -304,11 +412,24 @@ async fn ready(State(gov): State<Governance>) -> Response {
     noi_log::health::ready(&[("database", database), ("roles and rules", copy)])
 }
 
-async fn touch_start(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<TouchStart>) -> Result<impl IntoResponse> {
-    Ok(Json(gov.touch_start(&session(&headers)?, &b.action, &b.targets).await?))
+async fn touch_start(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<TouchStart>,
+) -> Result<impl IntoResponse> {
+    Ok(Json(
+        gov.touch_start(&session(&headers)?, &b.action, &b.targets)
+            .await?,
+    ))
 }
-async fn touch_finish(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<Finish>) -> Result<Json<Value>> {
-    let touch = gov.touch_finish(&session(&headers)?, b.ceremony, &b.credential).await?;
+async fn touch_finish(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<Finish>,
+) -> Result<Json<Value>> {
+    let touch = gov
+        .touch_finish(&session(&headers)?, b.ceremony, &b.credential)
+        .await?;
     Ok(Json(json!({"touch": touch})))
 }
 
@@ -323,7 +444,11 @@ struct May {
     #[serde(default)]
     touch: Option<Uuid>,
 }
-async fn may(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<May>) -> Result<impl IntoResponse> {
+async fn may(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<May>,
+) -> Result<impl IntoResponse> {
     let credential = b
         .credential
         .or_else(|| cookie_session(&headers).map(Credential::Session))
@@ -347,7 +472,9 @@ struct RunToken {
 }
 async fn run_token(State(gov): State<Governance>, Json(b): Json<RunToken>) -> Result<Json<Value>> {
     let (token, agent) = gov.run_token(&b.vouch).await?;
-    Ok(Json(json!({"run_token": token, "agent": agent, "expires_in": super::RUN_TOKEN_MINUTES * 60})))
+    Ok(Json(
+        json!({"run_token": token, "agent": agent, "expires_in": super::RUN_TOKEN_MINUTES * 60}),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -357,9 +484,23 @@ struct Grant {
     role: String,
     scope: String,
 }
-async fn grant(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<Grant>) -> Result<Json<Value>> {
-    let spec = GrantSpec { role: b.role, scope: b.scope };
-    let id = gov.grant(&Credential::Session(session(&headers)?), b.touch, &b.handle, &spec).await?;
+async fn grant(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<Grant>,
+) -> Result<Json<Value>> {
+    let spec = GrantSpec {
+        role: b.role,
+        scope: b.scope,
+    };
+    let id = gov
+        .grant(
+            &Credential::Session(session(&headers)?),
+            b.touch,
+            &b.handle,
+            &spec,
+        )
+        .await?;
     Ok(Json(json!({"grant": id})))
 }
 #[derive(Deserialize)]
@@ -367,8 +508,13 @@ struct EndGrant {
     touch: Option<Uuid>,
     grant: Uuid,
 }
-async fn end_grant(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<EndGrant>) -> Result<Json<Value>> {
-    gov.end_grant(&Credential::Session(session(&headers)?), b.touch, b.grant).await?;
+async fn end_grant(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<EndGrant>,
+) -> Result<Json<Value>> {
+    gov.end_grant(&Credential::Session(session(&headers)?), b.touch, b.grant)
+        .await?;
     Ok(Json(json!({"ok": true})))
 }
 #[derive(Deserialize)]
@@ -381,9 +527,20 @@ struct Invite {
     #[serde(default)]
     grants: Vec<GrantSpec>,
 }
-async fn invite(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<Invite>) -> Result<Json<Value>> {
+async fn invite(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<Invite>,
+) -> Result<Json<Value>> {
     let link = gov
-        .invite(&Credential::Session(session(&headers)?), b.touch, &b.handle, &b.display_name, b.email.as_deref(), &b.grants)
+        .invite(
+            &Credential::Session(session(&headers)?),
+            b.touch,
+            &b.handle,
+            &b.display_name,
+            b.email.as_deref(),
+            &b.grants,
+        )
         .await?;
     Ok(Json(json!({"link": link})))
 }
@@ -396,9 +553,21 @@ struct AddAgent {
     sponsor: String,
     vouched_by: String,
 }
-async fn add_agent(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<AddAgent>) -> Result<Json<Value>> {
+async fn add_agent(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<AddAgent>,
+) -> Result<Json<Value>> {
     let id = gov
-        .add_agent(&Credential::Session(session(&headers)?), b.touch, &b.handle, &b.display_name, &b.purpose, &b.sponsor, &b.vouched_by)
+        .add_agent(
+            &Credential::Session(session(&headers)?),
+            b.touch,
+            &b.handle,
+            &b.display_name,
+            &b.purpose,
+            &b.sponsor,
+            &b.vouched_by,
+        )
         .await?;
     Ok(Json(json!({"account": id})))
 }
@@ -407,8 +576,14 @@ struct EndSessions {
     touch: Option<Uuid>,
     handle: String,
 }
-async fn end_sessions(State(gov): State<Governance>, headers: HeaderMap, Json(b): Json<EndSessions>) -> Result<Json<Value>> {
-    let ended = gov.end_sessions(&Credential::Session(session(&headers)?), b.touch, &b.handle).await?;
+async fn end_sessions(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<EndSessions>,
+) -> Result<Json<Value>> {
+    let ended = gov
+        .end_sessions(&Credential::Session(session(&headers)?), b.touch, &b.handle)
+        .await?;
     Ok(Json(json!({"ended": ended})))
 }
 /// Mero calls this after an approval in noi.gov. It only ever pulls what Mero has approved.
@@ -417,7 +592,11 @@ async fn copy(State(gov): State<Governance>) -> Result<impl IntoResponse> {
 }
 
 fn page(title: &str, body: &str) -> Html<String> {
-    let title = if title == "Governance" { "Governance".to_string() } else { format!("{title} · Governance") };
+    let title = if title == "Governance" {
+        "Governance".to_string()
+    } else {
+        format!("{title} · Governance")
+    };
     Html(format!(
         r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title><style>{STYLE}</style><script>{SCRIPT}</script></head><body><main><p class="label">No Origins · Governance</p>{body}</main></body></html>"#

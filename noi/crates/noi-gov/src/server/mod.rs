@@ -9,9 +9,9 @@ mod passkeys;
 mod runs;
 mod views;
 
+pub use crate::{Credential, Target};
 pub use accounts::{GrantSpec, Setup};
 pub use copy::Copied;
-pub use crate::{Credential, Target};
 pub use decide::Answer;
 pub use runs::{new_voucher_key, vouch, Vouch};
 pub use views::{device_label, RecordFilter};
@@ -111,7 +111,14 @@ impl Governance {
 
     /// Keeps one problem for the Problems page (agreed 8 Nov): a failed answer and its inner reason,
     /// never a secret.
-    pub async fn record_problem(&self, request_id: &str, method: &str, path: &str, status: i32, what: &str) -> Result<()> {
+    pub async fn record_problem(
+        &self,
+        request_id: &str,
+        method: &str,
+        path: &str,
+        status: i32,
+        what: &str,
+    ) -> Result<()> {
         sqlx::query("INSERT INTO gov.problems(request_id, method, path, status, what) VALUES($1,$2,$3,$4,$5)")
             .bind(request_id)
             .bind(method)
@@ -126,7 +133,9 @@ impl Governance {
     /// Records a limit's refusal. If the record can't be written, the log still says it.
     pub(crate) async fn note_limit(&self, account: Option<Uuid>, why: &str, detail: Value) {
         let written = match self.pool.acquire().await {
-            Ok(mut conn) => record(&mut conn, "limit", account, None, &[], false, why, detail).await.is_ok(),
+            Ok(mut conn) => record(&mut conn, "limit", account, None, &[], false, why, detail)
+                .await
+                .is_ok(),
             Err(_) => false,
         };
         if !written {
@@ -136,7 +145,10 @@ impl Governance {
 
     /// Whether the database answers, and whether a copy of the roles and rules is there to decide with.
     pub async fn readiness(&self) -> (bool, bool) {
-        match sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM gov.policies)").fetch_one(&self.pool).await {
+        match sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM gov.policies)")
+            .fetch_one(&self.pool)
+            .await
+        {
             Ok(copy) => (true, copy),
             Err(_) => (false, false),
         }

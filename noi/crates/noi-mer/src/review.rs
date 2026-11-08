@@ -44,15 +44,23 @@ impl Change {
     pub fn target(&self) -> Option<Uuid> {
         match self {
             Change::Add { .. } => None,
-            Change::Update { uid, .. } | Change::Rename { uid, .. } | Change::Deprecate { uid, .. } => Some(*uid),
+            Change::Update { uid, .. }
+            | Change::Rename { uid, .. }
+            | Change::Deprecate { uid, .. } => Some(*uid),
         }
     }
     fn expected_revision(&self) -> Option<i64> {
         match self {
             Change::Add { .. } => None,
-            Change::Update { expected_revision, .. }
-            | Change::Rename { expected_revision, .. }
-            | Change::Deprecate { expected_revision, .. } => Some(*expected_revision),
+            Change::Update {
+                expected_revision, ..
+            }
+            | Change::Rename {
+                expected_revision, ..
+            }
+            | Change::Deprecate {
+                expected_revision, ..
+            } => Some(*expected_revision),
         }
     }
     fn validate(&self) -> Result<()> {
@@ -60,13 +68,21 @@ impl Change {
             Change::Add { meron, container } => {
                 meron.validate()?;
                 if meron.authority_scope.is_none() {
-                    return Err(ValidationError(format!("{}: a new meron needs its authority_scope", meron.path)).into());
+                    return Err(ValidationError(format!(
+                        "{}: a new meron needs its authority_scope",
+                        meron.path
+                    ))
+                    .into());
                 }
                 if let Some(path) = container {
                     validate_path(path)?;
                 }
             }
-            Change::Update { meron, compatibility, .. } => {
+            Change::Update {
+                meron,
+                compatibility,
+                ..
+            } => {
                 meron.validate()?;
                 compatibility.validate()?;
             }
@@ -257,13 +273,19 @@ impl Registry {
         }
         let resources = change_resources(&mut conn, &batch.changes).await?;
         drop(conn);
-        let decision = self.authorize(
-            proposer,
-            Action::Propose,
-            resources,
-            json!({"batch":batch.title,"changes":batch.changes}),
-        ).await?;
-        let items: Vec<(Actor, Change)> = batch.changes.iter().map(|c| (proposer.clone(), c.clone())).collect();
+        let decision = self
+            .authorize(
+                proposer,
+                Action::Propose,
+                resources,
+                json!({"batch":batch.title,"changes":batch.changes}),
+            )
+            .await?;
+        let items: Vec<(Actor, Change)> = batch
+            .changes
+            .iter()
+            .map(|c| (proposer.clone(), c.clone()))
+            .collect();
         let outcomes = self.test_run(proposer, &items).await?;
         let mut tx = self.write().await?;
         let uid = Uuid::new_v4();
@@ -278,7 +300,17 @@ impl Registry {
                 .bind(Uuid::new_v4()).bind(uid).bind(position as i32).bind(change.operation()).bind(change.target())
                 .bind(serde_json::to_value(change)?).bind(outcome).execute(tx.as_mut()).await?;
         }
-        proposal_event(tx.as_mut(), uid, None, "proposal.submit", proposer, &decision, note.as_deref(), json!({"changes": batch.changes.len()})).await?;
+        proposal_event(
+            tx.as_mut(),
+            uid,
+            None,
+            "proposal.submit",
+            proposer,
+            &decision,
+            note.as_deref(),
+            json!({"changes": batch.changes.len()}),
+        )
+        .await?;
         tx.commit().await?;
         self.batch(proposer, uid).await
     }
@@ -286,9 +318,11 @@ impl Registry {
     /// Every batch, newest first, with its proposals and their history.
     pub async fn review(&self, actor: &Actor) -> Result<Vec<Batch>> {
         let mut conn = self.pool.acquire().await?;
-        let batches = sqlx::query_as::<_, BatchRow>("SELECT * FROM mer.batches ORDER BY created_at DESC, uid")
-            .fetch_all(&mut *conn)
-            .await?;
+        let batches = sqlx::query_as::<_, BatchRow>(
+            "SELECT * FROM mer.batches ORDER BY created_at DESC, uid",
+        )
+        .fetch_all(&mut *conn)
+        .await?;
         self.read_review(&mut conn, actor, batches, true).await
     }
     pub async fn batch(&self, actor: &Actor, uid: Uuid) -> Result<Batch> {
@@ -297,11 +331,20 @@ impl Registry {
             .bind(uid)
             .fetch_all(&mut *conn)
             .await?;
-        self.read_review(&mut conn, actor, batches, false).await?.pop().ok_or(Error::NotFound)
+        self.read_review(&mut conn, actor, batches, false)
+            .await?
+            .pop()
+            .ok_or(Error::NotFound)
     }
     /// Reading all of review needs reading the registry (`noi`) too; reading one batch needs
     /// reading only what it touches, so an agent allowed in one place sees what it proposed.
-    async fn read_review(&self, conn: &mut PgConnection, actor: &Actor, batches: Vec<BatchRow>, whole_review: bool) -> Result<Vec<Batch>> {
+    async fn read_review(
+        &self,
+        conn: &mut PgConnection,
+        actor: &Actor,
+        batches: Vec<BatchRow>,
+        whole_review: bool,
+    ) -> Result<Vec<Batch>> {
         let uids: Vec<Uuid> = batches.iter().map(|b| b.uid).collect();
         let rows = sqlx::query_as::<_, ProposalRow>("SELECT uid,batch,position,change,state,revision,outcome,checked_at,decided_by,decided_at,created_at,updated_at FROM mer.proposals WHERE batch = ANY($1) ORDER BY batch, position")
             .bind(&uids)
@@ -328,11 +371,21 @@ impl Registry {
         if resources.is_empty() {
             return Ok(vec![]);
         }
-        self.authorize(actor, Action::Read, resources, json!({"operation":"review"})).await?;
+        self.authorize(
+            actor,
+            Action::Read,
+            resources,
+            json!({"operation":"review"}),
+        )
+        .await?;
         Ok(batches
             .into_iter()
             .map(|b| Batch {
-                proposals: proposals.iter().filter(|p| p.batch == b.uid).cloned().collect(),
+                proposals: proposals
+                    .iter()
+                    .filter(|p| p.batch == b.uid)
+                    .cloned()
+                    .collect(),
                 events: events
                     .iter()
                     .filter(|e| e.batch == b.uid)
@@ -371,23 +424,30 @@ impl Registry {
             let change: Change = serde_json::from_value(row.change.clone())?;
             let label = label(tx.as_mut(), &change).await;
             if row.state != "waiting" {
-                return Err(ValidationError(format!("{label}: only a waiting proposal can be approved; this one is {}", row.state)).into());
+                return Err(ValidationError(format!(
+                    "{label}: only a waiting proposal can be approved; this one is {}",
+                    row.state
+                ))
+                .into());
             }
-            let proposer: String = sqlx::query_scalar("SELECT proposer FROM mer.batches WHERE uid=$1")
-                .bind(row.batch)
-                .fetch_one(tx.as_mut())
-                .await?;
+            let proposer: String =
+                sqlx::query_scalar("SELECT proposer FROM mer.batches WHERE uid=$1")
+                    .bind(row.batch)
+                    .fetch_one(tx.as_mut())
+                    .await?;
             labels.push(label);
             items.push((Actor { subject: proposer }, change));
         }
         let changes: Vec<Change> = items.iter().map(|(_, c)| c.clone()).collect();
         let resources = change_resources(tx.as_mut(), &changes).await?;
-        let decision = self.authorize(
-            approver,
-            Action::Review,
-            resources,
-            json!({"approve": rows.iter().map(|r| r.uid).collect::<Vec<_>>()}),
-        ).await?;
+        let decision = self
+            .authorize(
+                approver,
+                Action::Review,
+                resources,
+                json!({"approve": rows.iter().map(|r| r.uid).collect::<Vec<_>>()}),
+            )
+            .await?;
         let under = Registry {
             pool: self.pool.clone(),
             authorizer: Arc::new(UnderApproval(decision.clone())),
@@ -400,14 +460,26 @@ impl Registry {
             .collect();
         if !failures.is_empty() {
             tx.rollback().await?;
-            return Err(ValidationError(format!("nothing was approved. {}", failures.join("; "))).into());
+            return Err(
+                ValidationError(format!("nothing was approved. {}", failures.join("; "))).into(),
+            );
         }
         let mut approved = vec![];
         for (row, result) in rows.into_iter().zip(results) {
             let outcome = result.expect("failures returned above");
             sqlx::query("UPDATE mer.proposals SET state='approved',decided_by=$2,decided_at=clock_timestamp(),outcome=$3,checked_at=clock_timestamp(),updated_at=clock_timestamp() WHERE uid=$1")
                 .bind(row.uid).bind(&approver.subject).bind(&outcome).execute(tx.as_mut()).await?;
-            proposal_event(tx.as_mut(), row.batch, Some(row.uid), "proposal.approve", approver, &decision, None, json!({"steps": outcome["steps"]})).await?;
+            proposal_event(
+                tx.as_mut(),
+                row.batch,
+                Some(row.uid),
+                "proposal.approve",
+                approver,
+                &decision,
+                None,
+                json!({"steps": outcome["steps"]}),
+            )
+            .await?;
             approved.push(row.uid);
         }
         tx.commit().await?;
@@ -421,33 +493,66 @@ impl Registry {
 
     /// The places that approving (every waiting proposal of these, or of these batches) or sending
     /// back or rejecting (one proposal) asks Governance about: exactly what a touch must be for.
-    pub async fn review_places(&self, actor: &Actor, uids: &[Uuid], whole_batches: bool) -> Result<Vec<String>> {
+    pub async fn review_places(
+        &self,
+        actor: &Actor,
+        uids: &[Uuid],
+        whole_batches: bool,
+    ) -> Result<Vec<String>> {
         let mut conn = self.pool.acquire().await?;
         let query = if whole_batches {
             "SELECT change FROM mer.proposals WHERE uid = ANY($1) OR (batch = ANY($1) AND state = 'waiting') ORDER BY batch, position"
         } else {
             "SELECT change FROM mer.proposals WHERE uid = ANY($1) ORDER BY batch, position"
         };
-        let rows: Vec<Value> = sqlx::query_scalar(query).bind(uids).fetch_all(&mut *conn).await?;
+        let rows: Vec<Value> = sqlx::query_scalar(query)
+            .bind(uids)
+            .fetch_all(&mut *conn)
+            .await?;
         if rows.is_empty() {
             return Err(Error::NotFound);
         }
-        let changes = rows.into_iter().map(serde_json::from_value).collect::<std::result::Result<Vec<Change>, _>>()?;
+        let changes = rows
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<std::result::Result<Vec<Change>, _>>()?;
         let resources = change_resources(&mut conn, &changes).await?;
         drop(conn);
-        self.authorize(actor, Action::Read, resources.clone(), json!({"operation": "review-places"})).await?;
+        self.authorize(
+            actor,
+            Action::Read,
+            resources.clone(),
+            json!({"operation": "review-places"}),
+        )
+        .await?;
         Ok(places(&resources))
     }
 
     /// Returns a waiting proposal to its proposer with a note saying what to change.
     pub async fn send_back(&self, reviewer: &Actor, uid: Uuid, note: &str) -> Result<Proposal> {
         let note = note_text(Some(note), true)?;
-        self.decide(reviewer, uid, ProposalState::SentBack, &[ProposalState::Waiting], "proposal.send-back", note).await
+        self.decide(
+            reviewer,
+            uid,
+            ProposalState::SentBack,
+            &[ProposalState::Waiting],
+            "proposal.send-back",
+            note,
+        )
+        .await
     }
     /// Closes a proposal for good, with a note saying why. It stays on record.
     pub async fn reject(&self, reviewer: &Actor, uid: Uuid, note: &str) -> Result<Proposal> {
         let note = note_text(Some(note), true)?;
-        self.decide(reviewer, uid, ProposalState::Rejected, &[ProposalState::Waiting, ProposalState::SentBack], "proposal.reject", note).await
+        self.decide(
+            reviewer,
+            uid,
+            ProposalState::Rejected,
+            &[ProposalState::Waiting, ProposalState::SentBack],
+            "proposal.reject",
+            note,
+        )
+        .await
     }
     async fn decide(
         &self,
@@ -464,14 +569,36 @@ impl Registry {
         let state = ProposalState::parse(&row.state)?;
         if !from.contains(&state) {
             let label = label(tx.as_mut(), &change).await;
-            return Err(ValidationError(format!("{label}: a {} proposal cannot be {}", state.as_str(), to.as_str())).into());
+            return Err(ValidationError(format!(
+                "{label}: a {} proposal cannot be {}",
+                state.as_str(),
+                to.as_str()
+            ))
+            .into());
         }
         let resources = change_resources(tx.as_mut(), std::slice::from_ref(&change)).await?;
-        let decision = self.authorize(reviewer, Action::Review, resources, json!({"proposal":uid,"to":to.as_str()})).await?;
+        let decision = self
+            .authorize(
+                reviewer,
+                Action::Review,
+                resources,
+                json!({"proposal":uid,"to":to.as_str()}),
+            )
+            .await?;
         let decided = to == ProposalState::Rejected;
         sqlx::query("UPDATE mer.proposals SET state=$2,decided_by=CASE WHEN $3 THEN $4 END,decided_at=CASE WHEN $3 THEN clock_timestamp() END,updated_at=clock_timestamp() WHERE uid=$1")
             .bind(uid).bind(to.as_str()).bind(decided).bind(&reviewer.subject).execute(tx.as_mut()).await?;
-        proposal_event(tx.as_mut(), row.batch, Some(uid), action, reviewer, &decision, note.as_deref(), json!({})).await?;
+        proposal_event(
+            tx.as_mut(),
+            row.batch,
+            Some(uid),
+            action,
+            reviewer,
+            &decision,
+            note.as_deref(),
+            json!({}),
+        )
+        .await?;
         tx.commit().await?;
         let mut conn = self.pool.acquire().await?;
         proposal_row(&mut conn, uid).await?.into_proposal(false)
@@ -479,7 +606,13 @@ impl Registry {
 
     /// The proposer answers a send-back: the proposal takes the new change and waits again.
     /// The whole batch is test-run again, since its changes can depend on each other.
-    pub async fn revise(&self, proposer: &Actor, uid: Uuid, change: Change, note: Option<&str>) -> Result<Batch> {
+    pub async fn revise(
+        &self,
+        proposer: &Actor,
+        uid: Uuid,
+        change: Change,
+        note: Option<&str>,
+    ) -> Result<Batch> {
         let note = note_text(note, false)?;
         change.validate()?;
         let mut conn = self.pool.acquire().await?;
@@ -490,7 +623,9 @@ impl Registry {
             .fetch_one(&mut *conn)
             .await?;
         if owner != proposer.subject {
-            return Err(Error::Denied("only the proposer can revise its proposal".into()));
+            return Err(Error::Denied(
+                "only the proposer can revise its proposal".into(),
+            ));
         }
         if !ProposalState::parse(&row.state)?.open() {
             return Err(ValidationError("a decided proposal cannot be revised".into()).into());
@@ -499,7 +634,14 @@ impl Registry {
             return Err(ValidationError("a revision keeps the proposal's operation".into()).into());
         }
         let resources = change_resources(&mut conn, std::slice::from_ref(&change)).await?;
-        let decision = self.authorize(proposer, Action::Propose, resources, json!({"revise":uid,"change":change})).await?;
+        let decision = self
+            .authorize(
+                proposer,
+                Action::Propose,
+                resources,
+                json!({"revise":uid,"change":change}),
+            )
+            .await?;
         let open = sqlx::query_as::<_, ProposalRow>("SELECT uid,batch,position,change,state,revision,outcome,checked_at,decided_by,decided_at,created_at,updated_at FROM mer.proposals WHERE batch=$1 AND state IN ('waiting','sent-back') ORDER BY position")
             .bind(row.batch)
             .fetch_all(&mut *conn)
@@ -507,7 +649,11 @@ impl Registry {
         drop(conn);
         let mut items = vec![];
         for p in &open {
-            let c = if p.uid == uid { change.clone() } else { serde_json::from_value(p.change.clone())? };
+            let c = if p.uid == uid {
+                change.clone()
+            } else {
+                serde_json::from_value(p.change.clone())?
+            };
             items.push((proposer.clone(), c));
         }
         let outcomes = self.test_run(proposer, &items).await?;
@@ -521,7 +667,17 @@ impl Registry {
                     .bind(p.uid).bind(outcome).execute(tx.as_mut()).await?;
             }
         }
-        proposal_event(tx.as_mut(), row.batch, Some(uid), "proposal.revise", proposer, &decision, note.as_deref(), json!({"revision": row.revision + 1})).await?;
+        proposal_event(
+            tx.as_mut(),
+            row.batch,
+            Some(uid),
+            "proposal.revise",
+            proposer,
+            &decision,
+            note.as_deref(),
+            json!({"revision": row.revision + 1}),
+        )
+        .await?;
         tx.commit().await?;
         self.batch(proposer, row.batch).await
     }
@@ -550,13 +706,17 @@ impl Registry {
         approver: &Actor,
         items: &[(Actor, Change)],
     ) -> Result<Vec<std::result::Result<Value, String>>> {
-        let mut results: Vec<std::result::Result<Value, String>> = vec![Err("not run".into()); items.len()];
+        let mut results: Vec<std::result::Result<Value, String>> =
+            vec![Err("not run".into()); items.len()];
         let mut pending: Vec<usize> = (0..items.len()).collect();
         loop {
             let mut failed = vec![];
             for &i in &pending {
                 let mut savepoint = conn.begin().await?;
-                match self.apply(savepoint.as_mut(), &items[i].0, approver, &items[i].1).await {
+                match self
+                    .apply(savepoint.as_mut(), &items[i].0, approver, &items[i].1)
+                    .await
+                {
                     Ok(outcome) => {
                         savepoint.commit().await?;
                         results[i] = Ok(outcome);
@@ -578,7 +738,13 @@ impl Registry {
     }
 
     /// One change, exactly as proposed. Returns what it did, for the proposal's record.
-    async fn apply(&self, conn: &mut PgConnection, proposer: &Actor, approver: &Actor, change: &Change) -> Result<Value> {
+    async fn apply(
+        &self,
+        conn: &mut PgConnection,
+        proposer: &Actor,
+        approver: &Actor,
+        change: &Change,
+    ) -> Result<Value> {
         let before: i64 = sqlx::query_scalar("SELECT coalesce(max(sequence),0) FROM mer.events")
             .fetch_one(&mut *conn)
             .await?;
@@ -594,38 +760,92 @@ impl Registry {
                     Some(path) => resolve(conn, path).await?,
                     None => load(conn, m.authority_scope).await?,
                 };
-                self.relate_in(conn, approver, container.identity.uid, Predicate::Contains, m.identity.uid)
-                    .await?;
+                self.relate_in(
+                    conn,
+                    approver,
+                    container.identity.uid,
+                    Predicate::Contains,
+                    m.identity.uid,
+                )
+                .await?;
                 let m = self
-                    .transition_in(conn, approver, m.identity.uid, m.revision, MeronState::Registered)
+                    .transition_in(
+                        conn,
+                        approver,
+                        m.identity.uid,
+                        m.revision,
+                        MeronState::Registered,
+                    )
                     .await?;
-                self.transition_in(conn, approver, m.identity.uid, m.revision, MeronState::Active)
+                self.transition_in(
+                    conn,
+                    approver,
+                    m.identity.uid,
+                    m.revision,
+                    MeronState::Active,
+                )
+                .await?
+            }
+            Change::Update {
+                uid,
+                expected_revision,
+                meron,
+                compatibility,
+            } => {
+                self.update_in(
+                    conn,
+                    approver,
+                    *uid,
+                    *expected_revision,
+                    meron.clone(),
+                    compatibility.clone(),
+                )
+                .await?
+            }
+            Change::Rename {
+                uid,
+                expected_revision,
+                path,
+            } => {
+                self.rename_in(conn, approver, *uid, *expected_revision, path)
                     .await?
             }
-            Change::Update { uid, expected_revision, meron, compatibility } => {
-                self.update_in(conn, approver, *uid, *expected_revision, meron.clone(), compatibility.clone())
-                    .await?
-            }
-            Change::Rename { uid, expected_revision, path } => {
-                self.rename_in(conn, approver, *uid, *expected_revision, path).await?
-            }
-            Change::Deprecate { uid, expected_revision } => {
-                self.transition_in(conn, approver, *uid, *expected_revision, MeronState::Deprecated)
-                    .await?
+            Change::Deprecate {
+                uid,
+                expected_revision,
+            } => {
+                self.transition_in(
+                    conn,
+                    approver,
+                    *uid,
+                    *expected_revision,
+                    MeronState::Deprecated,
+                )
+                .await?
             }
         };
-        let rows: Vec<(String, Value)> =
-            sqlx::query_as("SELECT action,payload FROM mer.events WHERE sequence > $1 ORDER BY sequence")
-                .bind(before)
-                .fetch_all(&mut *conn)
-                .await?;
+        let rows: Vec<(String, Value)> = sqlx::query_as(
+            "SELECT action,payload FROM mer.events WHERE sequence > $1 ORDER BY sequence",
+        )
+        .bind(before)
+        .fetch_all(&mut *conn)
+        .await?;
         let mut steps = vec![];
         let mut gathered: BTreeMap<&str, Vec<Value>> = BTreeMap::new();
         for (action, payload) in rows {
             steps.push(action);
-            for field in ["checks", "invariants", "covered", "rechecked", "affected_consumers"] {
+            for field in [
+                "checks",
+                "invariants",
+                "covered",
+                "rechecked",
+                "affected_consumers",
+            ] {
                 if let Some(values) = payload.get(field).and_then(Value::as_array) {
-                    gathered.entry(field).or_default().extend(values.iter().cloned());
+                    gathered
+                        .entry(field)
+                        .or_default()
+                        .extend(values.iter().cloned());
                 }
             }
         }
@@ -646,9 +866,12 @@ async fn change_resources(conn: &mut PgConnection, changes: &[Change]) -> Result
     for change in changes {
         match change {
             Change::Add { meron, .. } => {
-                let scope = meron
-                    .authority_scope
-                    .ok_or_else(|| ValidationError(format!("{}: a new meron needs its authority_scope", meron.path)))?;
+                let scope = meron.authority_scope.ok_or_else(|| {
+                    ValidationError(format!(
+                        "{}: a new meron needs its authority_scope",
+                        meron.path
+                    ))
+                })?;
                 out.push(Resource {
                     uid: Uuid::nil(),
                     path: meron.path.clone(),
@@ -665,7 +888,9 @@ async fn change_resources(conn: &mut PgConnection, changes: &[Change]) -> Result
                 out.push(resource(&meron));
                 out.push(moved);
             }
-            other => out.push(resource(&load(conn, other.target().expect("only add has no target")).await?)),
+            other => out.push(resource(
+                &load(conn, other.target().expect("only add has no target")).await?,
+            )),
         }
     }
     Ok(out)
@@ -683,7 +908,9 @@ fn unchanged(current: &Meron, proposed: &NewMeron) -> bool {
         && same(&current.classification, &proposed.classification)
         && same(&current.semantics, &proposed.semantics)
         && same(&current.lifecycle.release_mode, &proposed.release_mode)
-        && proposed.authority_scope.is_none_or(|s| s == current.authority_scope)
+        && proposed
+            .authority_scope
+            .is_none_or(|s| s == current.authority_scope)
         && current.metadata == proposed.metadata
         && current.spec == proposed.spec
 }
@@ -694,7 +921,11 @@ async fn refuse_no_op(conn: &mut PgConnection, change: &Change) -> Result<()> {
         Change::Update { uid, meron, .. } => {
             let current = load(conn, *uid).await?;
             if unchanged(&current, meron) {
-                return Err(ValidationError(format!("{}: this change changes nothing; edit something first", current.identity.path)).into());
+                return Err(ValidationError(format!(
+                    "{}: this change changes nothing; edit something first",
+                    current.identity.path
+                ))
+                .into());
             }
         }
         Change::Rename { uid, path, .. } => {
@@ -711,10 +942,12 @@ async fn refuse_no_op(conn: &mut PgConnection, change: &Change) -> Result<()> {
 /// Whether an open proposal no longer fits Mero: its meron moved on, or its new path is taken.
 async fn is_stale(conn: &mut PgConnection, change: &Change) -> Result<bool> {
     match change {
-        Change::Add { meron, .. } => Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM mer.identifiers WHERE path=$1)")
-            .bind(&meron.path)
-            .fetch_one(&mut *conn)
-            .await?),
+        Change::Add { meron, .. } => Ok(sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM mer.identifiers WHERE path=$1)",
+        )
+        .bind(&meron.path)
+        .fetch_one(&mut *conn)
+        .await?),
         other => {
             let current = load(conn, other.target().expect("only add has no target")).await?;
             Ok(Some(current.revision) != other.expected_revision())

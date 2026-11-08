@@ -224,7 +224,12 @@ impl Governance {
     }
 
     /// Governance's problems, newest first, for those who may view (owners).
-    pub async fn problems(&self, credential: &Credential, before: Option<i64>, limit: Option<i64>) -> Result<Value> {
+    pub async fn problems(
+        &self,
+        credential: &Credential,
+        before: Option<i64>,
+        limit: Option<i64>,
+    ) -> Result<Value> {
         self.may_view(credential).await?;
         let limit = limit.unwrap_or(50).clamp(1, 200);
         let rows: Vec<ProblemRow> = sqlx::query_as(
@@ -235,7 +240,9 @@ impl Governance {
         .bind(limit)
         .fetch_all(&self.pool)
         .await?;
-        let next = (rows.len() as i64 == limit).then(|| rows.last().map(|r| r.0)).flatten();
+        let next = (rows.len() as i64 == limit)
+            .then(|| rows.last().map(|r| r.0))
+            .flatten();
         Ok(json!({
             "problems": rows.into_iter().map(|(seq, at, request_id, method, path, status, what)| json!({
                 "seq": seq, "at": at, "request_id": request_id, "method": method, "path": path, "status": status, "what": what,

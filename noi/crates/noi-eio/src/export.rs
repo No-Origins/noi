@@ -94,7 +94,11 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     for s in &sources {
         let (path, spec) = (s.path, s.spec);
         match s.subtype {
-            "color" => insert(&mut tree, path, json!(Oklch::from_palette_spec(spec)?.hex())),
+            "color" => insert(
+                &mut tree,
+                path,
+                json!(Oklch::from_palette_spec(spec)?.hex()),
+            ),
             "color-role" => {
                 let (l, d) = RoleSpec::parse(spec)?
                     .colors(&palette)
@@ -106,7 +110,11 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
             }
             "font-family" => {
                 let f = FontSpec::parse(spec)?;
-                insert(&mut tree, path, json!({ "family": f.family, "weights": f.weights, "italic": f.italic }));
+                insert(
+                    &mut tree,
+                    path,
+                    json!({ "family": f.family, "weights": f.weights, "italic": f.italic }),
+                );
             }
             "font-size" | "space" | "size" | "border-width" => {
                 let v = px(path, spec)?;
@@ -132,7 +140,9 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
                 }
             }
             "duration" => {
-                let ms = spec["ms"].as_u64().ok_or_else(|| format!("{path} has no ms"))?;
+                let ms = spec["ms"]
+                    .as_u64()
+                    .ok_or_else(|| format!("{path} has no ms"))?;
                 root.push(format!("  {}: {ms}ms;", var(path)));
                 durations.push(var(path));
                 insert(&mut tree, path, json!(ms));
@@ -142,15 +152,39 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
                     .as_array()
                     .filter(|b| b.len() == 4 && b.iter().all(Value::is_number))
                     .ok_or_else(|| format!("{path} has no four-number bezier"))?;
-                let numbers: Vec<String> = points.iter().map(|v| num(v.as_f64().unwrap_or_default()).to_string()).collect();
-                root.push(format!("  {}: cubic-bezier({});", var(path), numbers.join(", ")));
-                insert(&mut tree, path, Value::Array(points.iter().map(|v| num(v.as_f64().unwrap_or_default())).collect()));
+                let numbers: Vec<String> = points
+                    .iter()
+                    .map(|v| num(v.as_f64().unwrap_or_default()).to_string())
+                    .collect();
+                root.push(format!(
+                    "  {}: cubic-bezier({});",
+                    var(path),
+                    numbers.join(", ")
+                ));
+                insert(
+                    &mut tree,
+                    path,
+                    Value::Array(
+                        points
+                            .iter()
+                            .map(|v| num(v.as_f64().unwrap_or_default()))
+                            .collect(),
+                    ),
+                );
             }
             "window" => {
-                let min = spec["minWidth"].as_u64().ok_or_else(|| format!("{path} has no minWidth"))?;
-                let panes = spec["panes"].as_u64().ok_or_else(|| format!("{path} has no panes"))?;
+                let min = spec["minWidth"]
+                    .as_u64()
+                    .ok_or_else(|| format!("{path} has no minWidth"))?;
+                let panes = spec["panes"]
+                    .as_u64()
+                    .ok_or_else(|| format!("{path} has no panes"))?;
                 windows.push((min, key(path).rsplit('.').next().unwrap_or_default(), panes));
-                insert(&mut tree, path, json!({ "minWidth": spec["minWidth"], "panes": spec["panes"] }));
+                insert(
+                    &mut tree,
+                    path,
+                    json!({ "minWidth": spec["minWidth"], "panes": spec["panes"] }),
+                );
             }
             "text-style" => {
                 let st = StyleSpec::parse(spec)?;
@@ -159,7 +193,11 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
                 if let Some(f) = &st.fallback {
                     stack.push(family(f)?);
                 }
-                let generic = if main.contains("Mono") { "monospace" } else { "sans-serif" };
+                let generic = if main.contains("Mono") {
+                    "monospace"
+                } else {
+                    "sans-serif"
+                };
                 let size = px(&st.size, spec_of(&st.size, "font-size")?)?;
                 let case = match st.case {
                     Case::None => "none",
@@ -209,13 +247,23 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     let mut blocks = vec![];
     for (i, (min, name, panes)) in windows.iter().enumerate() {
         let margin = format!("{PREFIX}space.margin.{name}");
-        spec_of(&margin, "space-role").map_err(|_| format!("window class {name} needs the margin role {margin}"))?;
-        let (one, two) = if *panes > 1 { ("none", "contents") } else { ("contents", "none") };
+        spec_of(&margin, "space-role")
+            .map_err(|_| format!("window class {name} needs the margin role {margin}"))?;
+        let (one, two) = if *panes > 1 {
+            ("none", "contents")
+        } else {
+            ("contents", "none")
+        };
         let vars = format!(
             "--eio-window-margin: var({});\n--eio-window-panes: {panes};\n--eio-window-one-pane: {one};\n--eio-window-two-panes: {two};",
             var(&margin)
         );
-        let block = |pad: &str| vars.lines().map(|l| format!("{pad}{l}")).collect::<Vec<_>>().join("\n");
+        let block = |pad: &str| {
+            vars.lines()
+                .map(|l| format!("{pad}{l}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
         blocks.push(if i == 0 {
             format!("/* {name}: {min} px and up */\n:root {{\n{}\n}}\n", block("  "))
         } else {
@@ -242,7 +290,13 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     };
 
     const HEAD: &str = "@noi/eio-tokens: Eidos tokens for No Origins apps.\nGenerated by `noi export eio` from the active merons in Mero. Do not edit by hand.";
-    let indent = |lines: &[String]| lines.iter().map(|l| format!("  {l}")).collect::<Vec<_>>().join("\n");
+    let indent = |lines: &[String]| {
+        lines
+            .iter()
+            .map(|l| format!("  {l}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
     let css = format!(
         "/* {} */\n@import \"./fonts.css\";\n\n:root {{\n  color-scheme: light;\n{}\n{}\n}}\n\n/* Themes. Without a data-theme the page follows the system; data-theme on any element\n   chooses that element's theme, so a light section can sit inside a dark page and back. */\n@media (prefers-color-scheme: dark) {{\n  :root:not([data-theme=\"light\"]) {{\n    color-scheme: dark;\n{}\n  }}\n}}\n[data-theme=\"light\"] {{\n  color-scheme: light;\n{}\n}}\n[data-theme=\"dark\"] {{\n  color-scheme: dark;\n{}\n}}\n{window_css}{motion_css}\n/* Text styles. Color comes from a color role, never from the style. */\n{}\n",
         HEAD.replace('\n', "\n   "),
@@ -254,7 +308,10 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
         classes.join("\n\n"),
     );
     let tree = Value::Object(tree);
-    let json = format!("{}\n", serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())?);
+    let json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())?
+    );
     let windows = if tree.pointer("/layout/window").is_some() {
         "\nexport type WindowClass = keyof typeof tokens.layout.window\n\n/** The window class for a width in CSS pixels: the widest class whose minimum width fits. */\nexport function windowClass(width: number): WindowClass {\n  const classes = Object.entries(tokens.layout.window) as [WindowClass, { minWidth: number }][]\n  return classes.filter(([, w]) => width >= w.minWidth).sort((a, b) => b[1].minWidth - a[1].minWidth)[0][0]\n}\n"
     } else {
@@ -276,7 +333,8 @@ mod tests {
     fn exports_roles_in_both_themes_and_styles_as_classes() {
         let lime = json!({"family":"brand","value":{"colorSpace":"oklch","components":[0.896,0.196,119.552],"hex":"#CEEE38"}});
         let white = json!({"family":"neutral","value":{"colorSpace":"oklch","components":[1,0,0]}});
-        let black = json!({"family":"neutral","value":{"colorSpace":"oklch","components":[0.145,0,0]}});
+        let black =
+            json!({"family":"neutral","value":{"colorSpace":"oklch","components":[0.145,0,0]}});
         let role = json!({"light":{"ref":"noi.eio.color.palette.black"},"dark":{"ref":"noi.eio.color.palette.white"}});
         let hover = json!({"light":{"mix":{"color":"noi.eio.color.palette.lime","percent":14,"over":"noi.eio.color.palette.white"}},"dark":{"ref":"noi.eio.color.palette.black"}});
         let font = json!({"family":"Geist Mono","weights":[400,500],"italic":false,"scripts":["latin"],"license":"OFL-1.1","source":"https://fonts.google.com/specimen/Geist+Mono"});
@@ -286,56 +344,152 @@ mod tests {
         let scale = json!({"px":24});
         let gap = json!({"ref":"noi.eio.space.scale.px24"});
         let sources = [
-            TokenSource { path: "noi.eio.color.palette.lime", subtype: "color", spec: &lime },
-            TokenSource { path: "noi.eio.color.palette.white", subtype: "color", spec: &white },
-            TokenSource { path: "noi.eio.color.palette.black", subtype: "color", spec: &black },
-            TokenSource { path: "noi.eio.color.text.primary", subtype: "color-role", spec: &role },
-            TokenSource { path: "noi.eio.color.state.hover", subtype: "color-role", spec: &hover },
-            TokenSource { path: "noi.eio.type.font.geist-mono", subtype: "font-family", spec: &font },
-            TokenSource { path: "noi.eio.type.size.px12", subtype: "font-size", spec: &size },
-            TokenSource { path: "noi.eio.type.style.label", subtype: "text-style", spec: &style },
-            TokenSource { path: "noi.eio.radius.button", subtype: "radius", spec: &full },
-            TokenSource { path: "noi.eio.space.scale.px24", subtype: "space", spec: &scale },
-            TokenSource { path: "noi.eio.space.gap.group", subtype: "space-role", spec: &gap },
+            TokenSource {
+                path: "noi.eio.color.palette.lime",
+                subtype: "color",
+                spec: &lime,
+            },
+            TokenSource {
+                path: "noi.eio.color.palette.white",
+                subtype: "color",
+                spec: &white,
+            },
+            TokenSource {
+                path: "noi.eio.color.palette.black",
+                subtype: "color",
+                spec: &black,
+            },
+            TokenSource {
+                path: "noi.eio.color.text.primary",
+                subtype: "color-role",
+                spec: &role,
+            },
+            TokenSource {
+                path: "noi.eio.color.state.hover",
+                subtype: "color-role",
+                spec: &hover,
+            },
+            TokenSource {
+                path: "noi.eio.type.font.geist-mono",
+                subtype: "font-family",
+                spec: &font,
+            },
+            TokenSource {
+                path: "noi.eio.type.size.px12",
+                subtype: "font-size",
+                spec: &size,
+            },
+            TokenSource {
+                path: "noi.eio.type.style.label",
+                subtype: "text-style",
+                spec: &style,
+            },
+            TokenSource {
+                path: "noi.eio.radius.button",
+                subtype: "radius",
+                spec: &full,
+            },
+            TokenSource {
+                path: "noi.eio.space.scale.px24",
+                subtype: "space",
+                spec: &scale,
+            },
+            TokenSource {
+                path: "noi.eio.space.gap.group",
+                subtype: "space-role",
+                spec: &gap,
+            },
         ];
         let files = export_tokens(&sources).unwrap();
         assert!(files.css.contains("  --eio-color-text-primary: #0A0A0A;"));
         assert!(files.css.contains("[data-theme=\"dark\"] {\n  color-scheme: dark;\n  --eio-color-state-hover: #0A0A0A;\n  --eio-color-text-primary: #FFFFFF;"));
-        assert!(files.css.contains("  --eio-color-state-hover: #F8FDE9;"), "lime 14% over white, as checked");
+        assert!(
+            files.css.contains("  --eio-color-state-hover: #F8FDE9;"),
+            "lime 14% over white, as checked"
+        );
         assert!(
             files.css.contains("[data-theme=\"light\"] {\n  color-scheme: light;\n  --eio-color-state-hover: #F8FDE9;"),
             "a light section can sit inside a dark page"
         );
-        assert!(!files.css.contains("--eio-color-palette"), "components read roles, never palette colors");
-        assert!(files.css.contains("  --eio-type-style-label-font: 'Geist Mono', monospace;"));
-        assert!(files.css.contains("  --eio-type-style-label-case: uppercase;"));
+        assert!(
+            !files.css.contains("--eio-color-palette"),
+            "components read roles, never palette colors"
+        );
+        assert!(files
+            .css
+            .contains("  --eio-type-style-label-font: 'Geist Mono', monospace;"));
+        assert!(files
+            .css
+            .contains("  --eio-type-style-label-case: uppercase;"));
         assert!(files.css.contains(".eio-type-style-label {"));
         assert!(files.css.contains("  --eio-radius-button: 9999px;"));
         assert!(files.css.contains("  --eio-space-gap-group: 24px;"));
         let tree: Value = serde_json::from_str(&files.json).unwrap();
         assert_eq!(tree["color"]["palette"]["lime"], "#CEEE38");
         assert_eq!(tree["space"]["gap"]["group"], 24);
-        assert_eq!(tree["type"]["style"]["label"]["font"], json!(["Geist Mono", "monospace"]));
+        assert_eq!(
+            tree["type"]["style"]["label"]["font"],
+            json!(["Geist Mono", "monospace"])
+        );
         assert!(files.ts.starts_with("// @noi/eio-tokens"));
-        assert_eq!(export_tokens(&sources).unwrap().css, files.css, "deterministic");
+        assert_eq!(
+            export_tokens(&sources).unwrap().css,
+            files.css,
+            "deterministic"
+        );
     }
 
     #[test]
     fn window_classes_switch_the_window_variables() {
         let (s16, s24) = (json!({"px":16}), json!({"px":24}));
-        let (m16, m24) = (json!({"ref":"noi.eio.space.scale.px16"}), json!({"ref":"noi.eio.space.scale.px24"}));
+        let (m16, m24) = (
+            json!({"ref":"noi.eio.space.scale.px16"}),
+            json!({"ref":"noi.eio.space.scale.px24"}),
+        );
         let compact = json!({"minWidth":0,"panes":1});
         let medium = json!({"minWidth":600,"panes":1});
         let expanded = json!({"minWidth":840,"panes":2});
         let mut sources = vec![
-            TokenSource { path: "noi.eio.space.scale.px16", subtype: "space", spec: &s16 },
-            TokenSource { path: "noi.eio.space.scale.px24", subtype: "space", spec: &s24 },
-            TokenSource { path: "noi.eio.space.margin.compact", subtype: "space-role", spec: &m16 },
-            TokenSource { path: "noi.eio.space.margin.medium", subtype: "space-role", spec: &m24 },
-            TokenSource { path: "noi.eio.space.margin.expanded", subtype: "space-role", spec: &m24 },
-            TokenSource { path: "noi.eio.layout.window.expanded", subtype: "window", spec: &expanded },
-            TokenSource { path: "noi.eio.layout.window.compact", subtype: "window", spec: &compact },
-            TokenSource { path: "noi.eio.layout.window.medium", subtype: "window", spec: &medium },
+            TokenSource {
+                path: "noi.eio.space.scale.px16",
+                subtype: "space",
+                spec: &s16,
+            },
+            TokenSource {
+                path: "noi.eio.space.scale.px24",
+                subtype: "space",
+                spec: &s24,
+            },
+            TokenSource {
+                path: "noi.eio.space.margin.compact",
+                subtype: "space-role",
+                spec: &m16,
+            },
+            TokenSource {
+                path: "noi.eio.space.margin.medium",
+                subtype: "space-role",
+                spec: &m24,
+            },
+            TokenSource {
+                path: "noi.eio.space.margin.expanded",
+                subtype: "space-role",
+                spec: &m24,
+            },
+            TokenSource {
+                path: "noi.eio.layout.window.expanded",
+                subtype: "window",
+                spec: &expanded,
+            },
+            TokenSource {
+                path: "noi.eio.layout.window.compact",
+                subtype: "window",
+                spec: &compact,
+            },
+            TokenSource {
+                path: "noi.eio.layout.window.medium",
+                subtype: "window",
+                spec: &medium,
+            },
         ];
         let css = export_tokens(&sources).unwrap().css;
         // The narrowest class needs no query; the others start at their own width, narrowest first.
@@ -343,10 +497,16 @@ mod tests {
         assert!(css.contains("@media (width >= 600px) {\n  :root {\n    --eio-window-margin: var(--eio-space-margin-medium);"));
         assert!(css.contains("@media (width >= 840px) {\n  :root {\n    --eio-window-margin: var(--eio-space-margin-expanded);\n    --eio-window-panes: 2;\n    --eio-window-one-pane: none;\n    --eio-window-two-panes: contents;"));
         assert!(css.find("width >= 600px").unwrap() < css.find("width >= 840px").unwrap());
-        assert_eq!(css.matches("@media (width").count(), 2, "widths appear only in the window queries");
+        assert_eq!(
+            css.matches("@media (width").count(),
+            2,
+            "widths appear only in the window queries"
+        );
         // A window class without its margin role cannot be exported.
         sources.retain(|s| s.path != "noi.eio.space.margin.medium");
-        assert!(export_tokens(&sources).err().is_some_and(|e| e.contains("noi.eio.space.margin.medium")));
+        assert!(export_tokens(&sources)
+            .err()
+            .is_some_and(|e| e.contains("noi.eio.space.margin.medium")));
     }
 
     #[test]
@@ -354,25 +514,48 @@ mod tests {
         let (ms100, ms300) = (json!({"ms":100}), json!({"ms":300}));
         let standard = json!({"bezier":[0.2,0,0,1]});
         let sources = [
-            TokenSource { path: "noi.eio.motion.duration.ms300", subtype: "duration", spec: &ms300 },
-            TokenSource { path: "noi.eio.motion.duration.ms100", subtype: "duration", spec: &ms100 },
-            TokenSource { path: "noi.eio.motion.easing.standard", subtype: "easing", spec: &standard },
+            TokenSource {
+                path: "noi.eio.motion.duration.ms300",
+                subtype: "duration",
+                spec: &ms300,
+            },
+            TokenSource {
+                path: "noi.eio.motion.duration.ms100",
+                subtype: "duration",
+                spec: &ms100,
+            },
+            TokenSource {
+                path: "noi.eio.motion.easing.standard",
+                subtype: "easing",
+                spec: &standard,
+            },
         ];
         let files = export_tokens(&sources).unwrap();
         assert!(files.css.contains("  --eio-motion-duration-ms100: 100ms;"));
-        assert!(files.css.contains("  --eio-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);"));
+        assert!(files
+            .css
+            .contains("  --eio-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);"));
         assert!(files.css.contains("@media (prefers-reduced-motion: reduce) {\n  :root {\n    --eio-motion-duration-ms100: 0ms;\n    --eio-motion-duration-ms300: 0ms;\n  }\n}"));
         let tree: Value = serde_json::from_str(&files.json).unwrap();
         assert_eq!(tree["motion"]["duration"]["ms300"], 300);
         assert_eq!(tree["motion"]["easing"]["standard"], json!([0.2, 0, 0, 1]));
         let bad = json!({"bezier":[0.2,0,1]});
-        assert!(export_tokens(&[TokenSource { path: "noi.eio.motion.easing.bad", subtype: "easing", spec: &bad }]).is_err());
+        assert!(export_tokens(&[TokenSource {
+            path: "noi.eio.motion.easing.bad",
+            subtype: "easing",
+            spec: &bad
+        }])
+        .is_err());
     }
 
     #[test]
     fn a_role_reading_a_missing_color_fails() {
         let role = json!({"light":{"ref":"noi.eio.color.palette.gone"},"dark":{"ref":"noi.eio.color.palette.gone"}});
-        let sources = [TokenSource { path: "noi.eio.color.text.primary", subtype: "color-role", spec: &role }];
+        let sources = [TokenSource {
+            path: "noi.eio.color.text.primary",
+            subtype: "color-role",
+            spec: &role,
+        }];
         assert!(export_tokens(&sources).is_err());
     }
 }

@@ -46,7 +46,10 @@ fn uid(text: &str) -> EntityUid {
     EntityUid::from_str(text).expect("entity names are built from checked parts")
 }
 fn quoted(kind: &str, id: &str) -> EntityUid {
-    uid(&format!("{kind}::{}", serde_json::to_string(id).expect("a string")))
+    uid(&format!(
+        "{kind}::{}",
+        serde_json::to_string(id).expect("a string")
+    ))
 }
 /// A role's Cedar name: its path under noi.gov.roles, as the rules write it (Role::"owner").
 pub(crate) fn role_name(path: &str) -> &str {
@@ -55,7 +58,10 @@ pub(crate) fn role_name(path: &str) -> &str {
 /// The place and every place above it: noi.eio.color → noi.eio.color, noi.eio, noi.
 fn ancestry(path: &str) -> Vec<String> {
     let parts: Vec<&str> = path.split('.').collect();
-    (1..=parts.len()).rev().map(|n| parts[..n].join(".")).collect()
+    (1..=parts.len())
+        .rev()
+        .map(|n| parts[..n].join("."))
+        .collect()
 }
 fn covers(scope: &str, path: &str) -> bool {
     path == scope || path.starts_with(&format!("{scope}."))
@@ -65,7 +71,12 @@ fn declared(action: &str) -> bool {
 }
 
 async fn handle_of(conn: &mut PgConnection, account: Uuid) -> Result<String> {
-    Ok(sqlx::query_scalar("SELECT handle FROM gov.accounts WHERE id = $1").bind(account).fetch_one(conn).await?)
+    Ok(
+        sqlx::query_scalar("SELECT handle FROM gov.accounts WHERE id = $1")
+            .bind(account)
+            .fetch_one(conn)
+            .await?,
+    )
 }
 
 /// The canonical form of what a touch approves: one action on these resources, in order.
@@ -78,7 +89,11 @@ pub(crate) fn intent(action: &str, targets: &[Target]) -> Value {
 impl Governance {
     /// Checks a credential. A session must be live and its person active; a run token must be live,
     /// its agent active and its sponsor active.
-    pub(crate) async fn asker(&self, conn: &mut PgConnection, credential: &Credential) -> Result<Asker> {
+    pub(crate) async fn asker(
+        &self,
+        conn: &mut PgConnection,
+        credential: &Credential,
+    ) -> Result<Asker> {
         match credential {
             Credential::Visitor => Ok(Asker {
                 account: VISITORS,
@@ -113,7 +128,9 @@ impl Governance {
                 .fetch_optional(&mut *conn)
                 .await?;
                 let (account,) = row.ok_or_else(|| {
-                    Error::Refused("no live run token, or its agent or sponsor is not active".into())
+                    Error::Refused(
+                        "no live run token, or its agent or sponsor is not active".into(),
+                    )
                 })?;
                 Ok(Asker {
                     account,
@@ -134,23 +151,58 @@ impl Governance {
     ) -> Result<Answer> {
         let labels: Vec<String> = targets.iter().map(Target::label).collect();
         let mut tx = self.pool.begin().await?;
-        match self.decide(&mut tx, credential, action, targets, touch).await {
+        match self
+            .decide(&mut tx, credential, action, targets, touch)
+            .await
+        {
             Ok((account, determined)) => {
-                let seq = record(&mut tx, "decision", Some(account), Some(action), &labels, true, "allowed", json!({"policies": determined})).await?;
+                let seq = record(
+                    &mut tx,
+                    "decision",
+                    Some(account),
+                    Some(action),
+                    &labels,
+                    true,
+                    "allowed",
+                    json!({"policies": determined}),
+                )
+                .await?;
                 let handle = handle_of(tx.as_mut(), account).await?;
                 tx.commit().await?;
-                Ok(Answer { allowed: true, reason: "allowed".into(), account: Some(account), handle: Some(handle), record: seq })
+                Ok(Answer {
+                    allowed: true,
+                    reason: "allowed".into(),
+                    account: Some(account),
+                    handle: Some(handle),
+                    record: seq,
+                })
             }
             Err((account, reason)) => {
                 // Nothing a refused request touched is kept, but the refusal itself is recorded.
                 tx.rollback().await?;
                 let mut conn = self.pool.acquire().await?;
-                let seq = record(&mut conn, "decision", account, Some(action), &labels, false, &reason, json!({})).await?;
+                let seq = record(
+                    &mut conn,
+                    "decision",
+                    account,
+                    Some(action),
+                    &labels,
+                    false,
+                    &reason,
+                    json!({}),
+                )
+                .await?;
                 let handle = match account {
                     Some(a) => Some(handle_of(&mut conn, a).await?),
                     None => None,
                 };
-                Ok(Answer { allowed: false, reason, account, handle, record: seq })
+                Ok(Answer {
+                    allowed: false,
+                    reason,
+                    account,
+                    handle,
+                    record: seq,
+                })
             }
         }
     }
@@ -165,10 +217,16 @@ impl Governance {
         targets: &[Target],
         touch: Option<Uuid>,
     ) -> std::result::Result<(Uuid, Vec<String>), (Option<Uuid>, String)> {
-        let asker = self.asker(conn, credential).await.map_err(|e| (None, refusal(e)))?;
+        let asker = self
+            .asker(conn, credential)
+            .await
+            .map_err(|e| (None, refusal(e)))?;
         let who = Some(asker.account);
         if !declared(action) {
-            return Err((who, format!("{action} is not an action any system declares")));
+            return Err((
+                who,
+                format!("{action} is not an action any system declares"),
+            ));
         }
         if targets.is_empty() {
             return Err((who, "an action needs at least one resource".into()));
@@ -189,12 +247,21 @@ impl Governance {
                 .map_err(|e| (who, refusal(e)))?,
             None => false,
         };
-        let policies = self.policy_set(conn, asker.account).await.map_err(|e| (who, refusal(e)))?;
-        let grants = self.live_grants(conn, asker.account).await.map_err(|e| (who, refusal(e)))?;
+        let policies = self
+            .policy_set(conn, asker.account)
+            .await
+            .map_err(|e| (who, refusal(e)))?;
+        let grants = self
+            .live_grants(conn, asker.account)
+            .await
+            .map_err(|e| (who, refusal(e)))?;
         let schema = crate::cedar::schema();
         let action_uid = quoted("Action", action);
-        let context = Context::from_json_value(json!({"fresh_signature": fresh}), Some((schema, &action_uid)))
-            .map_err(|e| (who, format!("context: {e}")))?;
+        let context = Context::from_json_value(
+            json!({"fresh_signature": fresh}),
+            Some((schema, &action_uid)),
+        )
+        .map_err(|e| (who, format!("context: {e}")))?;
         let principal = quoted("Account", &asker.account.to_string());
         let mut determined = HashSet::new();
         for target in targets {
@@ -202,8 +269,19 @@ impl Governance {
                 Target::Path(p) => (quoted("Scope", p), p.clone(), vec![]),
                 Target::Account(id) => {
                     let account = quoted("Account", &id.to_string());
-                    let entity = Entity::new_no_attrs(account.clone(), HashSet::from([quoted("Scope", "noi")]));
-                    (account, "noi".to_string(), if *id == asker.account { vec![] } else { vec![entity] })
+                    let entity = Entity::new_no_attrs(
+                        account.clone(),
+                        HashSet::from([quoted("Scope", "noi")]),
+                    );
+                    (
+                        account,
+                        "noi".to_string(),
+                        if *id == asker.account {
+                            vec![]
+                        } else {
+                            vec![entity]
+                        },
+                    )
                 }
             };
             // The asker is in each role they hold where this resource is.
@@ -213,7 +291,8 @@ impl Governance {
                     parents.insert(quoted("Role", role_name(role)));
                 }
             }
-            let mut entities: Vec<Entity> = vec![Entity::new_no_attrs(principal.clone(), parents.clone())];
+            let mut entities: Vec<Entity> =
+                vec![Entity::new_no_attrs(principal.clone(), parents.clone())];
             for role in &parents {
                 if role.type_name().to_string() == "Role" {
                     entities.push(Entity::new_no_attrs(role.clone(), HashSet::new()));
@@ -221,24 +300,53 @@ impl Governance {
             }
             let chain = ancestry(&place);
             for (i, p) in chain.iter().enumerate() {
-                let up = chain.get(i + 1).map(|q| HashSet::from([quoted("Scope", q)])).unwrap_or_default();
+                let up = chain
+                    .get(i + 1)
+                    .map(|q| HashSet::from([quoted("Scope", q)]))
+                    .unwrap_or_default();
                 entities.push(Entity::new_no_attrs(quoted("Scope", p), up));
             }
             entities.append(&mut extra);
-            let entities = Entities::from_entities(entities, Some(schema)).map_err(|e| (who, format!("entities: {e}")))?;
-            let request = Request::new(principal.clone(), action_uid.clone(), resource, context.clone(), Some(schema))
-                .map_err(|e| (who, format!("{action} does not apply here: {e}")))?;
+            let entities = Entities::from_entities(entities, Some(schema))
+                .map_err(|e| (who, format!("entities: {e}")))?;
+            let request = Request::new(
+                principal.clone(),
+                action_uid.clone(),
+                resource,
+                context.clone(),
+                Some(schema),
+            )
+            .map_err(|e| (who, format!("{action} does not apply here: {e}")))?;
             let response = Authorizer::new().is_authorized(&request, &policies, &entities);
-            let reasons: Vec<String> = response.diagnostics().reason().map(|p| p.to_string()).collect();
-            if !response.diagnostics().errors().collect::<Vec<_>>().is_empty() {
+            let reasons: Vec<String> = response
+                .diagnostics()
+                .reason()
+                .map(|p| p.to_string())
+                .collect();
+            if !response
+                .diagnostics()
+                .errors()
+                .collect::<Vec<_>>()
+                .is_empty()
+            {
                 return Err((who, "a policy could not be evaluated, so no".into()));
             }
             if response.decision() != Decision::Allow {
-                let forbids: Vec<&String> = reasons.iter().filter(|r| !r.starts_with("grant:")).collect();
+                let forbids: Vec<&String> = reasons
+                    .iter()
+                    .filter(|r| !r.starts_with("grant:"))
+                    .collect();
                 let why = if forbids.is_empty() {
                     format!("no grant allows {action} on {}", target.label())
                 } else {
-                    format!("{} says no", forbids.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "))
+                    format!(
+                        "{} says no",
+                        forbids
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
                 };
                 return Err((who, why));
             }
@@ -250,7 +358,11 @@ impl Governance {
     }
 
     /// The live grants of an account whose role is in the copy: (role path, scope).
-    async fn live_grants(&self, conn: &mut PgConnection, account: Uuid) -> Result<Vec<(String, String)>> {
+    async fn live_grants(
+        &self,
+        conn: &mut PgConnection,
+        account: Uuid,
+    ) -> Result<Vec<(String, String)>> {
         Ok(sqlx::query_as(
             "SELECT g.role, g.scope FROM gov.grants g JOIN gov.policies p ON p.path = g.role AND p.kind = 'role'
              WHERE g.account = $1 AND g.ended_at IS NULL ORDER BY g.granted_at",
@@ -267,16 +379,21 @@ impl Governance {
                 .fetch_all(&mut *conn)
                 .await?;
         if copied.is_empty() {
-            return Err(Error::Refused("Governance has no copy of the roles and rules yet".into()));
+            return Err(Error::Refused(
+                "Governance has no copy of the roles and rules yet".into(),
+            ));
         }
         let mut set = PolicySet::new();
-        let broken = |e: String| Error::Refused(format!("the copied roles and rules do not load: {e}"));
+        let broken =
+            |e: String| Error::Refused(format!("the copied roles and rules do not load: {e}"));
         for (path, kind, cedar) in &copied {
             if kind == "role" {
-                let t = Template::parse(Some(PolicyId::new(path)), cedar).map_err(|e| broken(e.to_string()))?;
+                let t = Template::parse(Some(PolicyId::new(path)), cedar)
+                    .map_err(|e| broken(e.to_string()))?;
                 set.add_template(t).map_err(|e| broken(e.to_string()))?;
             } else {
-                let p = Policy::parse(Some(PolicyId::new(path)), cedar).map_err(|e| broken(e.to_string()))?;
+                let p = Policy::parse(Some(PolicyId::new(path)), cedar)
+                    .map_err(|e| broken(e.to_string()))?;
                 set.add(p).map_err(|e| broken(e.to_string()))?;
             }
         }
@@ -292,15 +409,25 @@ impl Governance {
                 (SlotId::principal(), quoted("Account", &account.to_string())),
                 (SlotId::resource(), quoted("Scope", &scope)),
             ]);
-            set.link(PolicyId::new(&role), PolicyId::new(format!("grant:{id}")), fill)
-                .map_err(|e| broken(e.to_string()))?;
+            set.link(
+                PolicyId::new(&role),
+                PolicyId::new(format!("grant:{id}")),
+                fill,
+            )
+            .map_err(|e| broken(e.to_string()))?;
         }
         Ok(set)
     }
 
     /// A touch counts once, for the session and person that made it, for exactly what it approved,
     /// within a minute.
-    async fn use_touch(&self, conn: &mut PgConnection, asker: &Asker, id: Uuid, intent: &Value) -> Result<bool> {
+    async fn use_touch(
+        &self,
+        conn: &mut PgConnection,
+        asker: &Asker,
+        id: Uuid,
+        intent: &Value,
+    ) -> Result<bool> {
         let Some(session) = &asker.session else {
             return Err(Error::Refused("only a signed-in person can touch".into()));
         };
@@ -318,7 +445,9 @@ impl Governance {
         if used == 1 {
             Ok(true)
         } else {
-            Err(Error::Refused("the touch is used, expired, or was for something else".into()))
+            Err(Error::Refused(
+                "the touch is used, expired, or was for something else".into(),
+            ))
         }
     }
 }
@@ -336,7 +465,10 @@ mod tests {
     use super::*;
     #[test]
     fn places_cover_what_is_below_them() {
-        assert_eq!(ancestry("noi.eio.color"), ["noi.eio.color", "noi.eio", "noi"]);
+        assert_eq!(
+            ancestry("noi.eio.color"),
+            ["noi.eio.color", "noi.eio", "noi"]
+        );
         assert!(covers("noi", "noi.gov.roles.owner"));
         assert!(covers("noi.eio", "noi.eio"));
         assert!(!covers("noi.eio", "noi.eio-evil"));
@@ -346,9 +478,21 @@ mod tests {
     }
     #[test]
     fn a_touch_names_one_action_and_its_resources_in_order() {
-        let a = intent("review", &[Target::Path("noi.b".into()), Target::Path("noi.a".into())]);
-        let b = intent("review", &[Target::Path("noi.a".into()), Target::Path("noi.b".into())]);
+        let a = intent(
+            "review",
+            &[Target::Path("noi.b".into()), Target::Path("noi.a".into())],
+        );
+        let b = intent(
+            "review",
+            &[Target::Path("noi.a".into()), Target::Path("noi.b".into())],
+        );
         assert_eq!(a, b);
-        assert_ne!(a, intent("update", &[Target::Path("noi.a".into()), Target::Path("noi.b".into())]));
+        assert_ne!(
+            a,
+            intent(
+                "update",
+                &[Target::Path("noi.a".into()), Target::Path("noi.b".into())]
+            )
+        );
     }
 }

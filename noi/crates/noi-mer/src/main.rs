@@ -108,7 +108,11 @@ struct RunArgs {
     #[arg(long, conflicts_with = "run_token")]
     agent: Option<String>,
     /// This Mac's Hyperbase key, which vouches for the run (owner-only).
-    #[arg(long, env = "NOI_VOUCH_KEY", default_value = "hyperbase-vouch.local.pem")]
+    #[arg(
+        long,
+        env = "NOI_VOUCH_KEY",
+        default_value = "hyperbase-vouch.local.pem"
+    )]
     key_file: PathBuf,
     /// Who vouches: this Mac's Hyperbase, until Hyperbase runs elsewhere.
     #[arg(long, default_value = "hyperbase:this-mac")]
@@ -124,16 +128,18 @@ struct Operator;
 const OPERATOR: &str = "operator";
 impl Authorizer for Operator {
     fn authorize<'a>(&'a self, request: &'a AuthorizationRequest) -> Answer<'a> {
-        answer(if request.action == Action::Read && request.actor.subject == OPERATOR {
-            Decision::Allow {
-                reference: "operator:database-password".into(),
-                policies: vec![],
-            }
-        } else {
-            Decision::Deny {
+        answer(
+            if request.action == Action::Read && request.actor.subject == OPERATOR {
+                Decision::Allow {
+                    reference: "operator:database-password".into(),
+                    policies: vec![],
+                }
+            } else {
+                Decision::Deny {
                 reason: "the terminal only reads: agents propose with noi propose, people approve in the Explorer".into(),
             }
-        })
+            },
+        )
     }
 }
 
@@ -146,13 +152,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `noi gov …` is Governance's own command, which sits beside this one.
     let mut args = std::env::args_os();
     if args.nth(1).is_some_and(|a| a == "gov") {
-        let status = std::process::Command::new(sibling("noi-gov")?).args(args).status()?;
+        let status = std::process::Command::new(sibling("noi-gov")?)
+            .args(args)
+            .status()?;
         std::process::exit(status.code().unwrap_or(1));
     }
     let cli = Cli::parse();
     let registry = Registry::connect(&cli.database_url).await?;
     let governance = GovernanceClient::new(&cli.governance);
-    let operator = Actor { subject: OPERATOR.into() };
+    let operator = Actor {
+        subject: OPERATOR.into(),
+    };
     let reader = || registry.clone().with_authorizer(Arc::new(Operator));
     match cli.command {
         Command::Migrate => {
@@ -165,20 +175,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(q) = query {
                 let q = q.to_lowercase();
                 s.merons.retain(|e| {
-                    format!("{} {} {}", e.identity.path, e.identity.name, e.classification.kind)
-                        .to_lowercase()
-                        .contains(&q)
+                    format!(
+                        "{} {} {}",
+                        e.identity.path, e.identity.name, e.classification.kind
+                    )
+                    .to_lowercase()
+                    .contains(&q)
                 });
             }
             print(s.merons)?;
         }
         Command::History { uid } => print(reader().history(&operator, uid).await?)?,
         Command::Review => print(reader().review(&operator).await?)?,
-        Command::EffectiveRelease { uid } => print(reader().effective_release(&operator, uid).await?)?,
+        Command::EffectiveRelease { uid } => {
+            print(reader().effective_release(&operator, uid).await?)?
+        }
         Command::Export { target, output } => {
             let snapshot = reader().snapshot(&operator).await?;
             if target.is_some() {
-                let dir = output.ok_or("`export eio` needs --output, the @noi/eio-tokens folder")?;
+                let dir =
+                    output.ok_or("`export eio` needs --output, the @noi/eio-tokens folder")?;
                 let exported = export_eio(&snapshot, &dir)?;
                 print(json!({"exported": exported, "output": dir}))?;
             } else if let Some(file) = output {
@@ -187,15 +203,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 print(snapshot)?;
             }
         }
-        Command::Propose { files, title, note, run } => {
+        Command::Propose {
+            files,
+            title,
+            note,
+            run,
+        } => {
             let batch = read_batch(&files, title, note)?;
             let (agent, registry) = as_agent(&registry, &governance, &run).await?;
             print(registry.propose_batch(&agent, batch).await?)?
         }
-        Command::Revise { uid, file, note, run } => {
+        Command::Revise {
+            uid,
+            file,
+            note,
+            run,
+        } => {
             let change = read_change(&file)?;
             let (agent, registry) = as_agent(&registry, &governance, &run).await?;
-            print(registry.revise(&agent, uid, change, note.as_deref()).await?)?
+            print(
+                registry
+                    .revise(&agent, uid, change, note.as_deref())
+                    .await?,
+            )?
         }
         Command::Serve { bind, eio_tokens } => {
             // On this Mac, loopback only. Inside a container (its image sets NOI_IN_CONTAINER=1) the
@@ -217,12 +247,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .route("/api/review/approve", post(approve_handler))
                 .route("/api/review/send-back", post(send_back_handler))
                 .route("/api/review/reject", post(reject_handler))
-                .route("/api/governance/roles-and-rules", get(roles_and_rules_handler))
+                .route(
+                    "/api/governance/roles-and-rules",
+                    get(roles_and_rules_handler),
+                )
                 .route("/api/cedar/read", post(cedar_read_handler))
                 .route("/api/cedar/write", post(cedar_write_handler))
                 .route("/api/problems", get(problems_handler))
                 .layer(middleware::from_fn(local_only))
-                .with_state(Served { registry: registry.clone(), governance, eio_tokens });
+                .with_state(Served {
+                    registry: registry.clone(),
+                    governance,
+                    eio_tokens,
+                });
             // At most 5 MB a request (a batch of changes) and 30 seconds an answer (agreed 8 Nov).
             let app = noi_log::limits::around(app, 5 << 20, std::time::Duration::from_secs(30));
             // One line per request on standard error, with nothing secret in it; every failure is
@@ -231,8 +268,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let report: noi_log::Report = Arc::new(move |p: noi_log::Problem| {
                 let keep = keep.clone();
                 tokio::spawn(async move {
-                    if keep.record_problem(&p.request_id, &p.method, &p.path, p.status as i32, &p.what).await.is_err() {
-                        tracing::warn!("a problem was not kept: the log line above is all there is");
+                    if keep
+                        .record_problem(&p.request_id, &p.method, &p.path, p.status as i32, &p.what)
+                        .await
+                        .is_err()
+                    {
+                        tracing::warn!(
+                            "a problem was not kept: the log line above is all there is"
+                        );
                     }
                 });
             });
@@ -257,7 +300,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn sibling(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let path = std::env::current_exe()?.with_file_name(name);
     if !path.exists() {
-        return Err(format!("{}: build it with cargo build -p noi-gov --features server", path.display()).into());
+        return Err(format!(
+            "{}: build it with cargo build -p noi-gov --features server",
+            path.display()
+        )
+        .into());
     }
     Ok(path)
 }
@@ -292,8 +339,15 @@ async fn as_agent(
     };
     let credential = Credential::RunToken(token);
     let who = governance.who(&credential).await?;
-    let registry = registry.clone().with_authorizer(Arc::new(governance.asking(credential, None)));
-    Ok((Actor { subject: who.handle }, registry))
+    let registry = registry
+        .clone()
+        .with_authorizer(Arc::new(governance.asking(credential, None)));
+    Ok((
+        Actor {
+            subject: who.handle,
+        },
+        registry,
+    ))
 }
 
 /// What Mero's server holds: the registry and Governance's address. No identity of its own.
@@ -311,25 +365,42 @@ fn credential(headers: &HeaderMap) -> Result<Credential, String> {
     let Some(value) = headers.get(header::AUTHORIZATION) else {
         return Ok(Credential::Visitor);
     };
-    let value = value.to_str().map_err(|_| "unreadable credential".to_string())?;
+    let value = value
+        .to_str()
+        .map_err(|_| "unreadable credential".to_string())?;
     match value.split_once(' ') {
-        Some(("Session", token)) if !token.trim().is_empty() => Ok(Credential::Session(token.trim().into())),
-        Some(("Run", token)) if !token.trim().is_empty() => Ok(Credential::RunToken(token.trim().into())),
+        Some(("Session", token)) if !token.trim().is_empty() => {
+            Ok(Credential::Session(token.trim().into()))
+        }
+        Some(("Run", token)) if !token.trim().is_empty() => {
+            Ok(Credential::RunToken(token.trim().into()))
+        }
         _ => Err("send Authorization: Session <token> or Run <token>".into()),
     }
 }
 
 /// Who is asking, by Governance's word, and the registry that asks Governance for them. Signed
 /// out, you can at most read (rule 5), so a change is refused before Mero looks anything up.
-async fn caller(served: &Served, headers: &HeaderMap, touch: Option<Uuid>, changes: bool) -> Result<(Actor, Registry), Box<Response>> {
-    let credential = credential(headers).map_err(|e| Box::new(refused(StatusCode::UNAUTHORIZED, &e)))?;
+async fn caller(
+    served: &Served,
+    headers: &HeaderMap,
+    touch: Option<Uuid>,
+    changes: bool,
+) -> Result<(Actor, Registry), Box<Response>> {
+    let credential =
+        credential(headers).map_err(|e| Box::new(refused(StatusCode::UNAUTHORIZED, &e)))?;
     if changes && credential == Credential::Visitor {
-        return Err(Box::new(refused(StatusCode::UNAUTHORIZED, "signed out: sign in at Governance first")));
+        return Err(Box::new(refused(
+            StatusCode::UNAUTHORIZED,
+            "signed out: sign in at Governance first",
+        )));
     }
     // Governance's line for this request carries the same ID as Mero's.
-    let governance = served
-        .governance
-        .for_request(headers.get(noi_log::REQUEST_ID).and_then(|v| v.to_str().ok()));
+    let governance = served.governance.for_request(
+        headers
+            .get(noi_log::REQUEST_ID)
+            .and_then(|v| v.to_str().ok()),
+    );
     let who = governance
         .who(&credential)
         .await
@@ -339,7 +410,12 @@ async fn caller(served: &Served, headers: &HeaderMap, touch: Option<Uuid>, chang
         .registry
         .clone()
         .with_authorizer(Arc::new(governance.asking(credential, touch)));
-    Ok((Actor { subject: who.handle }, registry))
+    Ok((
+        Actor {
+            subject: who.handle,
+        },
+        registry,
+    ))
 }
 fn refused(status: StatusCode, error: &str) -> Response {
     (status, Json(json!({ "error": error }))).into_response()
@@ -355,7 +431,9 @@ fn failure(e: MeroError) -> Response {
     let mut response = refused(status, &e.to_string());
     // A failure inside Mero reaches the Problems page with its reason.
     if status.is_server_error() {
-        response.extensions_mut().insert(noi_log::Why(e.to_string()));
+        response
+            .extensions_mut()
+            .insert(noi_log::Why(e.to_string()));
     }
     response
 }
@@ -375,20 +453,33 @@ struct ProblemsQuery {
     limit: Option<i64>,
 }
 /// Mero's problems, newest first, for those Governance lets view (owners).
-async fn problems_handler(State(served): State<Served>, headers: HeaderMap, axum::extract::Query(q): axum::extract::Query<ProblemsQuery>) -> Response {
+async fn problems_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<ProblemsQuery>,
+) -> Response {
     let (actor, _) = caller!(served, headers, None, true);
     let credential = match credential(&headers) {
         Ok(c) => c,
         Err(e) => return refused(StatusCode::UNAUTHORIZED, &e),
     };
-    let governance = served.governance.for_request(headers.get(noi_log::REQUEST_ID).and_then(|v| v.to_str().ok()));
+    let governance = served.governance.for_request(
+        headers
+            .get(noi_log::REQUEST_ID)
+            .and_then(|v| v.to_str().ok()),
+    );
     if !governance.may_view(&credential).await {
-        return refused(StatusCode::FORBIDDEN, &format!("{} may not view Mero's problems: owners may", actor.subject));
+        return refused(
+            StatusCode::FORBIDDEN,
+            &format!("{} may not view Mero's problems: owners may", actor.subject),
+        );
     }
     let limit = q.limit.unwrap_or(50);
     match served.registry.problems(q.before, limit).await {
         Ok(problems) => {
-            let next = (problems.len() as i64 == limit.clamp(1, 200)).then(|| problems.last().map(|p| p["seq"].clone())).flatten();
+            let next = (problems.len() as i64 == limit.clamp(1, 200))
+                .then(|| problems.last().map(|p| p["seq"].clone()))
+                .flatten();
             Json(json!({ "problems": problems, "next": next })).into_response()
         }
         Err(e) => failure(e),
@@ -397,7 +488,10 @@ async fn problems_handler(State(served): State<Served>, headers: HeaderMap, axum
 
 /// Mero can do its job when its database answers and Governance answers: no answer means no.
 async fn ready_handler(State(served): State<Served>) -> Response {
-    let (database, governance) = tokio::join!(served.registry.database_answers(), served.governance.alive());
+    let (database, governance) = tokio::join!(
+        served.registry.database_answers(),
+        served.governance.alive()
+    );
     noi_log::health::ready(&[("database", database), ("governance", governance)])
 }
 
@@ -432,9 +526,16 @@ struct PlacesBody {
     #[serde(default)]
     whole_batches: bool,
 }
-async fn places_handler(State(served): State<Served>, headers: HeaderMap, Json(body): Json<PlacesBody>) -> Response {
+async fn places_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    Json(body): Json<PlacesBody>,
+) -> Response {
     let (actor, registry) = caller!(served, headers, None, false);
-    match registry.review_places(&actor, &body.proposals, body.whole_batches).await {
+    match registry
+        .review_places(&actor, &body.proposals, body.whole_batches)
+        .await
+    {
         Ok(places) => Json(json!({
             "action": Action::Review.as_str(),
             "targets": places.into_iter().map(|p| json!({"path": p})).collect::<Vec<_>>(),
@@ -443,7 +544,11 @@ async fn places_handler(State(served): State<Served>, headers: HeaderMap, Json(b
         Err(e) => failure(e),
     }
 }
-async fn propose_handler(State(served): State<Served>, headers: HeaderMap, Json(batch): Json<NewBatch>) -> Response {
+async fn propose_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    Json(batch): Json<NewBatch>,
+) -> Response {
     let (actor, registry) = caller!(served, headers, None, true);
     match registry.propose_batch(&actor, batch).await {
         Ok(batch) => Json(json!(batch)).into_response(),
@@ -456,7 +561,11 @@ struct ApproveBody {
     proposals: Vec<Uuid>,
     touch: Option<Uuid>,
 }
-async fn approve_handler(State(served): State<Served>, headers: HeaderMap, Json(body): Json<ApproveBody>) -> Response {
+async fn approve_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    Json(body): Json<ApproveBody>,
+) -> Response {
     let (actor, registry) = caller!(served, headers, body.touch, true);
     let approved = match registry.approve(&actor, &body.proposals).await {
         Ok(p) => p,
@@ -477,7 +586,9 @@ async fn approve_handler(State(served): State<Served>, headers: HeaderMap, Json(
     let copied = if touches(&approved, "noi.gov.") {
         match served.governance.copy().await {
             Ok(c) => c,
-            Err(e) => json!({"error": format!("approved, but Governance has not copied it yet: {e}")}),
+            Err(e) => {
+                json!({"error": format!("approved, but Governance has not copied it yet: {e}")})
+            }
         }
     } else {
         Value::Null
@@ -501,14 +612,22 @@ struct DecideBody {
     note: String,
     touch: Option<Uuid>,
 }
-async fn send_back_handler(State(served): State<Served>, headers: HeaderMap, Json(body): Json<DecideBody>) -> Response {
+async fn send_back_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    Json(body): Json<DecideBody>,
+) -> Response {
     let (actor, registry) = caller!(served, headers, body.touch, true);
     match registry.send_back(&actor, body.proposal, &body.note).await {
         Ok(p) => Json(json!(p)).into_response(),
         Err(e) => failure(e),
     }
 }
-async fn reject_handler(State(served): State<Served>, headers: HeaderMap, Json(body): Json<DecideBody>) -> Response {
+async fn reject_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    Json(body): Json<DecideBody>,
+) -> Response {
     let (actor, registry) = caller!(served, headers, body.touch, true);
     match registry.reject(&actor, body.proposal, &body.note).await {
         Ok(p) => Json(json!(p)).into_response(),
@@ -541,10 +660,17 @@ const CEDAR_ITEMS: usize = 200;
 const CEDAR_LENGTH: usize = 20_000;
 /// Each role or rule as the form, or why it is written by hand; and every system's verbs, for
 /// the form's checkboxes.
-async fn cedar_read_handler(State(served): State<Served>, headers: HeaderMap, Json(body): Json<CedarReadBody>) -> Response {
+async fn cedar_read_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    Json(body): Json<CedarReadBody>,
+) -> Response {
     let _ = caller!(served, headers, None, true);
     if body.items.len() > CEDAR_ITEMS {
-        return refused(StatusCode::PAYLOAD_TOO_LARGE, "too many roles and rules at once");
+        return refused(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "too many roles and rules at once",
+        );
     }
     Json(cedar_readings(&body.items)).into_response()
 }
@@ -553,8 +679,12 @@ fn cedar_readings(items: &[CedarText]) -> Value {
         .iter()
         .map(|item| {
             let read = match item {
-                CedarText::Rule { cedar } if cedar.len() <= CEDAR_LENGTH => form::read_rule(cedar).map(|f| json!(f)),
-                CedarText::Role { system, cedar } if cedar.len() <= CEDAR_LENGTH => form::read_role(system, cedar).map(|f| json!(f)),
+                CedarText::Rule { cedar } if cedar.len() <= CEDAR_LENGTH => {
+                    form::read_rule(cedar).map(|f| json!(f))
+                }
+                CedarText::Role { system, cedar } if cedar.len() <= CEDAR_LENGTH => {
+                    form::read_role(system, cedar).map(|f| json!(f))
+                }
                 _ => Err("it is too long to read".into()),
             };
             match read {
@@ -563,7 +693,10 @@ fn cedar_readings(items: &[CedarText]) -> Value {
             }
         })
         .collect();
-    let verbs: serde_json::Map<String, Value> = form::verbs().into_iter().map(|(s, v)| (s.to_string(), json!(v))).collect();
+    let verbs: serde_json::Map<String, Value> = form::verbs()
+        .into_iter()
+        .map(|(s, v)| (s.to_string(), json!(v)))
+        .collect();
     json!({ "readings": readings, "verbs": verbs })
 }
 #[derive(Deserialize)]
@@ -573,7 +706,11 @@ enum CedarForm {
     Role { form: form::RoleForm },
 }
 /// The Cedar a form says, checked as Mero will check it when it is proposed.
-async fn cedar_write_handler(State(served): State<Served>, headers: HeaderMap, Json(body): Json<CedarForm>) -> Response {
+async fn cedar_write_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    Json(body): Json<CedarForm>,
+) -> Response {
     let _ = caller!(served, headers, None, true);
     match cedar_written(&body) {
         Ok(cedar) => Json(json!({ "cedar": cedar })).into_response(),
@@ -593,7 +730,9 @@ fn export_eio(snapshot: &Snapshot, dir: &Path) -> Result<usize, Box<dyn std::err
     let sources: Vec<noi_eio::TokenSource> = snapshot
         .merons
         .iter()
-        .filter(|m| m.lifecycle.state == MeronState::Active && m.identity.path.starts_with("noi.eio."))
+        .filter(|m| {
+            m.lifecycle.state == MeronState::Active && m.identity.path.starts_with("noi.eio.")
+        })
         .map(|m| noi_eio::TokenSource {
             path: &m.identity.path,
             subtype: m.classification.subtype.as_deref().unwrap_or(""),
@@ -601,7 +740,11 @@ fn export_eio(snapshot: &Snapshot, dir: &Path) -> Result<usize, Box<dyn std::err
         })
         .collect();
     let files = noi_eio::export_tokens(&sources)?;
-    for (name, body) in [("tokens.css", &files.css), ("tokens.ts", &files.ts), ("tokens.json", &files.json)] {
+    for (name, body) in [
+        ("tokens.css", &files.css),
+        ("tokens.ts", &files.ts),
+        ("tokens.json", &files.json),
+    ] {
         std::fs::write(dir.join(name), body)?;
     }
     Ok(sources.len())
@@ -619,7 +762,11 @@ fn read_change(file: &Path) -> Result<Change, Box<dyn std::error::Error>> {
         }
     })
 }
-fn read_batch(files: &[PathBuf], title: Option<String>, note: Option<String>) -> Result<NewBatch, Box<dyn std::error::Error>> {
+fn read_batch(
+    files: &[PathBuf],
+    title: Option<String>,
+    note: Option<String>,
+) -> Result<NewBatch, Box<dyn std::error::Error>> {
     if let [file] = files {
         let value: Value = serde_json::from_slice(&std::fs::read(file)?)?;
         if value.get("changes").is_some() {
@@ -629,13 +776,20 @@ fn read_batch(files: &[PathBuf], title: Option<String>, note: Option<String>) ->
             return Ok(batch);
         }
     }
-    let changes = files.iter().map(|f| read_change(f)).collect::<Result<Vec<_>, _>>()?;
+    let changes = files
+        .iter()
+        .map(|f| read_change(f))
+        .collect::<Result<Vec<_>, _>>()?;
     let title = title.unwrap_or_else(|| match &changes[..] {
         [Change::Add { meron, .. }] => format!("Add {}", meron.name),
         [one] => format!("{} one meron", one.operation()),
         many => format!("{} changes", many.len()),
     });
-    Ok(NewBatch { title, note, changes })
+    Ok(NewBatch {
+        title,
+        note,
+        changes,
+    })
 }
 
 async fn local_only(request: Request, next: Next) -> axum::response::Response {
@@ -693,7 +847,19 @@ mod tests {
 
     #[test]
     fn the_terminal_changes_nothing_but_proposals() {
-        for gone in ["approve", "send-back", "reject", "update", "rename", "transition", "relate", "unrelate", "plan-release", "transition-release", "seed"] {
+        for gone in [
+            "approve",
+            "send-back",
+            "reject",
+            "update",
+            "rename",
+            "transition",
+            "relate",
+            "unrelate",
+            "plan-release",
+            "transition-release",
+            "seed",
+        ] {
             assert!(parse(&[gone]).is_err(), "{gone}");
         }
         assert!(parse(&["propose", "change.json", "--agent", "design-agent"]).is_ok());
@@ -734,27 +900,60 @@ mod tests {
         .unwrap();
         let out = cedar_readings(&items);
         assert_eq!(out["readings"][0]["form"]["unless"], json!(["fresh-touch"]));
-        assert_eq!(out["readings"][1]["form"], json!({"system": "mero", "pick": "every", "except": []}));
-        assert!(out["readings"][2]["by_hand"].as_str().unwrap().contains("names no actions"));
-        assert!(out["verbs"]["governance"].as_array().unwrap().contains(&json!("view")));
+        assert_eq!(
+            out["readings"][1]["form"],
+            json!({"system": "mero", "pick": "every", "except": []})
+        );
+        assert!(out["readings"][2]["by_hand"]
+            .as_str()
+            .unwrap()
+            .contains("names no actions"));
+        assert!(out["verbs"]["governance"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("view")));
         let form = out["readings"][0]["form"].clone();
-        let body: CedarForm = serde_json::from_value(json!({"kind": "rule", "form": form})).unwrap();
+        let body: CedarForm =
+            serde_json::from_value(json!({"kind": "rule", "form": form})).unwrap();
         assert_eq!(cedar_written(&body).unwrap(), fresh);
-        let wrong: CedarForm = serde_json::from_value(json!({"kind": "role", "form": {"system": "mero", "pick": "these", "verbs": []}})).unwrap();
-        assert!(cedar_written(&wrong).unwrap_err().contains("tick at least one"));
-        assert!(serde_json::from_value::<CedarForm>(json!({"kind": "rule", "form": {}, "extra": 1})).is_err());
+        let wrong: CedarForm = serde_json::from_value(
+            json!({"kind": "role", "form": {"system": "mero", "pick": "these", "verbs": []}}),
+        )
+        .unwrap();
+        assert!(cedar_written(&wrong)
+            .unwrap_err()
+            .contains("tick at least one"));
+        assert!(serde_json::from_value::<CedarForm>(
+            json!({"kind": "rule", "form": {}, "extra": 1})
+        )
+        .is_err());
     }
 
     #[tokio::test]
     async fn the_operator_only_reads() {
         let request = |action, subject: &str| AuthorizationRequest {
-            actor: Actor { subject: subject.into() },
+            actor: Actor {
+                subject: subject.into(),
+            },
             action,
             resources: vec![],
             intent: Value::Null,
         };
-        assert!(matches!(Operator.authorize(&request(Action::Read, OPERATOR)).await, Decision::Allow { .. }));
-        assert!(matches!(Operator.authorize(&request(Action::Propose, OPERATOR)).await, Decision::Deny { .. }));
-        assert!(matches!(Operator.authorize(&request(Action::Read, "hiddenstack")).await, Decision::Deny { .. }));
+        assert!(matches!(
+            Operator.authorize(&request(Action::Read, OPERATOR)).await,
+            Decision::Allow { .. }
+        ));
+        assert!(matches!(
+            Operator
+                .authorize(&request(Action::Propose, OPERATOR))
+                .await,
+            Decision::Deny { .. }
+        ));
+        assert!(matches!(
+            Operator
+                .authorize(&request(Action::Read, "hiddenstack"))
+                .await,
+            Decision::Deny { .. }
+        ));
     }
 }

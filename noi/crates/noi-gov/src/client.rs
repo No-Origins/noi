@@ -49,7 +49,10 @@ impl GovernanceClient {
 
     /// The same client, asking on behalf of this request.
     pub fn for_request(&self, id: Option<&str>) -> Self {
-        Self { request_id: id.map(String::from), ..self.clone() }
+        Self {
+            request_id: id.map(String::from),
+            ..self.clone()
+        }
     }
 
     async fn post(&self, path: &str, body: Value) -> Result<Value, String> {
@@ -79,9 +82,12 @@ impl GovernanceClient {
     /// Who holds this credential. Mero writes this handle next to whatever they do.
     /// Whether this credential may view (owners may): who reads the Problems page.
     pub async fn may_view(&self, credential: &Credential) -> bool {
-        self.post("/api/may", json!({ "credential": credential, "action": "view", "targets": [{"path": "noi"}] }))
-            .await
-            .is_ok_and(|v| v["allowed"] == true)
+        self.post(
+            "/api/may",
+            json!({ "credential": credential, "action": "view", "targets": [{"path": "noi"}] }),
+        )
+        .await
+        .is_ok_and(|v| v["allowed"] == true)
     }
 
     /// Whether Governance's server answers at all, for Mero's `/health/ready`.
