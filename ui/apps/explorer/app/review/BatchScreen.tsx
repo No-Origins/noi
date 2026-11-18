@@ -65,7 +65,7 @@ export async function BatchScreen({ batch }: { batch: string }) {
           <h1 className="eio-type-style-title">{b.title}</h1>
           <p className={cx(styles.muted, 'eio-type-style-body')}>
             {b.proposals.length} change{b.proposals.length === 1 ? '' : 's'}. {b.commit
-              ? 'Approving tries them again, all together, and they wait for their code: they take effect when its commit lands on main.'
+              ? 'Approving tries them again, all together, and they wait for their code: they take effect when main has their files, however they get there.'
               : 'Approving runs them again for real, all together: if one fails, none apply.'}
           </p>
           {b.branch && b.commit && (
@@ -76,7 +76,7 @@ export async function BatchScreen({ batch }: { batch: string }) {
           )}
           {b.proposals.some(p => p.state === 'landing') && (
             <p className={cx(styles.muted, 'eio-type-style-body')}>
-              Approved, waiting to land: nothing in Mero changes until this commit is on main (pnpm land --merge).
+              Approved, waiting to land: nothing in Mero changes until main has these files. pnpm land tells Mero once they are there.
             </p>
           )}
         </div>

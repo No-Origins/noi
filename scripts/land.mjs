@@ -6,12 +6,16 @@
 //   1. The branch: not main, nothing uncommitted; to merge, the same as on GitHub.
 //   2. The checks GitHub runs, here first: Rust (format, clippy, tests; the database tests too when
 //      NOI_TEST_ADMIN_URL is set), the component merons match the code, the type checks, the tests.
-//   3. What you approved: Mero's own check (noi check-approved): every component's meron and the
-//      component rule in the branch are exactly what Mero holds, and Mero holds no component the
-//      branch lacks. On a pushed branch Mero posts the answer on GitHub as "Mero approved".
+//   3. What you approved: Mero first takes in what main already carries (noi landed), then its own
+//      check (noi check-approved): every component's meron and the component rule in the branch are
+//      what Mero holds, or what a batch approved and waiting for its code leaves them as, and Mero
+//      holds no component the branch lacks. On a pushed branch Mero posts the answer on GitHub as
+//      "Mero approved".
 //   4. Its pull request to main: open, and GitHub's checks green.
 //   5. With --merge: merges it, with a merge commit, so every commit stays as it was, and tells Mero,
-//      so what you approved for this code takes effect (noi landed).
+//      so what you approved for this code takes effect (noi landed). Mero reads main's files, not the
+//      commits' ids, so a merge made on GitHub (a squash too) lands as well: the next pnpm land, or
+//      noi landed, takes it in.
 //
 // Usage, from anywhere in the repository:
 //   pnpm land               says whether the current branch may land
@@ -45,6 +49,13 @@ const read = (cwd, cmd, args, env = {}) => {
   return { ok: r.status === 0, out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim() }
 }
 const git = (...args) => read(ROOT, 'git', args)
+/** What noi landed did: batches taken in, batches sent back, batches that could not land. */
+const tell = ({ landed = [], sent_back = [], failed = {} }) => {
+  const s = n => (n === 1 ? '' : 'es')
+  if (landed.length) console.log(`  Mero took ${landed.length} approved batch${s(landed.length)} main carries`)
+  if (sent_back.length) console.log(`  ${sent_back.length} other batch${s(sent_back.length)} went back to the proposer: approved against what was there before`)
+  for (const [batch, f] of Object.entries(failed)) console.log(`  batch ${batch} could not land: ${f.error}`)
+}
 
 // 1 · The branch.
 say('The branch')
@@ -86,6 +97,12 @@ if (!existsSync(login) || !existsSync(noi)) {
 } else {
   const env = Object.fromEntries(readFileSync(login, 'utf8').split('\n')
     .filter(l => /^[A-Z_]+=/.test(l)).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
+  // What main already carries lands first (decision 4, by the files), however it was merged, so the
+  // check counts it as Mero's.
+  const caught = read(NOI, noi, ['landed'], env)
+  let took
+  try { took = JSON.parse(caught.out) } catch { stop(`Mero could not look at main: ${(caught.err || caught.out).split('\n')[0]}`) }
+  tell(took)
   const asked = read(NOI, noi, ['check-approved', '--commit', here, ...(pushed ? ['--post'] : [])], env)
   let answer
   try { answer = JSON.parse(asked.out) } catch { stop(`Mero could not be asked: ${(asked.err || asked.out).split('\n')[0]}`) }
@@ -138,7 +155,8 @@ if (existsSync(join(NOI, 'mero.local.env')) && existsSync(join(NOI, 'target/debu
     .filter(l => /^[A-Z_]+=/.test(l)).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
   const landed = read(NOI, join(NOI, 'target/debug/noi'), ['landed'], env)
   if (!landed.ok) stop(`merged, but Mero has not taken it yet: ${(landed.err || landed.out).split('\n')[0]}. Run noi landed`)
-  const n = JSON.parse(landed.out).landed.length
-  console.log(`  Mero took ${n} approved batch${n === 1 ? '' : 'es'} that waited for this code`)
+  const took = JSON.parse(landed.out)
+  if (!took.landed.length) console.log('  Mero had no approved batch waiting for this code')
+  tell(took)
 }
 console.log(`\n✓ ${branch} landed on main`)

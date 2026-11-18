@@ -102,8 +102,9 @@ enum Command {
         #[command(flatten)]
         github: GitHubArgs,
     },
-    /// Lands what waited for its code (part B, decision 4): every approved batch whose commit is now
-    /// on GitHub's main is applied, under the approval it was given. `pnpm land --merge` runs it.
+    /// Lands what waited for its code (part B, decision 4): every approved batch whose files GitHub's
+    /// main now carries, however they got there, is applied under the approval it was given; another
+    /// batch waiting with a change to the same meron goes back to its proposer. `pnpm land` runs it.
     Landed,
     /// Mero's API for the Explorer and Governance. Loopback only. Each request carries its own
     /// credential, and Mero asks Governance about it.
@@ -159,20 +160,92 @@ fn pushed_head() -> Result<(String, String), Box<dyn std::error::Error>> {
     Ok((branch, commit))
 }
 
-/// What Mero counts as approved for a commit: the merons it holds, with the changes approved and
-/// waiting for that very commit to land as they will be.
-async fn approved_for(
+/// Mero's check on a commit's meron files (decision 2): what Mero holds, with each batch approved
+/// and waiting for its code that these files carry whole. Read from the files, never from the
+/// commit's id (decision 4, changed 18 Nov), so a squash or a rebase keeps what you approved.
+async fn check_files(
     registry: &Registry,
     reader: &Registry,
     operator: &Actor,
-    commit: &str,
-) -> Result<Vec<noi_inv::Meron>, Box<dyn std::error::Error>> {
-    let mut held = reader.snapshot(operator).await?.merons;
-    for m in registry.landing_for(commit).await? {
-        held.retain(|h| h.identity.uid != m.identity.uid);
-        held.push(m);
+    files: &[Value],
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let held = reader.snapshot(operator).await?.merons;
+    let waiting = registry.waiting_to_land().await?;
+    Ok(noi_mer::approved::check(&held, files, &waiting))
+}
+
+/// Lands what main carries (decision 4, changed 18 Nov: by the files): each batch approved and
+/// waiting whose files main has, as the batch left them, however they got there. Main's commits that
+/// changed these files since the first such approval are looked at one by one, oldest first, so a
+/// batch lands even when a later commit changed its merons again before this ran.
+async fn land_what_main_carries(
+    registry: &Registry,
+    operator: &Actor,
+) -> Result<Value, Box<dyn std::error::Error>> {
+    git(&["fetch", "-q", "origin", "main"])?;
+    let reader = registry.clone().with_authorizer(Arc::new(Operator));
+    let (mut landed, mut sent_back, mut failed) = (vec![], vec![], serde_json::Map::new());
+    let mut waiting = registry.waiting_to_land().await?;
+    let Some(since) = noi_mer::approved::look_since(&waiting) else {
+        return Ok(json!({"landed": landed, "sent_back": sent_back, "failed": failed}));
+    };
+    let commits = git(&[
+        "log",
+        "--first-parent",
+        "--reverse",
+        "--format=%H %cI",
+        &format!("--since={}", since.to_rfc3339()),
+        "origin/main",
+        "--",
+        noi_mer::approved::COMPONENTS,
+        noi_mer::approved::RULE,
+    ])?;
+    for line in commits.lines() {
+        let Some((commit, made)) = line.split_once(' ') else {
+            continue;
+        };
+        let made = chrono::DateTime::parse_from_rfc3339(made)?.with_timezone(&chrono::Utc);
+        let files = merons_at(commit)?;
+        loop {
+            let held = reader.snapshot(operator).await?.merons;
+            let open: Vec<_> = waiting
+                .iter()
+                .filter(|w| !failed.contains_key(&w.batch.to_string()))
+                .cloned()
+                .collect();
+            let Some(batch) = noi_mer::approved::lands_first(&held, &files, &open, made) else {
+                break;
+            };
+            match registry.land(operator, batch).await {
+                Ok(l) => {
+                    landed.push(
+                        json!({"batch": batch, "on_main": commit, "changes": l.proposals.len()}),
+                    );
+                    sent_back.extend(l.sent_back);
+                }
+                Err(e) => {
+                    failed.insert(
+                        batch.to_string(),
+                        json!({"on_main": commit, "error": e.to_string()}),
+                    );
+                }
+            }
+            waiting = registry.waiting_to_land().await?;
+        }
+        if waiting.is_empty() {
+            break;
+        }
     }
-    Ok(held)
+    Ok(json!({"landed": landed, "sent_back": sent_back, "failed": failed}))
+}
+
+/// The head of a batch's branch on GitHub, where its pull request is now: GitHub may have rebased
+/// it since it was proposed. Its proposed commit when the branch is gone.
+fn branch_head(branch: Option<&str>, commit: &str) -> String {
+    branch
+        .filter(|b| git(&["fetch", "-q", "origin", b]).is_ok())
+        .and_then(|b| git(&["rev-parse", &format!("origin/{b}")]).ok())
+        .unwrap_or_else(|| commit.to_string())
 }
 
 /// Mero looks at a commit and posts its answer on GitHub as "Mero approved" (decision 3).
@@ -187,8 +260,7 @@ async fn look_and_post(
         subject: OPERATOR.into(),
     };
     let reader = registry.clone().with_authorizer(Arc::new(Operator));
-    let held = approved_for(registry, &reader, &operator, commit).await?;
-    let problems = noi_mer::approved::problems(&held, &branch);
+    let problems = check_files(registry, &reader, &operator, &branch).await?;
     let words = noi_mer::approved::words(&problems, branch.len());
     let key = std::fs::read(&github.github_key)
         .map_err(|e| format!("the App's key, {}: {e}", github.github_key.display()))?;
@@ -346,8 +418,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             let sha = git(&["rev-parse", "--verify", &format!("{commit}^{{commit}}")])?;
             let branch = merons_at(&sha)?;
-            let held = approved_for(&registry, &reader(), &operator, &sha).await?;
-            let problems = noi_mer::approved::problems(&held, &branch);
+            let problems = check_files(&registry, &reader(), &operator, &branch).await?;
             let words = noi_mer::approved::words(&problems, branch.len());
             if post {
                 let key = std::fs::read(&github.github_key)
@@ -373,23 +444,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
         }
-        Command::Landed => {
-            git(&["fetch", "-q", "origin", "main"])?;
-            let mut landed = vec![];
-            for (batch, commit) in registry.waiting_to_land().await? {
-                let on_main = std::process::Command::new("git")
-                    .args(["merge-base", "--is-ancestor", &commit, "origin/main"])
-                    .status()?
-                    .success();
-                if on_main {
-                    let proposals = registry.land(&operator, batch).await?;
-                    landed.push(
-                        json!({"batch": batch, "commit": commit, "changes": proposals.len()}),
-                    );
-                }
-            }
-            print(json!({"landed": landed}))?;
-        }
+        Command::Landed => print(land_what_main_carries(&registry, &operator).await?)?,
         Command::Propose {
             files,
             title,
@@ -848,7 +903,8 @@ async fn approve_handler(
     };
     // Eidos's files are not written here: the branch carries them, made by Mero's writer (part B,
     // decision 5, agreed 18 Nov), and Mero only checks them. An approval that waits for its code to
-    // land is followed at once by Mero's look at that commit, posted on GitHub (decision 3).
+    // land is followed at once by Mero's look at its branch as GitHub has it now, posted there
+    // (decision 3): GitHub may have rebased it since it was proposed.
     let mut looked = vec![];
     if approved
         .iter()
@@ -858,6 +914,7 @@ async fn approve_handler(
         for batch in batches {
             if let Ok(b) = registry.batch(&actor, batch).await {
                 if let Some(commit) = b.commit {
+                    let commit = branch_head(b.branch.as_deref(), &commit);
                     let answer = match look_and_post(&served.registry, &served.github, &commit)
                         .await
                     {
