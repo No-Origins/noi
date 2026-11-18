@@ -73,6 +73,10 @@ enum Command {
         title: Option<String>,
         #[arg(long)]
         note: Option<String>,
+        /// Name the branch checked out here and its commit, which must be on GitHub (part B): the
+        /// approval then waits for that commit to land. A change to a component needs it.
+        #[arg(long)]
+        here: bool,
         #[command(flatten)]
         run: RunArgs,
     },
@@ -85,15 +89,217 @@ enum Command {
         #[command(flatten)]
         run: RunArgs,
     },
+    /// Mero's check on a commit (part B, agreed 18 Nov): are its Eidos meron files exactly what you
+    /// approved? With --post, Mero posts the answer on GitHub as the commit status "Mero approved".
+    /// Fails (exit 1) when they are not.
+    CheckApproved {
+        /// The commit: a hash, or anything git reads as one (HEAD, a branch).
+        #[arg(long)]
+        commit: String,
+        /// Post the answer on GitHub, as the App "No Origins Mero".
+        #[arg(long)]
+        post: bool,
+        #[command(flatten)]
+        github: GitHubArgs,
+    },
+    /// Lands what waited for its code (part B, decision 4): every approved batch whose files GitHub's
+    /// main now carries, however they got there, is applied under the approval it was given; another
+    /// batch waiting with a change to the same meron goes back to its proposer. `pnpm land` runs it.
+    Landed,
     /// Mero's API for the Explorer and Governance. Loopback only. Each request carries its own
     /// credential, and Mero asks Governance about it.
     Serve {
         #[arg(long, default_value = "127.0.0.1:8787")]
         bind: SocketAddr,
-        /// Writes the Eidos token files here after an approval that changes Eidos.
-        #[arg(long, env = "NOI_EIO_TOKENS")]
-        eio_tokens: Option<PathBuf>,
+        /// Mero's name on GitHub, to post "Mero approved" right after an approval that waits to land.
+        #[command(flatten)]
+        github: GitHubArgs,
     },
+}
+
+/// Mero's own name on GitHub (part B, decision 1): the App "No Origins Mero" and its private key,
+/// an owner-only file beside Mero's other secrets.
+#[derive(Args)]
+struct GitHubArgs {
+    #[arg(long, env = "NOI_GITHUB_APP", default_value = "5818697")]
+    github_app: String,
+    #[arg(long, env = "NOI_GITHUB_KEY", default_value = "mero-github.local.pem")]
+    github_key: PathBuf,
+    #[arg(long, env = "NOI_GITHUB_REPO", default_value = "No-Origins/noi")]
+    github_repo: String,
+    #[arg(long, env = "NOI_GITHUB_API", default_value = "https://api.github.com")]
+    github_api: String,
+}
+
+/// git, run at the top of the repository this Mero works in.
+fn git(args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+    let out = std::process::Command::new("git").args(args).output()?;
+    if !out.status.success() {
+        return Err(format!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )
+        .into());
+    }
+    Ok(String::from_utf8(out.stdout)?.trim().to_string())
+}
+
+/// The branch checked out here and its commit, which must be on GitHub, where Mero looks at it.
+fn pushed_head() -> Result<(String, String), Box<dyn std::error::Error>> {
+    let branch = git(&["branch", "--show-current"])?;
+    if branch.is_empty() || branch == "main" {
+        return Err("check out the change's own branch: a proposal names it".into());
+    }
+    let commit = git(&["rev-parse", "HEAD"])?;
+    git(&["fetch", "-q", "origin", &branch])
+        .map_err(|_| format!("{branch} is not on GitHub: push it first"))?;
+    if git(&["rev-parse", &format!("origin/{branch}")])? != commit {
+        return Err(format!("{branch} here and on GitHub differ: push it first").into());
+    }
+    Ok((branch, commit))
+}
+
+/// Mero's check on a commit's meron files (decision 2): what Mero holds, with each batch approved
+/// and waiting for its code that these files carry whole. Read from the files, never from the
+/// commit's id (decision 4, changed 18 Nov), so a squash or a rebase keeps what you approved.
+async fn check_files(
+    registry: &Registry,
+    reader: &Registry,
+    operator: &Actor,
+    files: &[Value],
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let held = reader.snapshot(operator).await?.merons;
+    let waiting = registry.waiting_to_land().await?;
+    Ok(noi_mer::approved::check(&held, files, &waiting))
+}
+
+/// Lands what main carries (decision 4, changed 18 Nov: by the files): each batch approved and
+/// waiting whose files main has, as the batch left them, however they got there. Main's commits that
+/// changed these files since the first such approval are looked at one by one, oldest first, so a
+/// batch lands even when a later commit changed its merons again before this ran.
+async fn land_what_main_carries(
+    registry: &Registry,
+    operator: &Actor,
+) -> Result<Value, Box<dyn std::error::Error>> {
+    git(&["fetch", "-q", "origin", "main"])?;
+    let reader = registry.clone().with_authorizer(Arc::new(Operator));
+    let (mut landed, mut sent_back, mut failed) = (vec![], vec![], serde_json::Map::new());
+    let mut waiting = registry.waiting_to_land().await?;
+    let Some(since) = noi_mer::approved::look_since(&waiting) else {
+        return Ok(json!({"landed": landed, "sent_back": sent_back, "failed": failed}));
+    };
+    let commits = git(&[
+        "log",
+        "--first-parent",
+        "--reverse",
+        "--format=%H %cI",
+        &format!("--since={}", since.to_rfc3339()),
+        "origin/main",
+        "--",
+        noi_mer::approved::COMPONENTS,
+        noi_mer::approved::RULE,
+    ])?;
+    for line in commits.lines() {
+        let Some((commit, made)) = line.split_once(' ') else {
+            continue;
+        };
+        let made = chrono::DateTime::parse_from_rfc3339(made)?.with_timezone(&chrono::Utc);
+        let files = merons_at(commit)?;
+        loop {
+            let held = reader.snapshot(operator).await?.merons;
+            let open: Vec<_> = waiting
+                .iter()
+                .filter(|w| !failed.contains_key(&w.batch.to_string()))
+                .cloned()
+                .collect();
+            let Some(batch) = noi_mer::approved::lands_first(&held, &files, &open, made) else {
+                break;
+            };
+            match registry.land(operator, batch).await {
+                Ok(l) => {
+                    landed.push(
+                        json!({"batch": batch, "on_main": commit, "changes": l.proposals.len()}),
+                    );
+                    sent_back.extend(l.sent_back);
+                }
+                Err(e) => {
+                    failed.insert(
+                        batch.to_string(),
+                        json!({"on_main": commit, "error": e.to_string()}),
+                    );
+                }
+            }
+            waiting = registry.waiting_to_land().await?;
+        }
+        if waiting.is_empty() {
+            break;
+        }
+    }
+    Ok(json!({"landed": landed, "sent_back": sent_back, "failed": failed}))
+}
+
+/// The head of a batch's branch on GitHub, where its pull request is now: GitHub may have rebased
+/// it since it was proposed. Its proposed commit when the branch is gone.
+fn branch_head(branch: Option<&str>, commit: &str) -> String {
+    branch
+        .filter(|b| git(&["fetch", "-q", "origin", b]).is_ok())
+        .and_then(|b| git(&["rev-parse", &format!("origin/{b}")]).ok())
+        .unwrap_or_else(|| commit.to_string())
+}
+
+/// Mero looks at a commit and posts its answer on GitHub as "Mero approved" (decision 3).
+async fn look_and_post(
+    registry: &Registry,
+    github: &GitHubArgs,
+    commit: &str,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let _ = git(&["fetch", "-q", "origin"]);
+    let branch = merons_at(commit)?;
+    let operator = Actor {
+        subject: OPERATOR.into(),
+    };
+    let reader = registry.clone().with_authorizer(Arc::new(Operator));
+    let problems = check_files(registry, &reader, &operator, &branch).await?;
+    let words = noi_mer::approved::words(&problems, branch.len());
+    let key = std::fs::read(&github.github_key)
+        .map_err(|e| format!("the App's key, {}: {e}", github.github_key.display()))?;
+    let verdict = if problems.is_empty() {
+        noi_mer::github::Verdict::Green
+    } else {
+        noi_mer::github::Verdict::Red
+    };
+    noi_mer::github::GitHub::new(
+        &github.github_app,
+        &key,
+        &github.github_repo,
+        &github.github_api,
+    )?
+    .post(commit, verdict, &words)
+    .await?;
+    Ok(problems.is_empty())
+}
+
+/// The Eidos meron files this check covers, as a commit has them.
+fn merons_at(commit: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    let top = git(&["rev-parse", "--show-toplevel"])?;
+    let files = git(&[
+        "-C",
+        &top,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        commit,
+        "--",
+        noi_mer::approved::COMPONENTS,
+        noi_mer::approved::RULE,
+    ])?;
+    let mut merons = vec![];
+    for file in files.lines().filter(|f| f.ends_with(".json")) {
+        let text = git(&["-C", &top, "show", &format!("{commit}:{file}")])?;
+        merons.push(serde_json::from_str(&text).map_err(|e| format!("{file}: {e}"))?);
+    }
+    Ok(merons)
 }
 
 /// What an agent's run carries. Until Hyperbase exists, `noi propose` plays its tool runner: it
@@ -205,13 +411,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 print(snapshot)?;
             }
         }
+        Command::CheckApproved {
+            commit,
+            post,
+            github,
+        } => {
+            let sha = git(&["rev-parse", "--verify", &format!("{commit}^{{commit}}")])?;
+            let branch = merons_at(&sha)?;
+            let problems = check_files(&registry, &reader(), &operator, &branch).await?;
+            let words = noi_mer::approved::words(&problems, branch.len());
+            if post {
+                let key = std::fs::read(&github.github_key)
+                    .map_err(|e| format!("the App's key, {}: {e}", github.github_key.display()))?;
+                let verdict = if problems.is_empty() {
+                    noi_mer::github::Verdict::Green
+                } else {
+                    noi_mer::github::Verdict::Red
+                };
+                noi_mer::github::GitHub::new(
+                    &github.github_app,
+                    &key,
+                    &github.github_repo,
+                    &github.github_api,
+                )?
+                .post(&sha, verdict, &words)
+                .await?;
+            }
+            print(
+                json!({"commit": sha, "approved": problems.is_empty(), "merons": branch.len(), "problems": problems, "words": words, "posted": post}),
+            )?;
+            if !problems.is_empty() {
+                std::process::exit(1);
+            }
+        }
+        Command::Landed => print(land_what_main_carries(&registry, &operator).await?)?,
         Command::Propose {
             files,
             title,
             note,
+            here,
             run,
         } => {
-            let batch = read_batch(&files, title, note)?;
+            let mut batch = read_batch(&files, title, note)?;
+            if here {
+                let (branch, commit) = pushed_head()?;
+                batch.branch = Some(branch);
+                batch.commit = Some(commit);
+            }
             let (agent, registry) = as_agent(&registry, &governance, &run).await?;
             print(registry.propose_batch(&agent, batch).await?)?
         }
@@ -229,7 +475,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await?,
             )?
         }
-        Command::Serve { bind, eio_tokens } => {
+        Command::Serve { bind, github } => {
             // On this Mac, loopback only. Inside a container (its image sets NOI_IN_CONTAINER=1) the
             // container's own network is private, and only the ports its host publishes reach it.
             if !bind.ip().is_loopback() && !noi_log::in_container() {
@@ -266,7 +512,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_state(Served {
                     registry: registry.clone(),
                     governance,
-                    eio_tokens,
+                    github: Arc::new(github),
                 });
             // At most 5 MB a request (a batch of changes) and 30 seconds an answer (agreed 8 Nov).
             let app = noi_log::limits::around(app, 5 << 20, std::time::Duration::from_secs(30));
@@ -363,7 +609,7 @@ async fn as_agent(
 struct Served {
     registry: Registry,
     governance: GovernanceClient,
-    eio_tokens: Option<PathBuf>,
+    github: Arc<GitHubArgs>,
 }
 
 /// The credential a request carries: `Authorization: Session <token>` from the Explorer's server,
@@ -655,17 +901,33 @@ async fn approve_handler(
         Ok(p) => p,
         Err(e) => return failure(e),
     };
-    // An approved Eidos change reaches the apps through the token files.
-    let exported = match (&served.eio_tokens, touches(&approved, "noi.eio.")) {
-        (Some(dir), true) => match registry.snapshot(&actor).await {
-            Ok(snapshot) => match export_eio(&snapshot, dir) {
-                Ok(n) => json!({"tokens": n}),
-                Err(e) => json!({"error": format!("approved, but the token export failed: {e}")}),
-            },
-            Err(e) => json!({"error": format!("approved, but the token export failed: {e}")}),
-        },
-        _ => Value::Null,
-    };
+    // Eidos's files are not written here: the branch carries them, made by Mero's writer (part B,
+    // decision 5, agreed 18 Nov), and Mero only checks them. An approval that waits for its code to
+    // land is followed at once by Mero's look at its branch as GitHub has it now, posted there
+    // (decision 3): GitHub may have rebased it since it was proposed.
+    let mut looked = vec![];
+    if approved
+        .iter()
+        .any(|p| p.state == noi_mer::ProposalState::Landing)
+    {
+        let batches: std::collections::BTreeSet<Uuid> = approved.iter().map(|p| p.batch).collect();
+        for batch in batches {
+            if let Ok(b) = registry.batch(&actor, batch).await {
+                if let Some(commit) = b.commit {
+                    let commit = branch_head(b.branch.as_deref(), &commit);
+                    let answer = match look_and_post(&served.registry, &served.github, &commit)
+                        .await
+                    {
+                        Ok(green) => json!({"commit": commit, "green": green}),
+                        Err(e) => {
+                            json!({"commit": commit, "error": format!("approved, but Mero could not post its check: {e}")})
+                        }
+                    };
+                    looked.push(answer);
+                }
+            }
+        }
+    }
     // An approved role or rule reaches Governance at once: it copies them again from Mero. Should
     // that fail, the next question says how current the rules are, and Governance copies then.
     let copied = if touches(&approved, "noi.gov.") {
@@ -681,7 +943,7 @@ async fn approve_handler(
     } else {
         Value::Null
     };
-    Json(json!({"approved": approved, "exported": exported, "copied": copied})).into_response()
+    Json(json!({"approved": approved, "copied": copied, "looked": looked})).into_response()
 }
 /// Whether an approval changed anything under this place, where it was or where it went.
 fn touches(approved: &[Proposal], prefix: &str) -> bool {
@@ -908,6 +1170,8 @@ fn read_batch(
         note,
         changes,
         touch: None,
+        branch: None,
+        commit: None,
     })
 }
 

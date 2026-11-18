@@ -158,8 +158,8 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    // Every registry migration plus the other application's row.
-    assert_eq!(unmoved, 14);
+    // Every registry migration (15, the last landing by the files, 18 Nov) plus the other application's row.
+    assert_eq!(unmoved, 16);
     metadata
         .execute("DELETE FROM public._sqlx_migrations WHERE version=42")
         .await
@@ -169,7 +169,7 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    assert_eq!(own_count, 13);
+    assert_eq!(own_count, 15);
     assert_eq!(registry.snapshot(&actor).await.unwrap().merons.len(), 3);
     let root = registry.get(&actor, "noi").await.unwrap();
     let root_uid = root.identity.uid;
@@ -1975,11 +1975,15 @@ async fn verify_components(url: &str) {
         expected_revision: revision,
         path: format!("{C}tree-row"),
     };
+    // A component's change names its branch and commit (part B, agreed 18 Nov).
+    let commit = "a".repeat(40);
     let batch = |changes: Vec<Change>| NewBatch {
         title: "Tree becomes Tree row".into(),
         note: None,
         changes,
         touch: None,
+        branch: Some("claude/tree-row".into()),
+        commit: Some(commit.clone()),
     };
     let alone = registry
         .propose_batch(&actor, batch(vec![rename.clone()]))
@@ -2011,6 +2015,152 @@ async fn verify_components(url: &str) {
     for p in &both.proposals {
         assert_eq!(p.outcome["ok"], json!(true), "{}", p.outcome);
     }
+
+    // In force, as Mero's components are: active.
+    registry
+        .transition(&actor, tree, revision, MeronState::Active)
+        .await
+        .unwrap();
+    let revision = revision + 1;
+
+    // What you approve is what lands (part B, decision 4, agreed 18 Nov). A component's change with no
+    // branch is refused; with one, approving it waits for its commit, and landing applies it.
+    let mut quieter = component("tree", R, &[], &[], &["src/Tree/Tree.tsx"]);
+    quieter.spec["job"] = json!("Show a tree, more quietly.");
+    let change = |rev: i64| Change::Update {
+        uid: tree,
+        expected_revision: rev,
+        meron: quieter.clone(),
+        compatibility: CompatibilityEvidence {
+            impact: Impact::NonBreaking,
+            rationale: "Its words".into(),
+            invariant_checks: vec!["Its rule".into()],
+            migration_plan: None,
+        },
+    };
+    let error = registry
+        .propose_batch(
+            &actor,
+            NewBatch {
+                branch: None,
+                commit: None,
+                ..batch(vec![change(revision)])
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(&format!(
+            "{C}tree: a change to a component names its branch and commit"
+        )),
+        "{error}"
+    );
+    let waits = registry
+        .propose_batch(&actor, batch(vec![change(revision)]))
+        .await
+        .unwrap();
+    assert_eq!(waits.commit.as_deref(), Some(commit.as_str()));
+    let approved = registry.approve(&actor, &[waits.uid]).await.unwrap();
+    assert_eq!(
+        approved[0].state,
+        ProposalState::Landing,
+        "approved, waiting to land"
+    );
+    let held = registry.get(&actor, &format!("{C}tree")).await.unwrap();
+    assert_eq!(held.revision, revision, "nothing in Mero changed yet");
+    assert_eq!(held.spec["job"], json!("A test component."));
+    // Waiting to land, as it leaves its meron: Mero reads from the files whether a commit carries it
+    // (decision 4, changed 18 Nov: by the files, not the commit's id), so a squash or a rebase does.
+    let waiting = registry.waiting_to_land().await.unwrap();
+    let w = waiting.iter().find(|w| w.batch == waits.uid).unwrap();
+    assert_eq!(w.merons.len(), 1);
+    assert_eq!(w.merons[0].spec["job"], json!("Show a tree, more quietly."));
+    let file = |m: &noi_inv::Meron| json!({"path": m.identity.path, "name": m.identity.name, "semantics": m.semantics, "spec": m.spec});
+    let held = registry.snapshot(&actor).await.unwrap().merons;
+    let carried = [file(&w.merons[0])];
+    assert!(noi_mer::approved::carries(&held, &carried, w));
+    let before = [file(held.iter().find(|m| m.identity.uid == tree).unwrap())];
+    assert!(!noi_mer::approved::carries(&held, &before, w));
+    // Another batch, with another change to the same meron, approved too.
+    let mut louder = component("tree", R, &[], &[], &["src/Tree/Tree.tsx"]);
+    louder.spec["job"] = json!("Show a tree, loudly.");
+    let rival = registry
+        .propose_batch(
+            &actor,
+            batch(vec![Change::Update {
+                uid: tree,
+                expected_revision: revision,
+                meron: louder.clone(),
+                compatibility: CompatibilityEvidence {
+                    impact: Impact::NonBreaking,
+                    rationale: "Its words".into(),
+                    invariant_checks: vec!["Its rule".into()],
+                    migration_plan: None,
+                },
+            }]),
+        )
+        .await
+        .unwrap();
+    registry.approve(&actor, &[rival.uid]).await.unwrap();
+    let made = chrono::Utc::now();
+    let waiting = registry.waiting_to_land().await.unwrap();
+    assert_eq!(
+        noi_mer::approved::lands_first(&held, &carried, &waiting, made),
+        Some(waits.uid),
+        "main's files carry the first, and only it"
+    );
+    // Approved once; not again.
+    assert!(registry.approve(&actor, &[waits.uid]).await.is_err());
+    let landed = registry.land(&actor, waits.uid).await.unwrap();
+    assert_eq!(landed.proposals[0].state, ProposalState::Approved);
+    let held = registry.get(&actor, &format!("{C}tree")).await.unwrap();
+    assert_eq!(
+        held.spec["job"],
+        json!("Show a tree, more quietly."),
+        "landed: now it is in Mero"
+    );
+    // The other was approved against what was there before: it goes back to its proposer.
+    assert_eq!(landed.sent_back, [rival.uid]);
+    let back = registry.batch(&actor, rival.uid).await.unwrap();
+    assert_eq!(back.proposals[0].state, ProposalState::SentBack);
+    assert!(back.proposals[0].decided_by.is_none());
+    assert!(back.events.iter().any(|e| e.action == "proposal.send-back"
+        && e.note
+            .as_deref()
+            .is_some_and(|n| n.contains("landed first"))));
+    assert!(registry
+        .waiting_to_land()
+        .await
+        .unwrap()
+        .iter()
+        .all(|w| w.batch != waits.uid && w.batch != rival.uid));
+    assert!(
+        matches!(registry.land(&actor, waits.uid).await, Err(Error::NotFound)),
+        "it lands once"
+    );
+    // Revised against what landed, it waits, and is approved again, to wait for its code again.
+    registry
+        .revise(
+            &actor,
+            back.proposals[0].uid,
+            Change::Update {
+                uid: tree,
+                expected_revision: held.revision,
+                meron: louder,
+                compatibility: CompatibilityEvidence {
+                    impact: Impact::NonBreaking,
+                    rationale: "Its words, after the other landed".into(),
+                    invariant_checks: vec!["Its rule".into()],
+                    migration_plan: None,
+                },
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    let again = registry.approve(&actor, &[rival.uid]).await.unwrap();
+    assert_eq!(again[0].state, ProposalState::Landing);
 }
 
 /// Review: proposals wait in batches; Mero holds only what a maintainer approved.
@@ -2086,6 +2236,8 @@ async fn verify_review(url: &str) {
         note: Some("From the review test".into()),
         changes,
         touch: None,
+        branch: None,
+        commit: None,
     };
 
     // Order inside a batch does not matter: the role comes before the color it reads.
@@ -2523,6 +2675,8 @@ async fn verify_governance(url: &str) {
         note: None,
         changes,
         touch: None,
+        branch: None,
+        commit: None,
     };
     let names = [
         "role-invariant.json",

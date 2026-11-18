@@ -19,7 +19,7 @@ It is in development on one Mac. Nothing is hosted yet.
 | --- | --- |
 | `noi/` | The Rust side, one Cargo workspace: Mero's and Governance's servers, the Invariants' and Eidos's checks, request logs; their migrations, Mero's data and the docs |
 | `ui/apps/explorer` | The Explorer (Next.js), the one app: browsing Mero, Review, the Eidos components and Governance's pages |
-| `ui/packages/eio-tokens` | Eidos tokens as CSS and TypeScript, written by Mero after each approval |
+| `ui/packages/eio-tokens` | Eidos tokens as CSS and TypeScript, made by Mero's writer on each branch (`pnpm eio:write`) and checked by Mero |
 | `ui/packages/eio-react` | Eidos components, built only from the tokens |
 | `infrastructure/containers` | Container images for the servers and the app |
 | `infrastructure/supabase` | The local Postgres (Supabase) every system shares, each in its own schema |

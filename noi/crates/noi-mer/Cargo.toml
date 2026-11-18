@@ -19,6 +19,10 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal
 clap = { version = "4", features = ["derive", "env"] }
 semver = "1"
 axum = "0.8"
+# Mero's own name on GitHub (part B, decision 1): the App's note, signed RS256, and the calls. The same
+# versions and settings Governance uses, so nothing new is fetched.
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto", "use_pem"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 [[bin]]
 name = "noi"
 path = "src/main.rs"

@@ -119,6 +119,9 @@ impl Change {
 pub enum ProposalState {
     Waiting,
     SentBack,
+    /// Approved, waiting to land (part B, decision 4, agreed 18 Nov): its batch names a branch, and
+    /// it takes effect when that commit is on main.
+    Landing,
     Approved,
     Rejected,
 }
@@ -127,6 +130,7 @@ impl ProposalState {
         match self {
             Self::Waiting => "waiting",
             Self::SentBack => "sent-back",
+            Self::Landing => "landing",
             Self::Approved => "approved",
             Self::Rejected => "rejected",
         }
@@ -135,6 +139,7 @@ impl ProposalState {
         Ok(match s {
             "waiting" => Self::Waiting,
             "sent-back" => Self::SentBack,
+            "landing" => Self::Landing,
             "approved" => Self::Approved,
             "rejected" => Self::Rejected,
             other => return Err(ValidationError(format!("unknown proposal state {other}")).into()),
@@ -143,6 +148,14 @@ impl ProposalState {
     fn open(self) -> bool {
         matches!(self, Self::Waiting | Self::SentBack)
     }
+}
+
+/// What landing a batch did: its proposals, now approved, and the batches that waited with a change
+/// to the same merons, sent back to their proposers.
+#[derive(Debug)]
+pub struct Landed {
+    pub proposals: Vec<Proposal>,
+    pub sent_back: Vec<Uuid>,
 }
 
 /// What a proposer sends: a title, an optional note, and the changes, in order.
@@ -156,6 +169,12 @@ pub struct NewBatch {
     /// A touch for writing Cedar by hand, when a change does (9 Nov, step 7). Never kept.
     #[serde(default, skip_serializing)]
     pub touch: Option<Uuid>,
+    /// The branch and the commit its code is on (part B, agreed 18 Nov). With them, an approval
+    /// waits for that commit to land on main. A change to a component always names them.
+    #[serde(default)]
+    pub branch: Option<String>,
+    #[serde(default)]
+    pub commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -192,6 +211,9 @@ pub struct Batch {
     pub title: String,
     pub proposer: String,
     pub created_at: DateTime<Utc>,
+    /// The branch and commit its code is on, when it names them (part B).
+    pub branch: Option<String>,
+    pub commit: Option<String>,
     pub proposals: Vec<Proposal>,
     pub events: Vec<ProposalEvent>,
     /// The places deciding its waiting proposals asks about (9 Nov, step 6), so a page can ask
@@ -239,6 +261,8 @@ struct BatchRow {
     title: String,
     proposer: String,
     created_at: DateTime<Utc>,
+    branch: Option<String>,
+    commit: Option<String>,
 }
 #[derive(FromRow)]
 struct ProposalEventRow {
@@ -294,12 +318,57 @@ impl Registry {
         for change in &batch.changes {
             change.validate()?;
         }
+        let branch = batch
+            .branch
+            .as_deref()
+            .map(str::trim)
+            .filter(|b| !b.is_empty());
+        let commit = batch
+            .commit
+            .as_deref()
+            .map(str::trim)
+            .filter(|c| !c.is_empty());
+        match (branch, commit) {
+            (None, None) => {}
+            (Some(b), Some(c)) => {
+                if b.chars().count() > 200 || b.chars().any(char::is_whitespace) {
+                    return Err(ValidationError(format!("{b:?} is not a branch's name")).into());
+                }
+                if c.len() != 40
+                    || !c
+                        .chars()
+                        .all(|x| x.is_ascii_digit() || ('a'..='f').contains(&x))
+                {
+                    return Err(ValidationError(format!(
+                        "{c:?} is not a commit: give its full hash"
+                    ))
+                    .into());
+                }
+            }
+            _ => {
+                return Err(ValidationError(
+                    "a batch names its branch and its commit together".into(),
+                )
+                .into())
+            }
+        }
         let mut conn = self.pool.acquire().await?;
         for change in &batch.changes {
             refuse_no_op(&mut conn, change).await?;
         }
         let resources = change_resources(&mut conn, &batch.changes).await?;
         drop(conn);
+        // A component's change comes with its code, so it names where that code is (part B,
+        // decision 4): approving it then waits for that commit to land.
+        if commit.is_none() {
+            if let Some(r) = resources.iter().find(|r| is_component_place(&r.path)) {
+                return Err(ValidationError(format!(
+                    "{}: a change to a component names its branch and commit; propose it from its pushed branch (noi propose --here)",
+                    r.path
+                ))
+                .into());
+            }
+        }
         let decision = self
             .authorize(
                 proposer,
@@ -343,12 +412,16 @@ impl Registry {
         let outcomes = self.test_run(proposer, &items).await?;
         let mut tx = self.write().await?;
         let uid = Uuid::new_v4();
-        sqlx::query("INSERT INTO mer.batches(uid,title,proposer) VALUES($1,$2,$3)")
-            .bind(uid)
-            .bind(batch.title.trim())
-            .bind(&proposer.subject)
-            .execute(tx.as_mut())
-            .await?;
+        sqlx::query(
+            "INSERT INTO mer.batches(uid,title,proposer,branch,commit) VALUES($1,$2,$3,$4,$5)",
+        )
+        .bind(uid)
+        .bind(batch.title.trim())
+        .bind(&proposer.subject)
+        .bind(branch)
+        .bind(commit)
+        .execute(tx.as_mut())
+        .await?;
         for (position, (change, outcome)) in batch.changes.iter().zip(outcomes).enumerate() {
             sqlx::query("INSERT INTO mer.proposals(uid,batch,position,operation,target,change,outcome,checked_at) VALUES($1,$2,$3,$4,$5,$6,$7,clock_timestamp())")
                 .bind(Uuid::new_v4()).bind(uid).bind(position as i32).bind(change.operation()).bind(change.target())
@@ -463,6 +536,8 @@ impl Registry {
         Ok(batches
             .into_iter()
             .map(|b| Batch {
+                branch: b.branch.clone(),
+                commit: b.commit.clone(),
                 proposals: proposals
                     .iter()
                     .filter(|p| p.batch == b.uid)
@@ -574,6 +649,35 @@ impl Registry {
             pool: self.pool.clone(),
             authorizer: Arc::new(UnderApproval(decision.clone())),
         };
+        // Whether these batches name a commit, and so wait for it to land (part B, decision 4).
+        let batch_uids: Vec<Uuid> = rows.iter().map(|r| r.batch).collect();
+        let commits: Vec<(Uuid, Option<String>)> =
+            sqlx::query_as("SELECT uid, commit FROM mer.batches WHERE uid = ANY($1)")
+                .bind(&batch_uids)
+                .fetch_all(tx.as_mut())
+                .await?;
+        let landing = commits.iter().any(|(_, c)| c.is_some());
+        if landing && commits.iter().any(|(_, c)| c.is_none()) {
+            return Err(ValidationError(
+                "approve a batch that waits for its code to land apart from the others".into(),
+            )
+            .into());
+        }
+        // It lands whole, so it is approved whole: every change of it open, none left behind.
+        if landing {
+            let row_uids: Vec<Uuid> = rows.iter().map(|r| r.uid).collect();
+            let left: i64 = sqlx::query_scalar("SELECT count(*) FROM mer.proposals WHERE batch = ANY($1) AND state IN ('waiting','sent-back') AND NOT (uid = ANY($2))")
+                .bind(&batch_uids)
+                .bind(&row_uids)
+                .fetch_one(tx.as_mut())
+                .await?;
+            if left > 0 {
+                return Err(ValidationError(
+                    "a batch that waits for its code lands whole, so it is approved whole: revise each change of it that was sent back, then approve the batch".into(),
+                )
+                .into());
+            }
+        }
         let results = under.settle(tx.as_mut(), approver, &items).await?;
         let failures: Vec<String> = results
             .iter()
@@ -586,11 +690,22 @@ impl Registry {
                 ValidationError(format!("nothing was approved. {}", failures.join("; "))).into(),
             );
         }
+        if landing {
+            // Tried and passing; nothing in Mero changes until its code lands. The approval's
+            // answer is kept, so landing applies the batch under it.
+            tx.rollback().await?;
+            tx = self.write().await?;
+        }
         let mut approved = vec![];
         for (row, result) in rows.into_iter().zip(results) {
             let outcome = result.expect("failures returned above");
-            sqlx::query("UPDATE mer.proposals SET state='approved',decided_by=$2,decided_at=clock_timestamp(),outcome=$3,checked_at=clock_timestamp(),updated_at=clock_timestamp() WHERE uid=$1")
-                .bind(row.uid).bind(&approver.subject).bind(&outcome).execute(tx.as_mut()).await?;
+            if landing {
+                sqlx::query("UPDATE mer.proposals SET state='landing',decided_by=$2,decided_at=clock_timestamp(),outcome=$3,approval=$4,checked_at=clock_timestamp(),updated_at=clock_timestamp() WHERE uid=$1 AND state='waiting'")
+                    .bind(row.uid).bind(&approver.subject).bind(&outcome).bind(serde_json::to_value(&decision)?).execute(tx.as_mut()).await?;
+            } else {
+                sqlx::query("UPDATE mer.proposals SET state='approved',decided_by=$2,decided_at=clock_timestamp(),outcome=$3,checked_at=clock_timestamp(),updated_at=clock_timestamp() WHERE uid=$1")
+                    .bind(row.uid).bind(&approver.subject).bind(&outcome).execute(tx.as_mut()).await?;
+            }
             proposal_event(
                 tx.as_mut(),
                 row.batch,
@@ -599,7 +714,11 @@ impl Registry {
                 approver,
                 &decision,
                 None,
-                json!({"steps": outcome["steps"]}),
+                if landing {
+                    json!({"steps": outcome["steps"], "waits": "to land"})
+                } else {
+                    json!({"steps": outcome["steps"]})
+                },
             )
             .await?;
             approved.push(row.uid);
@@ -611,6 +730,145 @@ impl Registry {
             .fetch_all(&mut *conn)
             .await?;
         rows.into_iter().map(|r| r.into_proposal(false)).collect()
+    }
+
+    /// Lands a batch that was approved and waited for its code (part B, decision 4): its changes are
+    /// applied now, under the approval it was given, and it is approved. The caller has seen main
+    /// carry its files (`noi landed`). Nothing is applied unless every change applies.
+    ///
+    /// Another batch waiting with a change to the same meron was approved against what it was
+    /// before; so it goes back to its proposer (changed 18 Nov), to bring its branch up to date with
+    /// main and revise it, and be approved again. Its whole batch goes back: a batch lands whole.
+    pub async fn land(&self, by: &Actor, batch: Uuid) -> Result<Landed> {
+        let mut tx = self.write().await?;
+        let rows: Vec<(Uuid, Value, String, Value)> = sqlx::query_as("SELECT uid, change, decided_by, approval FROM mer.proposals WHERE batch=$1 AND state='landing' ORDER BY position FOR UPDATE")
+            .bind(batch)
+            .fetch_all(tx.as_mut())
+            .await?;
+        let Some((_, _, approver, approval)) = rows.first().cloned() else {
+            return Err(Error::NotFound);
+        };
+        let decision: Decision = serde_json::from_value(approval)?;
+        let proposer: String = sqlx::query_scalar("SELECT proposer FROM mer.batches WHERE uid=$1")
+            .bind(batch)
+            .fetch_one(tx.as_mut())
+            .await?;
+        let mut items = vec![];
+        for (_, change, _, _) in &rows {
+            items.push((
+                Actor {
+                    subject: proposer.clone(),
+                },
+                serde_json::from_value::<Change>(change.clone())?,
+            ));
+        }
+        let under = Registry {
+            pool: self.pool.clone(),
+            authorizer: Arc::new(UnderApproval(decision.clone())),
+        };
+        let approver = Actor { subject: approver };
+        let results = under.settle(tx.as_mut(), &approver, &items).await?;
+        let failures: Vec<String> = results
+            .iter()
+            .filter_map(|r| r.as_ref().err().cloned())
+            .collect();
+        if !failures.is_empty() {
+            tx.rollback().await?;
+            return Err(ValidationError(format!("nothing landed. {}", failures.join("; "))).into());
+        }
+        let mut landed = vec![];
+        let (mut touched, mut names) = (vec![], vec![]);
+        for ((uid, ..), result) in rows.iter().zip(results) {
+            let outcome = result.expect("failures returned above");
+            sqlx::query("UPDATE mer.proposals SET state='approved',outcome=$2,landed_at=clock_timestamp(),checked_at=clock_timestamp(),updated_at=clock_timestamp() WHERE uid=$1")
+                .bind(uid).bind(&outcome).execute(tx.as_mut()).await?;
+            proposal_event(
+                tx.as_mut(),
+                batch,
+                Some(*uid),
+                "proposal.land",
+                by,
+                &decision,
+                None,
+                json!({"steps": outcome["steps"]}),
+            )
+            .await?;
+            landed.push(*uid);
+            if let Some(m) = outcome["meron"]["identity"]["uid"].as_str() {
+                touched.push(m.to_string());
+            }
+            if let Some(p) = outcome["meron"]["identity"]["path"].as_str() {
+                names.push(p.to_string());
+            }
+        }
+        let stale: Vec<Uuid> = sqlx::query_scalar("SELECT DISTINCT batch FROM mer.proposals WHERE state='landing' AND batch <> $1 AND outcome->'meron'->'identity'->>'uid' = ANY($2)")
+            .bind(batch)
+            .bind(&touched)
+            .fetch_all(tx.as_mut())
+            .await?;
+        let note = format!(
+            "Another approved change to {} landed first, and this batch was approved against what was there before. Bring its branch up to date with main and revise it, to be approved again.",
+            names.join(", ")
+        );
+        for other in &stale {
+            let back: Vec<Uuid> = sqlx::query_scalar("UPDATE mer.proposals SET state='sent-back',decided_by=NULL,decided_at=NULL,approval=NULL,updated_at=clock_timestamp() WHERE batch=$1 AND state='landing' RETURNING uid")
+                .bind(other)
+                .fetch_all(tx.as_mut())
+                .await?;
+            for uid in back {
+                proposal_event(
+                    tx.as_mut(),
+                    *other,
+                    Some(uid),
+                    "proposal.send-back",
+                    by,
+                    &decision,
+                    Some(note.as_str()),
+                    json!({"landed_first": batch}),
+                )
+                .await?;
+            }
+        }
+        tx.commit().await?;
+        let mut conn = self.pool.acquire().await?;
+        let rows = sqlx::query_as::<_, ProposalRow>("SELECT uid,batch,position,change,state,revision,outcome,checked_at,decided_by,decided_at,created_at,updated_at FROM mer.proposals WHERE uid = ANY($1) ORDER BY position")
+            .bind(&landed)
+            .fetch_all(&mut *conn)
+            .await?;
+        Ok(Landed {
+            proposals: rows
+                .into_iter()
+                .map(|r| r.into_proposal(false))
+                .collect::<Result<_>>()?,
+            sent_back: stale,
+        })
+    }
+
+    /// The batches approved and waiting for their code to land: when each was approved, and each
+    /// meron as it leaves them. Mero reads from the files whether a commit carries one (decision 4,
+    /// changed 18 Nov: by the files, not by the commit's id).
+    pub async fn waiting_to_land(&self) -> Result<Vec<crate::approved::Waiting>> {
+        let mut conn = self.pool.acquire().await?;
+        let rows: Vec<(Uuid, DateTime<Utc>, Option<Value>)> = sqlx::query_as("SELECT p.batch, p.decided_at, p.outcome->'meron' FROM mer.proposals p JOIN mer.batches b ON b.uid = p.batch WHERE p.state = 'landing' AND b.commit IS NOT NULL ORDER BY p.decided_at, p.batch, p.position")
+            .fetch_all(&mut *conn)
+            .await?;
+        let mut out: Vec<crate::approved::Waiting> = vec![];
+        for (batch, approved_at, meron) in rows {
+            if out.last().is_none_or(|w| w.batch != batch) {
+                out.push(crate::approved::Waiting {
+                    batch,
+                    approved_at,
+                    merons: vec![],
+                });
+            }
+            if let Some(m) = meron.filter(|m| !m.is_null()) {
+                out.last_mut()
+                    .expect("pushed above")
+                    .merons
+                    .push(serde_json::from_value(m)?);
+            }
+        }
+        Ok(out)
     }
 
     /// The places that approving (every waiting proposal of these, or of these batches) or sending
@@ -1337,4 +1595,9 @@ async fn hand_written(conn: &mut PgConnection, changes: &[Change]) -> Result<Vec
         }
     }
     Ok(out)
+}
+
+/// The places a component's change touches: a component's meron, or the rule every component meets.
+fn is_component_place(path: &str) -> bool {
+    crate::approved::covers(path)
 }

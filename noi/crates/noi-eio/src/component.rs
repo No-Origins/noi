@@ -236,8 +236,9 @@ pub fn export_component_types(sources: &[ComponentSource]) -> Result<String, Str
     sources.sort_by_key(|s| s.path);
     let mut out = String::from(
         "// Eidos's components and their states, by key, as you approved them in Mero (agreed 18 Nov,\n\
-         // \"Component States\"). Mero writes this file after each approval that changes Eidos; nobody\n\
-         // edits it. To change a state, change the component's meron and approve it in Review.\n\
+         // \"Component States\"). Mero's writer makes this file (pnpm eio:write) from the merons, and Mero\n\
+         // checks it is exactly what it writes; nobody edits it. To change a state, change the component's\n\
+         // meron and approve it in Review.\n\
          // A component's code reads each option through a table that names every key, so a key missing\n\
          // from the code, or one Mero never approved, fails the type check.\n",
     );

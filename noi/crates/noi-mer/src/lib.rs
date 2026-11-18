@@ -20,10 +20,12 @@ use std::{
 };
 use uuid::Uuid;
 
+pub mod approved;
 mod checks;
+pub mod github;
 pub mod reference;
 mod review;
-pub use review::{Batch, Change, NewBatch, Proposal, ProposalEvent, ProposalState};
+pub use review::{Batch, Change, Landed, NewBatch, Proposal, ProposalEvent, ProposalState};
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]

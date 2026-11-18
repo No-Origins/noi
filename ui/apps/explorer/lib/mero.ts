@@ -118,7 +118,8 @@ export const checkParams = (inv: Meron | undefined, name: string): any =>
 
 // ——— Review ———
 
-export type ProposalState = 'waiting' | 'sent-back' | 'approved' | 'rejected'
+/** `landing`: approved, waiting for its code to land (part B, decision 4, agreed 18 Nov). */
+export type ProposalState = 'waiting' | 'sent-back' | 'landing' | 'approved' | 'rejected'
 
 /** One change, exactly as proposed; approval runs this. */
 export type Change =
@@ -165,6 +166,8 @@ export interface ProposalEvent { sequence: number; proposal: string | null; acti
 export interface Batch {
   uid: string; title: string; proposer: string; created_at: string; proposals: Proposal[]; events: ProposalEvent[]
   places: string[]; may_decide?: boolean
+  /** The branch and commit its code is on, when it names them (part B): approving it waits for that commit to land. */
+  branch?: string | null; commit?: string | null
 }
 /** `writable`: you may decide at least one waiting batch. `reviewer`: who is signed in.
  * `touch_to_decide`: approving, sending back and rejecting need your touch. */
