@@ -11,7 +11,8 @@
 //      what Mero holds, or what a batch approved and waiting for its code leaves them as, and Mero
 //      holds no component the branch lacks. On a pushed branch Mero posts the answer on GitHub as
 //      "Mero approved".
-//   4. Its pull request to main: open, and GitHub's checks green.
+//   4. Its pull request to main: open, and GitHub's checks green: every check main requires has
+//      started and passed (a check GitHub has not started yet is not green). --merge waits for them.
 //   5. With --merge: merges it, with a merge commit, so every commit stays as it was, and tells Mero,
 //      so what you approved for this code takes effect (noi landed). Mero reads main's files, not the
 //      commits' ids, so a merge made on GitHub (a squash too) lands as well: the next pnpm land, or
@@ -92,6 +93,7 @@ if (skipLocal) {
 say('What you approved in Mero')
 const login = join(NOI, 'mero.local.env')
 const noi = join(NOI, 'target/debug/noi')
+let posted = false
 if (!existsSync(login) || !existsSync(noi)) {
   console.log('  (Mero is not on this Mac: it cannot be asked here)')
 } else {
@@ -108,6 +110,7 @@ if (!existsSync(login) || !existsSync(noi)) {
   try { answer = JSON.parse(asked.out) } catch { stop(`Mero could not be asked: ${(asked.err || asked.out).split('\n')[0]}`) }
   if (!answer.approved) stop(`what lands must be what you approved:\n  ${answer.problems.join('\n  ')}`)
   console.log(`  ${answer.words}${answer.posted ? ', posted on GitHub as “Mero approved”' : ''}`)
+  posted = Boolean(answer.posted)
 }
 
 // 4 · The pull request.
@@ -123,28 +126,56 @@ if (p.state !== 'OPEN') stop(`pull request ${p.url} is ${p.state.toLowerCase()}`
 if (p.baseRefName !== 'main') stop(`pull request ${p.url} goes into ${p.baseRefName}, not main`)
 if (p.isDraft) stop(`pull request ${p.url} is a draft`)
 console.log(`  ${p.url}`)
-const pending = () => (JSON.parse(read(ROOT, 'gh', ['pr', 'view', branch, '--json', 'statusCheckRollup']).out).statusCheckRollup ?? [])
+// The checks main requires, as its protection on GitHub names them. GitHub starts its own a little
+// after a push, so a check not there yet is not green: it has not started.
+const protection = read(ROOT, 'gh', ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks', '--jq', '.contexts[]'])
+const required = protection.ok ? protection.out.split('\n').filter(Boolean) : null
+if (!required) console.log('  (main\'s required checks could not be read here: waiting for any of GitHub\'s own to start)')
+const nameOf = c => c.name ?? c.context
+const list = cs => cs.map(c => (typeof c === 'string' ? c : nameOf(c))).join(', ')
+const rollup = () => JSON.parse(read(ROOT, 'gh', ['pr', 'view', branch, '--json', 'statusCheckRollup']).out).statusCheckRollup ?? []
 const verdict = checks => {
+  const names = new Set(checks.map(nameOf))
   const failed = checks.filter(c => ['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(c.conclusion ?? c.state))
-  const waiting = checks.filter(c => c.status && c.status !== 'COMPLETED')
-  return { failed, waiting }
+  const waiting = checks.filter(c => (c.status && c.status !== 'COMPLETED') || ['PENDING', 'EXPECTED'].includes(c.state))
+  const unstarted = required
+    ? required.filter(n => !names.has(n))
+    : checks.some(c => nameOf(c) !== 'Mero approved') ? [] : ['GitHub\'s own checks']
+  return { failed, waiting, unstarted }
 }
-let { failed, waiting } = verdict(p.statusCheckRollup ?? [])
-if (failed.length) stop(`GitHub's checks failed: ${failed.map(c => c.name ?? c.context).join(', ')}. See ${p.url}/checks`)
-if (waiting.length && merge) {
-  console.log(`  waiting for GitHub's checks: ${waiting.map(c => c.name ?? c.context).join(', ')}`)
-  run(ROOT, 'gh', ['pr', 'checks', branch, '--watch', '--fail-fast'])
-  ;({ failed, waiting } = verdict(pending()))
-  if (failed.length) stop(`GitHub's checks failed: ${failed.map(c => c.name ?? c.context).join(', ')}`)
-} else if (waiting.length) {
-  console.log(`  GitHub's checks still running: ${waiting.map(c => c.name ?? c.context).join(', ')}`)
+const sleep = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+let v = verdict(p.statusCheckRollup ?? [])
+if (v.failed.length) stop(`GitHub's checks failed: ${list(v.failed)}. See ${p.url}/checks`)
+if (merge) {
+  if (!posted && v.unstarted.includes('Mero approved')) stop('Mero has not posted “Mero approved” on this commit, and it is not on this Mac to be asked')
+  if (v.unstarted.length) {
+    console.log(`  waiting for GitHub to start: ${list(v.unstarted)}`)
+    for (let tries = 0; v.unstarted.length && !v.failed.length && tries < 60; tries++) {
+      sleep(10_000)
+      v = verdict(rollup())
+    }
+    if (v.failed.length) stop(`GitHub's checks failed: ${list(v.failed)}. See ${p.url}/checks`)
+    if (v.unstarted.length) stop(`GitHub has not started ${list(v.unstarted)} in ten minutes: see ${p.url}/checks`)
+  }
+  if (v.waiting.length) {
+    console.log(`  waiting for GitHub's checks: ${list(v.waiting)}`)
+    run(ROOT, 'gh', ['pr', 'checks', branch, '--watch', '--fail-fast'])
+    v = verdict(rollup())
+    if (v.failed.length) stop(`GitHub's checks failed: ${list(v.failed)}`)
+  }
+  console.log('  GitHub\'s checks green')
+} else if (v.unstarted.length) {
+  console.log(`  GitHub has not started: ${list(v.unstarted)}`)
+} else if (v.waiting.length) {
+  console.log(`  GitHub's checks still running: ${list(v.waiting)}`)
 } else {
   console.log('  GitHub\'s checks green')
 }
 
 // 5 · Landing.
 if (!merge) {
-  say(`Ready to land: run  pnpm land --merge  to merge ${p.url}`)
+  if (v.unstarted.length || v.waiting.length) say(`Not green yet: pnpm land --merge waits for GitHub's checks, then merges ${p.url}`)
+  else say(`Ready to land: run  pnpm land --merge  to merge ${p.url}`)
   process.exit(0)
 }
 say('Landing')
