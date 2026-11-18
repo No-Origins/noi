@@ -1,0 +1,41 @@
+{
+  "path": "noi.eio.components.choices",
+  "name": "Choices",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A question and its choices: a real fieldset and legend.",
+    "responsibility": "Be the one choices every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Put a question with its radios or checkboxes, so screen readers say the question with every choice.",
+    "states": {
+      "layout": {
+        "down": "one under another",
+        "across": "across, in a row that wraps"
+      }
+    },
+    "reads": [
+      "noi.eio.color.text.muted",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.gap.stack",
+      "noi.eio.type.style.caption",
+      "noi.eio.type.style.label"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Choices/Choices.module.css",
+        "sha256": "c2bf50d83cf79bc0eb485a7b78c1d4d40d504b760d27fad4841e15cacbdbce3d"
+      },
+      {
+        "path": "src/Choices/Choices.tsx",
+        "sha256": "9a5efe5c9457b6da00b503e2523a25bd5b943a952c3038fa327da6eee789a6e0"
+      }
+    ]
+  }
+}

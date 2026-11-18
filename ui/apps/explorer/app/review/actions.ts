@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { touchFinish, touchStart, type Started } from '../../lib/governance'
+import type { Touching } from '../gov/touch'
 import { covers, hrefOf, places, send, snapshot, type Change } from '../../lib/mero'
 
 export interface ActionState { error?: string; done?: string }
@@ -17,9 +18,9 @@ export type Decision = 'approve' | 'send-back' | 'reject'
 /** Step one of a touch: Mero says which places the decision covers, and Governance starts a touch
  * for exactly those. The browser then asks for Touch ID. */
 export async function askTouch(decision: Decision, proposals: string[]): Promise<({ ok: true; places: string[] } & Started) | { ok: false; error: string }> {
-  const asked = await places(proposals, decision === 'approve')
+  const asked = await places(proposals, decision === 'approve', decision)
   if (!asked.ok) return asked
-  const started = await touchStart(asked.data.action, asked.data.targets)
+  const started = await touchStart(asked.data.action, asked.data.targets, asked.data.about)
   if (!started.ok) return started
   return { ok: true, places: asked.data.targets.map(t => t.path), ...started.data }
 }
@@ -30,6 +31,9 @@ export async function finishTouch(ceremony: string, credential: any): Promise<{ 
   const finished = await touchFinish(ceremony, credential)
   return finished.ok ? { ok: true, touch: finished.data.touch } : finished
 }
+
+/** A touch for writing Cedar by hand, if the form has one, as a batch carries it. */
+const touchIn = (form: FormData) => (text(form, 'touch') ? { touch: text(form, 'touch') } : {})
 
 /** The touch a decision carries, if the form has one. */
 const touchOf = (form: FormData) => text(form, 'touch') || undefined
@@ -106,10 +110,29 @@ export async function proposeChange(_: ActionState, form: FormData): Promise<Act
       migration_plan: breaking ? plan : null,
     },
   }
-  const result = await send('batches', { title: `Change ${m.identity.name}`, note: rationale, changes: [change] })
+  // With a touch when the Cedar is written by hand (step 7); Mero asks for it then.
+  const result = await send('batches', { title: `Change ${m.identity.name}`, note: rationale, changes: [change], ...touchIn(form) })
   if (!result.ok) return { error: result.error }
   revalidatePath('/', 'layout')
   redirect(`/review/${result.data.uid}?from=${encodeURIComponent(hrefOf(m.identity.path))}`)
+}
+
+/** A touch for writing Cedar by hand (agreed 9 Nov, step 7): only owners may, with Touch ID, for
+ * this role or rule, named by its meron or, for a new role, by its name. Mero asks for exactly this
+ * when the Cedar the form didn't write is new or changed. */
+export async function askCedarTouch(of: { uid: string } | { role: string }): Promise<Touching> {
+  let path: string
+  if ('uid' in of) {
+    const m = (await snapshot()).merons.find(x => x.identity.uid === of.uid)
+    if (!m) return { ok: false, error: 'No such meron.' }
+    path = m.identity.path
+  } else {
+    const slug = slugOf(of.role)
+    if (!slug) return { ok: false, error: 'Give it a name, such as Proposer.' }
+    path = `noi.gov.roles.${slug}`
+  }
+  const started = await touchStart('write-cedar', [{ path }])
+  return started.ok ? { ok: true, what: `writing the Cedar of ${path} by hand`, ...started.data } : started
 }
 
 /** A role's last name in its path, from its name: "Proposer" → proposer. */
@@ -147,7 +170,7 @@ export async function proposeNewRole(_: ActionState, form: FormData): Promise<Ac
       spec,
     },
   }
-  const result = await send('batches', { title: `New role: ${name}`, note: rationale, changes: [change] })
+  const result = await send('batches', { title: `New role: ${name}`, note: rationale, changes: [change], ...touchIn(form) })
   if (!result.ok) return { error: result.error }
   revalidatePath('/', 'layout')
   redirect(`/review/${result.data.uid}?from=${encodeURIComponent(hrefOf('noi.gov.roles'))}`)

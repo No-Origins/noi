@@ -15,9 +15,11 @@ import { Sentence } from '../merons/Sentence'
 import { cedarKind, readCedar, rolesIn } from '../../lib/cedar'
 import { roleSentence, ruleSentence, type RoleForm, type RuleForm } from '../../lib/sentence'
 import { ApproveAll, Decide } from './Decide'
+import { ListDiff } from './ListDiff'
+import { asList, listChange, listChanged, type ListChange } from '../../lib/lists'
 import styles from './review.module.css'
 
-const OPERATION = { add: 'New', update: 'Change', rename: 'Rename', deprecate: 'Deprecate' } as const
+const OPERATION = { add: 'New', update: 'Change', rename: 'Rename', deprecate: 'Deprecate', reinstate: 'Reinstate' } as const
 const STATE = { waiting: 'Waiting', 'sent-back': 'Sent back', approved: 'Approved', rejected: 'Rejected' } as const
 const ACTION: Record<string, string> = {
   'proposal.submit': 'proposed this batch',
@@ -51,8 +53,9 @@ export async function BatchScreen({ batch }: { batch: string }) {
   const current = index(s)
   const waiting = b.proposals.filter(p => p.state === 'waiting')
   const blocked = waiting.map(blocker).find(Boolean)
-  // Signed in, you can decide; each decision asks for your touch first (Touch ID, in Safari).
-  const decides = r.writable
+  // Only where Governance would let you (asked as if you touched, unrecorded: 9 Nov, step 6); each
+  // decision still asks for your touch first (Touch ID, in Safari), and Governance decides then.
+  const decides = Boolean(b.may_decide)
   return (
     <article className={styles.batch}>
       <header className={styles.batchHead}>
@@ -65,6 +68,11 @@ export async function BatchScreen({ batch }: { batch: string }) {
         </div>
         {decides && waiting.length > 0 && (
           <ApproveAll proposals={waiting.map(p => p.uid)} blocked={blocked ? `Not yet: ${blocked}` : undefined} />
+        )}
+        {!decides && waiting.length > 0 && (
+          <p className={cx(styles.muted, 'eio-type-style-caption')}>
+            You may read this batch. Deciding it needs a role that may approve in its places{b.places.some(p => p === 'noi.gov' || p.startsWith('noi.gov.')) ? ': under noi.gov, an owner' : ''}.
+          </p>
         )}
       </header>
       {b.proposals.map(p => (
@@ -141,10 +149,13 @@ function ProposalCard({ p, b, s, idx, nodes, current, writable }: {
 function Changes({ p, before, s }: { p: Proposal; before?: Meron; s: Snapshot }) {
   const c = p.change
   if (c.operation === 'deprecate') return <p className="eio-type-style-body">Becomes deprecated: it stays readable, but nothing new should use it.</p>
+  if (c.operation === 'reinstate') return <p className="eio-type-style-body">Comes back from deprecated to active, because: {c.reason}</p>
   if (c.operation === 'rename') return <Diff rows={[['Path', before?.identity.path ?? '', c.path]]} />
   if (c.operation === 'add') return null
   const show = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2))
   const rows: [string, string, string][] = []
+  // A changed list says what was added, taken away and changed, not the whole list twice (18 Nov).
+  const lists: [string, unknown[], unknown[], ListChange][] = []
   // A role's or rule's Cedar reads as a sentence, before and after (agreed 8 Nov).
   const kind = before ? cedarKind(before) : undefined
   const words = kind && before && before.spec?.cedar !== c.meron.spec?.cedar
@@ -157,14 +168,28 @@ function Changes({ p, before, s }: { p: Proposal; before?: Meron; s: Snapshot })
     const keys = new Set([...Object.keys(before.spec ?? {}), ...Object.keys(c.meron.spec ?? {})])
     for (const k of keys) {
       if (words && k === 'cedar') continue
+      const a0 = asList(before.classification.type, k, before.spec?.[k])
+      const z0 = asList(c.meron.classification?.type, k, c.meron.spec?.[k])
+      const list = listChange(a0, z0)
+      if (list) {
+        if (listChanged(list)) lists.push([k, a0 as unknown[], z0 as unknown[], list])
+        continue
+      }
       const a = show(before.spec?.[k]), z = show(c.meron.spec?.[k])
       if (a !== z) rows.push([`spec.${k}`, a ?? '—', z ?? '—'])
     }
   }
+  const idx = lists.length > 0 ? index(s) : undefined
   return (
     <>
       {words}
-      {rows.length ? <Diff rows={rows} /> : !words && <p className={cx(styles.muted, 'eio-type-style-body')}>No field changes.</p>}
+      {rows.length > 0 && <Diff rows={rows} />}
+      {idx && (
+        <div className={styles.diff}>
+          {lists.map(([k, a, z, list]) => <ListDiff key={k} field={k} before={a} after={z} change={list} idx={idx} />)}
+        </div>
+      )}
+      {!rows.length && !lists.length && !words && <p className={cx(styles.muted, 'eio-type-style-body')}>No field changes.</p>}
       <p className={cx(styles.muted, 'eio-type-style-caption')}>
         Why: {c.compatibility.rationale} · {c.compatibility.impact === 'non-breaking' ? 'Nothing that reads it should break.' : `May break what reads it. Plan: ${c.compatibility.migration_plan}`}
       </p>
@@ -261,6 +286,7 @@ function testRun(p: Proposal, idx: Index): Check[] {
     update: `Updates it${links ? ` and records ${plural(links, 'new link')}` : ''}.`,
     rename: 'Renames it. The old path still finds it.',
     deprecate: 'Moves it to deprecated.',
+    reinstate: 'Checks it against today’s invariants, then moves it back to active.',
   }[p.change.operation]
   lines.push({ ok: null, text: `What approving does: ${did}` })
   return lines

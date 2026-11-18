@@ -1,0 +1,36 @@
+{
+  "path": "noi.eio.components.radio",
+  "name": "Radio",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A real radio Eidos draws, with its words: a lime circle with a dark dot when chosen.",
+    "responsibility": "Be the one radio every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Choose one of several, with its words; put radios in Choices, so their question is said with them.",
+    "states": {
+      "interaction": {
+        "checked": "chosen: a lime circle with a dark dot",
+        "disabled": "locked",
+        "focus": "focused, with the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.type.style.body"
+    ],
+    "uses": [
+      "noi.eio.components.choice"
+    ],
+    "files": [
+      {
+        "path": "src/Radio/Radio.tsx",
+        "sha256": "90ee768bf5153af1195d65c93d4b47246da79e49933124cc71e96e7b4f98ba59"
+      }
+    ]
+  }
+}

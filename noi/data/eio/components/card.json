@@ -1,0 +1,44 @@
+{
+  "path": "noi.eio.components.card",
+  "name": "Card",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A card on the card surface, with its border and its corners.",
+    "responsibility": "Be the one card every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Hold related things together on a page.",
+    "states": {
+      "inset": {
+        "default": "the card’s inset",
+        "tight": "the tighter inset of a control, for small cards"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.color.border.default",
+      "noi.eio.color.surface.card",
+      "noi.eio.color.text.primary",
+      "noi.eio.radius.card",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.card",
+      "noi.eio.space.inset.control"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Card/Card.module.css",
+        "sha256": "b097eb2ba099642fa52df131bfdca0413552d0d21e07957005335a577dadbfdc"
+      },
+      {
+        "path": "src/Card/Card.tsx",
+        "sha256": "ad82108509590d742296657307d7c40ba685a4957525af20563e98d35fc2391d"
+      }
+    ]
+  }
+}

@@ -110,17 +110,17 @@ export function Decide({ proposal, waiting, blocked }: { proposal: string; waiti
       <form ref={formRef} className={styles.decision} onSubmit={e => e.preventDefault()}>
         <input type="hidden" name="proposal" value={proposal} />
         {waiting && (
-          <Button variant="primary" icon="fingerprint" disabled={busy || Boolean(blocked)} onClick={approveIt}>
+          <Button className={styles.act} variant="primary" icon="fingerprint" disabled={busy || Boolean(blocked)} onClick={approveIt}>
             Approve
           </Button>
         )}
         <Field className={styles.note} label="Note for the proposer" name="note" placeholder="A note: what to change, or why not" />
         {waiting && (
-          <Button variant="secondary" icon="left" disabled={busy} onClick={() => withNote('send-back', sendBackAction)}>
+          <Button className={styles.act} variant="secondary" icon="left" disabled={busy} onClick={() => withNote('send-back', sendBackAction)}>
             Send back
           </Button>
         )}
-        <Button icon="x" disabled={busy} onClick={() => withNote('reject', rejectAction)}>Reject</Button>
+        <Button className={styles.act} icon="x" disabled={busy} onClick={() => withNote('reject', rejectAction)}>Reject</Button>
       </form>
       {blocked && waiting && <p className={[styles.muted, 'eio-type-style-caption'].join(' ')}>{blocked}</p>}
       {asking && <Asking places={asking} />}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.flight.dark",
+  "name": "Going dark",
+  "classification": {
+    "type": "token",
+    "subtype": "time"
+  },
+  "semantics": {
+    "definition": "How long the picture takes to go dark when the system's world is there. A guess, not agreed.",
+    "responsibility": "End a flight into a system."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "s": 0.8
+  }
+}

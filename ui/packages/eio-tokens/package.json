@@ -8,7 +8,8 @@
     "./tokens.css": "./tokens.css",
     "./fonts.css": "./fonts.css",
     "./tokens.json": "./tokens.json",
-    ".": "./tokens.ts"
+    ".": "./tokens.ts",
+    "./components": "./components.ts"
   },
-  "files": ["tokens.css", "fonts.css", "tokens.ts", "tokens.json", "fonts"]
+  "files": ["tokens.css", "fonts.css", "tokens.ts", "tokens.json", "components.ts", "fonts"]
 }

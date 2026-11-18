@@ -1,0 +1,40 @@
+{
+  "path": "noi.eio.components.menu-icon",
+  "name": "Menu icon",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The menu icon that turns into a close icon: three lines while the menu is shut, a cross while it is open.",
+    "responsibility": "Be the one menu icon every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Let one button open and close a menu.",
+    "states": {
+      "state": {
+        "shut": "three lines",
+        "open": "a cross: the outer lines turned to meet, the middle one gone"
+      }
+    },
+    "reads": [
+      "noi.eio.motion.duration.ms200",
+      "noi.eio.motion.duration.ms300",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.size.icon.small"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/MenuIcon/MenuIcon.module.css",
+        "sha256": "9302eaa6f4dd5a2ae89613bfa8d79706767725c6728a97faa8901522792b4291"
+      },
+      {
+        "path": "src/MenuIcon/MenuIcon.tsx",
+        "sha256": "031af44e24fd53744cc35ee62658e66a9593f907a3fdb8d1a07022640b2f05f1"
+      }
+    ]
+  }
+}

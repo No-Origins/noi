@@ -19,6 +19,7 @@ export type Reading<F> = { form: F } | { by_hand: string }
 /** The words for each verb: what it lets you do, and the same as "it's …" for an exception. */
 const VERBS: Record<string, [string, string]> = {
   read: ['read merons', 'reading'],
+  'read-review': ['read Review', 'reading Review'],
   propose: ['propose changes', 'proposing'],
   update: ['update merons', 'an update'],
   'evolve-breaking': ['make breaking changes', 'a breaking change'],
@@ -37,12 +38,15 @@ const VERBS: Record<string, [string, string]> = {
   'end-grant': ['end grants', 'ending a grant'],
   'end-session': ['end sign-ins', 'ending a sign-in'],
   view: ['view accounts, roles and the record', 'viewing'],
+  'write-cedar': ['write Cedar by hand', 'writing Cedar by hand'],
 }
 const SYSTEM: Record<string, string> = { mero: 'Mero', governance: 'Governance' }
 
 export const systemName = (s: string) => SYSTEM[s] ?? s
 /** What a verb lets you do, such as "propose changes". */
 export const verbWords = (v: string) => VERBS[v]?.[0] ?? v
+/** The same as a doing, such as "proposing": what a touch or a refusal was for. */
+export const verbDoing = (v: string) => VERBS[v]?.[1] ?? v
 const verbAsIt = (v: string) => VERBS[v]?.[1] ?? v
 
 /** Names for roles and accounts, where known: `owner` → Owner, an account's ID → its handle. */

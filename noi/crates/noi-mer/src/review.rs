@@ -31,6 +31,13 @@ pub enum Change {
         uid: Uuid,
         expected_revision: i64,
     },
+    /// Brings a deprecated meron back to active, for a reason (agreed 8 Nov). It must meet
+    /// today's invariants again, as at registration. Retired merons never come back.
+    Reinstate {
+        uid: Uuid,
+        expected_revision: i64,
+        reason: String,
+    },
 }
 impl Change {
     pub fn operation(&self) -> &'static str {
@@ -39,6 +46,7 @@ impl Change {
             Change::Update { .. } => "update",
             Change::Rename { .. } => "rename",
             Change::Deprecate { .. } => "deprecate",
+            Change::Reinstate { .. } => "reinstate",
         }
     }
     pub fn target(&self) -> Option<Uuid> {
@@ -46,7 +54,8 @@ impl Change {
             Change::Add { .. } => None,
             Change::Update { uid, .. }
             | Change::Rename { uid, .. }
-            | Change::Deprecate { uid, .. } => Some(*uid),
+            | Change::Deprecate { uid, .. }
+            | Change::Reinstate { uid, .. } => Some(*uid),
         }
     }
     fn expected_revision(&self) -> Option<i64> {
@@ -59,6 +68,9 @@ impl Change {
                 expected_revision, ..
             }
             | Change::Deprecate {
+                expected_revision, ..
+            }
+            | Change::Reinstate {
                 expected_revision, ..
             } => Some(*expected_revision),
         }
@@ -88,6 +100,15 @@ impl Change {
             }
             Change::Rename { path, .. } => validate_path(path)?,
             Change::Deprecate { .. } => {}
+            Change::Reinstate { reason, .. } => {
+                let reason = reason.trim();
+                if reason.is_empty() || reason.chars().count() > 400 {
+                    return Err(ValidationError(
+                        "a reinstatement needs its reason, in at most 400 characters".into(),
+                    )
+                    .into());
+                }
+            }
         }
         Ok(())
     }
@@ -132,6 +153,9 @@ pub struct NewBatch {
     #[serde(default)]
     pub note: Option<String>,
     pub changes: Vec<Change>,
+    /// A touch for writing Cedar by hand, when a change does (9 Nov, step 7). Never kept.
+    #[serde(default, skip_serializing)]
+    pub touch: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -170,6 +194,9 @@ pub struct Batch {
     pub created_at: DateTime<Utc>,
     pub proposals: Vec<Proposal>,
     pub events: Vec<ProposalEvent>,
+    /// The places deciding its waiting proposals asks about (9 Nov, step 6), so a page can ask
+    /// whether you may decide it before offering to.
+    pub places: Vec<String>,
 }
 
 #[derive(FromRow)]
@@ -281,6 +308,33 @@ impl Registry {
                 json!({"batch":batch.title,"changes":batch.changes}),
             )
             .await?;
+        // Cedar the form didn't write is for owners, with a touch (9 Nov, step 7): asked when a
+        // change brings new or changed hand-written Cedar for a role or rule.
+        let mut conn = self.pool.acquire().await?;
+        let by_hand = hand_written(&mut conn, &batch.changes).await?;
+        if !by_hand.is_empty() {
+            // Each role or rule's own place: what the touch is for, as the page names it.
+            let mut places = vec![];
+            for change in &by_hand {
+                if let Some(own) = change_resources(&mut conn, std::slice::from_ref(change))
+                    .await?
+                    .into_iter()
+                    .next()
+                {
+                    places.push(own);
+                }
+            }
+            drop(conn);
+            self.authorize(
+                proposer,
+                Action::WriteCedar,
+                places,
+                json!({"batch": batch.title, "operation": "write-cedar"}),
+            )
+            .await?;
+        } else {
+            drop(conn);
+        }
         let items: Vec<(Actor, Change)> = batch
             .changes
             .iter()
@@ -312,7 +366,7 @@ impl Registry {
         )
         .await?;
         tx.commit().await?;
-        self.batch(proposer, uid).await
+        self.just_proposed(uid).await
     }
 
     /// Every batch, newest first, with its proposals and their history.
@@ -323,7 +377,8 @@ impl Registry {
         )
         .fetch_all(&mut *conn)
         .await?;
-        self.read_review(&mut conn, actor, batches, true).await
+        self.read_review(&mut conn, Some(actor), batches, true)
+            .await
     }
     pub async fn batch(&self, actor: &Actor, uid: Uuid) -> Result<Batch> {
         let mut conn = self.pool.acquire().await?;
@@ -331,17 +386,33 @@ impl Registry {
             .bind(uid)
             .fetch_all(&mut *conn)
             .await?;
-        self.read_review(&mut conn, actor, batches, false)
+        self.read_review(&mut conn, Some(actor), batches, false)
+            .await?
+            .pop()
+            .ok_or(Error::NotFound)
+    }
+    /// The batch its proposer just sent or revised, for their answer: asking to propose those very
+    /// changes has just been answered, so reading Review isn't asked again (9 Nov, step 6). An
+    /// agent may propose without reading Review.
+    async fn just_proposed(&self, uid: Uuid) -> Result<Batch> {
+        let mut conn = self.pool.acquire().await?;
+        let batches = sqlx::query_as::<_, BatchRow>("SELECT * FROM mer.batches WHERE uid=$1")
+            .bind(uid)
+            .fetch_all(&mut *conn)
+            .await?;
+        self.read_review(&mut conn, None, batches, false)
             .await?
             .pop()
             .ok_or(Error::NotFound)
     }
     /// Reading all of review needs reading the registry (`noi`) too; reading one batch needs
     /// reading only what it touches, so an agent allowed in one place sees what it proposed.
+    /// Reads batches, asking whether `actor` may read Review in their places; with no actor, only
+    /// for a proposer's own batch just sent (`just_proposed`).
     async fn read_review(
         &self,
         conn: &mut PgConnection,
-        actor: &Actor,
+        actor: Option<&Actor>,
         batches: Vec<BatchRow>,
         whole_review: bool,
     ) -> Result<Vec<Batch>> {
@@ -361,9 +432,18 @@ impl Registry {
             }
         }
         let mut proposals = vec![];
+        let mut deciding: std::collections::HashMap<Uuid, std::collections::BTreeSet<String>> =
+            std::collections::HashMap::new();
         for row in rows {
             let change: Change = serde_json::from_value(row.change.clone())?;
-            resources.extend(change_resources(conn, std::slice::from_ref(&change)).await?);
+            let here = change_resources(conn, std::slice::from_ref(&change)).await?;
+            if row.state == "waiting" {
+                deciding
+                    .entry(row.batch)
+                    .or_default()
+                    .extend(here.iter().map(|r| r.path.clone()));
+            }
+            resources.extend(here);
             let open = ProposalState::parse(&row.state)?.open();
             let stale = open && is_stale(conn, &change).await?;
             proposals.push(row.into_proposal(stale)?);
@@ -371,13 +451,15 @@ impl Registry {
         if resources.is_empty() {
             return Ok(vec![]);
         }
-        self.authorize(
-            actor,
-            Action::Read,
-            resources,
-            json!({"operation":"review"}),
-        )
-        .await?;
+        if let Some(actor) = actor {
+            self.authorize(
+                actor,
+                Action::ReadReview,
+                resources,
+                json!({"operation":"review"}),
+            )
+            .await?;
+        }
         Ok(batches
             .into_iter()
             .map(|b| Batch {
@@ -399,12 +481,37 @@ impl Registry {
                         occurred_at: e.occurred_at,
                     })
                     .collect(),
+                places: deciding
+                    .remove(&b.uid)
+                    .map(|p| p.into_iter().collect())
+                    .unwrap_or_default(),
                 uid: b.uid,
                 title: b.title,
                 proposer: b.proposer,
                 created_at: b.created_at,
             })
             .collect())
+    }
+
+    /// How many proposals wait (9 Nov, step 6): Review's badge, without loading every batch ever.
+    /// Reading Review is asked first, in all of noi.
+    pub async fn waiting(&self, actor: &Actor) -> Result<i64> {
+        let root = {
+            let mut conn = self.pool.acquire().await?;
+            resolve(&mut conn, "noi").await?
+        };
+        self.authorize(
+            actor,
+            Action::ReadReview,
+            vec![resource(&root)],
+            json!({"operation": "review-waiting"}),
+        )
+        .await?;
+        Ok(
+            sqlx::query_scalar("SELECT count(*) FROM mer.proposals WHERE state = 'waiting'")
+                .fetch_one(&self.pool)
+                .await?,
+        )
     }
 
     /// Approves proposals, or every waiting proposal of a batch given by its uid. They run again,
@@ -445,9 +552,24 @@ impl Registry {
                 approver,
                 Action::Review,
                 resources,
-                json!({"approve": rows.iter().map(|r| r.uid).collect::<Vec<_>>()}),
+                json!({
+                    "approve": rows.iter().map(|r| r.uid).collect::<Vec<_>>(),
+                    "touch_for": touch_for("approve", rows.iter().map(|r| (r.uid, r.revision))),
+                }),
             )
             .await?;
+        // And what each change does, for the approver who applies it (9 Nov, step 7): so a rule
+        // about updating, renaming or moving a meron through its lifecycle applies to approvals
+        // too. Asked once per action, on all of its places; no touch, as no rule asks one.
+        for (action, places) in change_actions(tx.as_mut(), &changes).await? {
+            self.authorize(
+                approver,
+                action,
+                places,
+                json!({"approve": rows.iter().map(|r| r.uid).collect::<Vec<_>>(), "applies": action.as_str()}),
+            )
+            .await?;
+        }
         let under = Registry {
             pool: self.pool.clone(),
             authorizer: Arc::new(UnderApproval(decision.clone())),
@@ -499,33 +621,49 @@ impl Registry {
         uids: &[Uuid],
         whole_batches: bool,
     ) -> Result<Vec<String>> {
+        Ok(self
+            .review_places_for(actor, uids, whole_batches, None)
+            .await?
+            .0)
+    }
+    /// The places deciding these proposals asks about and, with the decision, what else the touch
+    /// for it names (9 Nov, step 7): the decision and each proposal at its revision. The decision
+    /// itself asks with the same, so a touch made for one decision never counts for another.
+    pub async fn review_places_for(
+        &self,
+        actor: &Actor,
+        uids: &[Uuid],
+        whole_batches: bool,
+        decision: Option<&str>,
+    ) -> Result<(Vec<String>, Option<Value>)> {
         let mut conn = self.pool.acquire().await?;
         let query = if whole_batches {
-            "SELECT change FROM mer.proposals WHERE uid = ANY($1) OR (batch = ANY($1) AND state = 'waiting') ORDER BY batch, position"
+            "SELECT uid, revision, change FROM mer.proposals WHERE uid = ANY($1) OR (batch = ANY($1) AND state = 'waiting') ORDER BY batch, position"
         } else {
-            "SELECT change FROM mer.proposals WHERE uid = ANY($1) ORDER BY batch, position"
+            "SELECT uid, revision, change FROM mer.proposals WHERE uid = ANY($1) ORDER BY batch, position"
         };
-        let rows: Vec<Value> = sqlx::query_scalar(query)
+        let rows: Vec<(Uuid, i32, Value)> = sqlx::query_as(query)
             .bind(uids)
             .fetch_all(&mut *conn)
             .await?;
         if rows.is_empty() {
             return Err(Error::NotFound);
         }
+        let about = decision.map(|d| touch_for(d, rows.iter().map(|(u, r, _)| (*u, *r))));
         let changes = rows
             .into_iter()
-            .map(serde_json::from_value)
+            .map(|(_, _, c)| serde_json::from_value(c))
             .collect::<std::result::Result<Vec<Change>, _>>()?;
         let resources = change_resources(&mut conn, &changes).await?;
         drop(conn);
         self.authorize(
             actor,
-            Action::Read,
+            Action::ReadReview,
             resources.clone(),
             json!({"operation": "review-places"}),
         )
         .await?;
-        Ok(places(&resources))
+        Ok((places(&resources), about))
     }
 
     /// Returns a waiting proposal to its proposer with a note saying what to change.
@@ -582,7 +720,14 @@ impl Registry {
                 reviewer,
                 Action::Review,
                 resources,
-                json!({"proposal":uid,"to":to.as_str()}),
+                json!({
+                    "proposal": uid,
+                    "to": to.as_str(),
+                    "touch_for": touch_for(
+                        if to == ProposalState::Rejected { "reject" } else { "send-back" },
+                        [(uid, row.revision)].into_iter(),
+                    ),
+                }),
             )
             .await?;
         let decided = to == ProposalState::Rejected;
@@ -642,6 +787,24 @@ impl Registry {
                 json!({"revise":uid,"change":change}),
             )
             .await?;
+        // As when proposing: Cedar the form didn't write is for owners, with a touch (10 Nov).
+        if !hand_written(&mut conn, std::slice::from_ref(&change))
+            .await?
+            .is_empty()
+        {
+            let places = change_resources(&mut conn, std::slice::from_ref(&change))
+                .await?
+                .into_iter()
+                .take(1)
+                .collect();
+            self.authorize(
+                proposer,
+                Action::WriteCedar,
+                places,
+                json!({"revise": uid, "operation": "write-cedar"}),
+            )
+            .await?;
+        }
         let open = sqlx::query_as::<_, ProposalRow>("SELECT uid,batch,position,change,state,revision,outcome,checked_at,decided_by,decided_at,created_at,updated_at FROM mer.proposals WHERE batch=$1 AND state IN ('waiting','sent-back') ORDER BY position")
             .bind(row.batch)
             .fetch_all(&mut *conn)
@@ -679,7 +842,7 @@ impl Registry {
         )
         .await?;
         tx.commit().await?;
-        self.batch(proposer, row.batch).await
+        self.just_proposed(row.batch).await
     }
 
     /// Runs changes in a transaction that is always rolled back, and reports each one's result.
@@ -723,7 +886,15 @@ impl Registry {
                     }
                     Err(e) => {
                         savepoint.rollback().await?;
-                        results[i] = Err(e.to_string());
+                        // Mero's own failure is not for the page or the stored outcome (10 Nov):
+                        // the log keeps the detail.
+                        results[i] = Err(match &e {
+                            Error::Database(_) | Error::Migration(_) | Error::Json(_) => {
+                                tracing::error!(error = %e, "a change failed on Mero's side");
+                                "Mero could not apply it: try again".to_string()
+                            }
+                            _ => e.to_string(),
+                        });
                         failed.push(i);
                     }
                 }
@@ -733,6 +904,41 @@ impl Registry {
                 break;
             }
             pending = failed;
+        }
+        // A renamed component is checked again once every change has had its turn (18 Nov): under
+        // its new name it must still pass its rule, so the batch that renames it also moves its files
+        // to the folder named for it, and its new type names must be free.
+        for (i, (_, change)) in items.iter().enumerate() {
+            let Change::Rename { uid, .. } = change else {
+                continue;
+            };
+            if results[i].is_err() {
+                continue;
+            }
+            let e = load(conn, *uid).await?;
+            if e.classification.kind != MeronType::Component {
+                continue;
+            }
+            let invariants = applicable_invariants(conn, &e.classification).await?;
+            let checked = checks::run(
+                conn,
+                e.identity.uid,
+                &e.identity.path,
+                &e.spec,
+                &invariants,
+                &HashMap::new(),
+            )
+            .await;
+            match checked {
+                Ok(_) => {}
+                Err(Error::Validation(v)) => {
+                    results[i] = Err(format!(
+                        "as {}, it does not pass its rule: {}. Change what the new name needs (such as its files' folder) in the same batch",
+                        e.identity.path, v.0
+                    ));
+                }
+                Err(other) => return Err(other),
+            }
         }
         Ok(results)
     }
@@ -775,6 +981,7 @@ impl Registry {
                         m.identity.uid,
                         m.revision,
                         MeronState::Registered,
+                        None,
                     )
                     .await?;
                 self.transition_in(
@@ -783,6 +990,7 @@ impl Registry {
                     m.identity.uid,
                     m.revision,
                     MeronState::Active,
+                    None,
                 )
                 .await?
             }
@@ -820,6 +1028,22 @@ impl Registry {
                     *uid,
                     *expected_revision,
                     MeronState::Deprecated,
+                    None,
+                )
+                .await?
+            }
+            Change::Reinstate {
+                uid,
+                expected_revision,
+                reason,
+            } => {
+                self.transition_in(
+                    conn,
+                    approver,
+                    *uid,
+                    *expected_revision,
+                    MeronState::Active,
+                    Some(reason.trim()),
                 )
                 .await?
             }
@@ -865,7 +1089,7 @@ async fn change_resources(conn: &mut PgConnection, changes: &[Change]) -> Result
     let mut out = vec![];
     for change in changes {
         match change {
-            Change::Add { meron, .. } => {
+            Change::Add { meron, container } => {
                 let scope = meron.authority_scope.ok_or_else(|| {
                     ValidationError(format!(
                         "{}: a new meron needs its authority_scope",
@@ -879,6 +1103,10 @@ async fn change_resources(conn: &mut PgConnection, changes: &[Change]) -> Result
                     authority_scope: scope,
                 });
                 out.push(resource(&load(conn, scope).await?));
+                // The meron it goes into is changed too (9 Nov, step 7): it is among the places.
+                if let Some(path) = container {
+                    out.push(resource(&resolve(conn, path).await?));
+                }
             }
             Change::Rename { uid, path, .. } => {
                 // Both places: where it is, and where it would go.
@@ -992,4 +1220,121 @@ async fn proposal_event(
         .bind(batch).bind(proposal).bind(action).bind(&actor.subject).bind(serde_json::to_value(decision)?).bind(note).bind(payload)
         .execute(conn).await?;
     Ok(())
+}
+
+/// What a touch for a decision in Review names besides its places (9 Nov, step 7): the decision,
+/// and each proposal at its revision, in order. Changed after the touch, a proposal needs a new one.
+pub fn touch_for(decision: &str, proposals: impl Iterator<Item = (Uuid, i32)>) -> Value {
+    let mut named: Vec<String> = proposals.map(|(uid, rev)| format!("{uid}@{rev}")).collect();
+    named.sort();
+    json!({ "decision": decision, "proposals": named })
+}
+
+/// What approving these changes does besides "review" (9 Nov, step 7), each action with its places,
+/// for the approver who applies them: a new meron is linked into its container and moved to active,
+/// an update is an update or a breaking change, a rename renames, a deprecation or reinstatement
+/// moves it through its lifecycle. Proposing was asked when it was proposed.
+async fn change_actions(
+    conn: &mut PgConnection,
+    changes: &[Change],
+) -> Result<Vec<(Action, Vec<Resource>)>> {
+    fn add(
+        by: &mut BTreeMap<&'static str, (Action, Vec<Resource>)>,
+        action: Action,
+        more: Vec<Resource>,
+    ) {
+        by.entry(action.as_str())
+            .or_insert_with(|| (action, vec![]))
+            .1
+            .extend(more);
+    }
+    let mut by: BTreeMap<&'static str, (Action, Vec<Resource>)> = BTreeMap::new();
+    for change in changes {
+        match change {
+            Change::Add { meron, container } => {
+                let scope = meron.authority_scope.ok_or_else(|| {
+                    ValidationError(format!(
+                        "{}: a new meron needs its authority_scope",
+                        meron.path
+                    ))
+                })?;
+                let new = Resource {
+                    uid: Uuid::nil(),
+                    path: meron.path.clone(),
+                    revision: 0,
+                    authority_scope: scope,
+                };
+                let holder = match container {
+                    Some(path) => resolve(conn, path).await?,
+                    None => load(conn, scope).await?,
+                };
+                add(
+                    &mut by,
+                    Action::Relate,
+                    vec![resource(&holder), new.clone()],
+                );
+                add(&mut by, Action::Transition, vec![new]);
+            }
+            Change::Update {
+                uid, compatibility, ..
+            } => {
+                let action = if compatibility.impact == Impact::NonBreaking {
+                    Action::Update
+                } else {
+                    Action::EvolveBreaking
+                };
+                add(&mut by, action, vec![resource(&load(conn, *uid).await?)]);
+            }
+            Change::Rename { uid, path, .. } => {
+                let meron = load(conn, *uid).await?;
+                let mut moved = resource(&meron);
+                moved.path = path.clone();
+                add(&mut by, Action::Rename, vec![resource(&meron), moved]);
+            }
+            Change::Deprecate { uid, .. } | Change::Reinstate { uid, .. } => {
+                add(
+                    &mut by,
+                    Action::Transition,
+                    vec![resource(&load(conn, *uid).await?)],
+                );
+            }
+        }
+    }
+    Ok(by.into_values().collect())
+}
+
+/// The changes that bring Cedar the form didn't write, new or changed, for a role or rule (9 Nov,
+/// step 7): proposing them asks "write Cedar", which only owners hold.
+async fn hand_written(conn: &mut PgConnection, changes: &[Change]) -> Result<Vec<Change>> {
+    let mut out = vec![];
+    for change in changes {
+        let (meron, before) = match change {
+            Change::Add { meron, .. } => (meron, None),
+            Change::Update { uid, meron, .. } => (meron, Some(load(conn, *uid).await?)),
+            _ => continue,
+        };
+        if meron.classification.kind != MeronType::Rule {
+            continue;
+        }
+        let Some(cedar) = meron.spec.get("cedar").and_then(Value::as_str) else {
+            continue;
+        };
+        if before.is_some_and(|b| b.spec.get("cedar").and_then(Value::as_str) == Some(cedar)) {
+            continue;
+        }
+        let read = if meron.classification.subtype.as_deref() == Some("role") {
+            let system = meron
+                .spec
+                .get("system")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            noi_gov::form::read_role(system, cedar).map(|_| ())
+        } else {
+            noi_gov::form::read_rule(cedar).map(|_| ())
+        };
+        if read.is_err() {
+            out.push(change.clone());
+        }
+    }
+    Ok(out)
 }

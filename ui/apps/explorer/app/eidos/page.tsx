@@ -2,8 +2,8 @@
 // Every Eidos component, in light and dark, built from the real packages. Used to check the components.
 import { type ReactNode, useState } from 'react'
 import {
-  Badge, Button, Card, Checkbox, Choices, Count, Disclosure, Field, Icon, type IconName, MenuIcon, Radio, Select, Swatch, Tab, Tabs,
-  TextArea, TreeRow,
+  Badge, Button, Card, Checkbox, Choices, Count, Disclosure, Field, Icon, type IconName, MenuIcon, Radio, Select, Sidebar, Swatch, Tab,
+  Tabs, TextArea, TreeRow,
 } from '@noi/eio-react'
 import { tokens } from '@noi/eio-tokens'
 import styles from './gallery.module.css'
@@ -29,6 +29,10 @@ function Gallery({ theme }: { theme: 'light' | 'dark' }) {
   const [who, setWho] = useState('role')
   const [role, setRole] = useState('maintainer')
   const [impact, setImpact] = useState('non-breaking')
+  const [find, setFind] = useState('')
+  const [open, setOpen] = useState(true)
+  const [meron, setMeron] = useState('color')
+  const [page, setPage] = useState('roles')
   const flip = (v: string, on: boolean) => setVerbs(vs => (on ? [...vs, v] : vs.filter(x => x !== v)))
   const danger = tokens.color.text.danger
   return (
@@ -162,6 +166,47 @@ function Gallery({ theme }: { theme: 'light' | 'dark' }) {
           <TreeRow name="Eidos" open preview={<Icon name="layers" />} count={98} selected={selected === 'eidos'} onSelect={() => setSelected('eidos')} />
           <TreeRow name="Palette" depth={1} open={false} count={17} selected={selected === 'palette'} onSelect={() => setSelected('palette')} />
           <TreeRow name="Danger text" depth={1} preview={<Swatch light={danger.light} dark={danger.dark} />} selected={selected === 'danger'} onSelect={() => setSelected('danger')} />
+        </div>
+      </Part>
+      <Part name="Sidebar">
+        {/* As Merons uses it: a search on top, then one tree whose rows open and close. */}
+        <div className={styles.tree}>
+          <Sidebar
+            label="Merons"
+            top={<Field label="Search merons" icon="search" hint="/" placeholder="Search names, paths, colors" value={find} onChange={e => setFind(e.target.value)} onClear={() => setFind('')} />}
+            empty={find ? <>Nothing matches “{find}”.</> : undefined}
+          >
+            {!find && <TreeRow name="Eidos · Design System" open={open} onToggle={() => setOpen(o => !o)} preview={<Icon name="layers" />} count={164} selected={meron === 'eidos'} onSelect={() => setMeron('eidos')} />}
+            {!find && open && <TreeRow name="Color" depth={1} open={false} preview={<Icon name="layers" />} count={48} selected={meron === 'color'} onSelect={() => setMeron('color')} />}
+            {!find && open && <TreeRow name="Layout" depth={1} open={false} preview={<Icon name="layers" />} count={3} selected={meron === 'layout'} onSelect={() => setMeron('layout')} />}
+            {!find && <TreeRow name="Governance" open={false} preview={<Icon name="layers" />} count={9} selected={meron === 'gov'} onSelect={() => setMeron('gov')} />}
+          </Sidebar>
+        </div>
+        {/* As Governance and Review use it: pages or batches by name, in groups. */}
+        <div className={styles.tree}>
+          <Sidebar
+            label="Governance"
+            groups={[
+              {
+                name: 'Yours',
+                rows: (
+                  <>
+                    <TreeRow name="Your account" preview={<Icon name="key" />} selected={page === 'account'} onSelect={() => setPage('account')} />
+                    <TreeRow name="Roles" preview={<Icon name="check" />} selected={page === 'roles'} onSelect={() => setPage('roles')} />
+                  </>
+                ),
+              },
+              {
+                name: 'For owners',
+                rows: (
+                  <>
+                    <TreeRow name="Accounts" preview={<Icon name="user" />} count={3} selected={page === 'accounts'} onSelect={() => setPage('accounts')} />
+                    <TreeRow name="Problems" preview={<Icon name="warn" />} selected={page === 'problems'} onSelect={() => setPage('problems')} />
+                  </>
+                ),
+              },
+            ]}
+          />
         </div>
       </Part>
       <Part name="Swatch">

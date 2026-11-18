@@ -1,8 +1,8 @@
 'use client'
-// Review's left pane: whether this Explorer can decide, then every batch by where it stands.
+// Review's left pane, on Eidos's Sidebar: whether this Explorer can decide, then every batch by where it stands.
 import type { MouseEvent } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Icon, TreeRow } from '@noi/eio-react'
+import { Icon, Sidebar, TreeRow } from '@noi/eio-react'
 import styles from './review.module.css'
 
 export interface BatchItem { uid: string; title: string; proposer: string; waiting: number; sentBack: number; open: number }
@@ -24,29 +24,33 @@ export function BatchList({ batches, next, writable, reviewer }: { batches: Batc
     ['Decided', batches.filter(b => b.open === 0)],
   ]
   return (
-    <div className={styles.list} onClick={follow}>
-      <p className={[styles.status, 'eio-type-style-caption'].join(' ')}>
-        <Icon name={writable ? 'user' : 'eye'} size="small" />
-        {writable
-          ? `Signed in as ${reviewer}. Approving, sending back and rejecting ask for your touch, in Safari.`
-          : 'Signed out: you see only what visitors may read.'}
-      </p>
-      {batches.length === 0 && <p className={[styles.muted, 'eio-type-style-body'].join(' ')}>Nothing has been proposed yet.</p>}
-      {groups.filter(([, list]) => list.length).map(([name, list]) => (
-        <div key={name} role="tree" aria-label={name} className={styles.group}>
-          <h2 className={[styles.groupName, 'eio-type-style-label'].join(' ')}>{name}</h2>
-          {list.map(b => (
-            <TreeRow
-              key={b.uid}
-              name={b.title}
-              preview={<Icon name={b.proposer === reviewer ? 'user' : 'agent'} />}
-              count={b.open || undefined}
-              selected={pathname === `/review/${b.uid}` || (pathname === '/review' && b.uid === next)}
-              href={`/review/${b.uid}`}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
+    <Sidebar
+      label="Review"
+      onClick={follow}
+      top={
+        <p className={[styles.status, 'eio-type-style-caption'].join(' ')}>
+          <Icon name={writable ? 'user' : 'eye'} size="small" />
+          {writable
+            ? `Signed in as ${reviewer}. Approving, sending back and rejecting ask for your touch, in Safari.`
+            : reviewer
+              ? `Signed in as ${reviewer}. You may read Review; deciding needs a role that may approve.`
+              : 'Signed out: you see only what visitors may read.'}
+        </p>
+      }
+      groups={groups.filter(([, list]) => list.length).map(([name, list]) => ({
+        name,
+        rows: list.map(b => (
+          <TreeRow
+            key={b.uid}
+            name={b.title}
+            preview={<Icon name={b.proposer === reviewer ? 'user' : 'agent'} />}
+            count={b.open || undefined}
+            selected={pathname === `/review/${b.uid}` || (pathname === '/review' && b.uid === next)}
+            href={`/review/${b.uid}`}
+          />
+        )),
+      }))}
+      empty={batches.length === 0 ? 'Nothing has been proposed yet.' : undefined}
+    />
   )
 }

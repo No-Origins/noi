@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.inv.time",
+  "name": "Time invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos time in seconds must meet.",
+    "responsibility": "Time what happens in the 3D world, in seconds. A control's motion is a duration, 50 to 300 ms, not a time."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "time"
+    },
+    "schema": {
+      "title": "Eidos time",
+      "type": "object",
+      "required": [
+        "s"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "s": {
+          "description": "How long something in the 3D world takes, or how often it comes, in seconds, to the hundredth: more than 0, at most 600.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 600,
+          "multipleOf": 0.01
+        }
+      }
+    }
+  }
+}

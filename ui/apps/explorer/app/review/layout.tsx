@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Panes } from '@noi/eio-react'
-import { nextBatch, Refused, review, snapshot } from '../../lib/mero'
+import { nextBatch, Refused, review, snapshot, type ReviewState, type Snapshot } from '../../lib/mero'
 import { SignedOut } from '../SignedOut'
 import { TopBar } from '../TopBar'
 import { BatchList } from './BatchList'
@@ -9,14 +9,15 @@ import styles from '../merons/merons.module.css'
 export const dynamic = 'force-dynamic'
 
 export default async function ReviewLayout({ children }: { children: ReactNode }) {
-  // Mero answers only those Governance allows; anyone else is asked to sign in.
+  // Review is for people signed in (9 Nov, step 6): reading it is its own action, which signed out
+  // you can never hold, though you may read Merons.
+  let s: Snapshot, r: ReviewState
   try {
-    await snapshot()
+    ;[s, r] = await Promise.all([snapshot(), review()])
   } catch (e) {
-    if (e instanceof Refused) return <SignedOut reason={e.message} />
+    if (e instanceof Refused) return <SignedOut reason={e.message} what="Review" />
     throw e
   }
-  const [s, r] = await Promise.all([snapshot(), review()])
   const items = r.batches.map(b => {
     const count = (state: string) => b.proposals.filter(p => p.state === state).length
     return { uid: b.uid, title: b.title, proposer: b.proposer, waiting: count('waiting'), sentBack: count('sent-back'), open: count('waiting') + count('sent-back') }

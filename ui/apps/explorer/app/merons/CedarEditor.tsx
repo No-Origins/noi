@@ -4,7 +4,7 @@
 // Review like any other change. A rule the form can't show is written by hand: owners may change
 // its Cedar directly; everyone else sees it as it is.
 import { useEffect, useRef, useState } from 'react'
-import { Checkbox, Choices, Disclosure, Field, Radio, Select, TextArea } from '@noi/eio-react'
+import { Button, Checkbox, Choices, Disclosure, Field, Radio, Select, TextArea } from '@noi/eio-react'
 import {
   roleSentence, ruleSentence, systemName, verbWords,
   type AnyReadingForm, type Condition, type Doing, type Names, type RoleForm, type RuleForm,
@@ -76,6 +76,8 @@ export function CedarEditor(p: CedarEditorProps) {
     <div className={styles.editor}>
       <input type="hidden" name="spec" value={JSON.stringify({ ...p.rest, ...(p.kind === 'role' && form ? { system: (form as RoleForm).system } : {}), cedar: cedar ?? '' })} />
       {problem && <input type="hidden" name="spec_error" value={problem} />}
+      {/* Written by hand and changed: the form asks for Touch ID first, for "write Cedar" (step 7). */}
+      {mode === 'hand' && hand.trim() !== p.cedar.trim() && <input type="hidden" name="by_hand" value="1" />}
       {mode === 'form' && form && (p.kind === 'rule'
         ? <RuleParts f={form as RuleForm} set={setForm} {...p} />
         : <RoleParts f={form as RoleForm} set={setForm} verbs={p.verbs} pickSystem={p.pickSystem} />)}
@@ -88,9 +90,9 @@ export function CedarEditor(p: CedarEditorProps) {
             <pre className={cx(styles.code, 'eio-type-style-mono')}>{pending ? 'Writing…' : written.ok ? written.cedar : '—'}</pre>
           </Disclosure>
           {p.owner && (
-            <button type="button" className={cx(styles.switch, 'eio-type-style-body')} onClick={() => { setHand(cedar ?? p.cedar); setMode('hand') }}>
+            <Button className={styles.switch} onClick={() => { setHand(cedar ?? p.cedar); setMode('hand') }}>
               Write the Cedar by hand instead
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -112,9 +114,9 @@ export function CedarEditor(p: CedarEditorProps) {
           />
           {!p.owner && <p className={cx(styles.muted, 'eio-type-style-body')}>Only an owner can change a {p.kind} written by hand.</p>}
           {form && (
-            <button type="button" className={cx(styles.switch, 'eio-type-style-body')} onClick={() => setMode('form')}>
+            <Button className={styles.switch} icon="left" onClick={() => setMode('form')}>
               Back to the form
-            </button>
+            </Button>
           )}
         </div>
       )}

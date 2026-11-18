@@ -1,0 +1,42 @@
+{
+  "path": "noi.eio.components.world.arch",
+  "name": "Arch",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A system’s arch, as you drew it from the side: a solid white triangle whose top reaches toward the pool, a frame of two posts and a beam from the front, with the block that goes on behind it.",
+    "responsibility": "Be the one arch every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Stand once for each system Mero holds, the way into that system.",
+    "states": {
+      "measure": {
+        "height": "how tall",
+        "width": "how wide",
+        "thickness": "how thick its posts and beam are",
+        "reach": "how far its top reaches toward the pool",
+        "distance": "how far its back stands from the pool’s middle"
+      }
+    },
+    "reads": [
+      "noi.eio.world.arch.distance",
+      "noi.eio.world.arch.height",
+      "noi.eio.world.arch.reach",
+      "noi.eio.world.arch.thickness",
+      "noi.eio.world.arch.width"
+    ],
+    "uses": [
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/arch/arch.ts",
+        "sha256": "56a824aff1bce060d2cf33cf16169f1df2712fe417a1bd11f190cfafc3e2902a"
+      }
+    ]
+  }
+}

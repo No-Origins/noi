@@ -1,0 +1,58 @@
+{
+  "path": "noi.eio.components.select",
+  "name": "Select",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A real select in the frame of a Field, with a down arrow. The list it opens is the system’s own.",
+    "responsibility": "Be the one select every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Pick one from a list.",
+    "states": {
+      "width": {
+        "content": "as wide as its words",
+        "wide": "as wide as its container"
+      },
+      "interaction": {
+        "focus": "focused, with the focus ring",
+        "disabled": "disabled"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.border.default",
+      "noi.eio.color.border.input",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.surface.page",
+      "noi.eio.color.text.faint",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.radius.field",
+      "noi.eio.size.control.default",
+      "noi.eio.size.icon.small",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.body"
+    ],
+    "uses": [
+      "noi.eio.components.icon"
+    ],
+    "files": [
+      {
+        "path": "src/Select/Select.module.css",
+        "sha256": "2e2b2aa1204a4dbcdc15af643a5b582daf6b90d5d00304f2d4148ab7f93c493c"
+      },
+      {
+        "path": "src/Select/Select.tsx",
+        "sha256": "8a3d51869cc4c6486fda42837d7b61998c007af524638f9e9dc70245f3ea012c"
+      }
+    ]
+  }
+}

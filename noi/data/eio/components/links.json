@@ -1,0 +1,26 @@
+{
+  "path": "noi.eio.components.links",
+  "name": "Where a link leads",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The rule Button and Chip share for an address: inside No Origins (a path, a part of the page, or a name of No Origins) or outside it (any other site, or another kind of address). The address is read the way a browser reads it, so what is said is where the link really goes.",
+    "responsibility": "Be the one place that says where an address leads, so every link of No Origins draws the same sign for the same address. It changes only through a proposal you approve."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "shared-part",
+    "job": "Say whether an address is inside No Origins or leads to another site.",
+    "states": {},
+    "reads": [],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/links/links.ts",
+        "sha256": "c9c71139d89b01cab5c2878bbdc124da3dabdb4c001ac8b95ce94e9dd2194693"
+      }
+    ]
+  }
+}

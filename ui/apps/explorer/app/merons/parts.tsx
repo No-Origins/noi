@@ -2,7 +2,7 @@
 // and the record. Server components; they read one snapshot and render it.
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { Badge, Disclosure, Icon } from '@noi/eio-react'
+import { Badge, Chip, Disclosure, Icon } from '@noi/eio-react'
 import type { Check } from '../../lib/checks'
 import { hrefOf, invariantsFor, type Index, type Meron, type Snapshot } from '../../lib/mero'
 import { preview } from '../../lib/tree'
@@ -92,11 +92,9 @@ export function AllPass({ checks }: { checks: Check[] }) {
 /** A link to another meron, with its mark. */
 export function MeronChip({ idx, m, note }: { idx: Index; m: Meron; note?: string }) {
   return (
-    <Link href={hrefOf(m.identity.path)} className={cx(styles.chip, 'eio-type-style-body')}>
-      <PreviewMark preview={preview(idx, m)} />
-      <span>{m.identity.name}</span>
-      {note && <span className={cx(styles.muted, 'eio-type-style-caption')}>{note}</span>}
-    </Link>
+    <Chip href={hrefOf(m.identity.path)} mark={<PreviewMark preview={preview(idx, m)} />} note={note}>
+      {m.identity.name}
+    </Chip>
   )
 }
 

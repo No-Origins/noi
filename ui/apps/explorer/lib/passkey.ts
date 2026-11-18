@@ -1,6 +1,7 @@
-// Passkeys in the browser, for a touch: Governance sends WebAuthn options with binary fields in
-// base64url, the browser wants bytes, and the answer goes back in base64url. No secret passes
-// through here: the passkey's private half never leaves the device.
+// Passkeys in the browser, to sign in, to add your passkey and for a touch: Governance sends
+// WebAuthn options with binary fields in base64url, the browser wants bytes, and the answer goes
+// back in base64url. No secret passes through here: the passkey's private half never leaves the
+// device.
 
 /** base64url → bytes. */
 export function dec(s: string): Uint8Array<ArrayBuffer> {
@@ -27,6 +28,30 @@ export function requestOptions(options: Json): CredentialRequestOptions {
   return { publicKey: p }
 }
 
+/** Governance's options for making a passkey, as the browser takes them. */
+export function creationOptions(options: Json): CredentialCreationOptions {
+  const p = structuredClone(options.publicKey)
+  p.challenge = dec(p.challenge)
+  p.user.id = dec(p.user.id)
+  for (const c of p.excludeCredentials ?? []) c.id = dec(c.id)
+  return { publicKey: p }
+}
+
+/** The new passkey's public half, as Governance takes it. */
+export function registered(c: Json): Json {
+  return {
+    id: c.id,
+    rawId: enc(c.rawId),
+    type: c.type,
+    extensions: c.getClientExtensionResults ? c.getClientExtensionResults() : {},
+    response: {
+      attestationObject: enc(c.response.attestationObject),
+      clientDataJSON: enc(c.response.clientDataJSON),
+      transports: c.response.getTransports ? c.response.getTransports() : undefined,
+    },
+  }
+}
+
 /** The browser's answer, as Governance takes it. */
 export function asserted(c: Json): Json {
   return {
@@ -46,6 +71,10 @@ export function asserted(c: Json): Json {
 /** Says what went wrong with a touch, in words. */
 export function touchError(e: unknown): string {
   const name = (e as { name?: string })?.name
+  // Making a passkey, the browser refuses when it already holds one for this account (9 Nov).
+  if (name === 'InvalidStateError') {
+    return 'This browser already has a passkey for this account, so it made no second one. Sign in with the one it has.'
+  }
   if (name === 'NotAllowedError' || name === 'NotSupportedError' || name === 'SecurityError') {
     return 'No touch: it was cancelled, or this browser can’t use your passkey. Your passkey is in Apple Passwords, so use Safari (or Chrome), not the browser inside the Claude app.'
   }

@@ -84,6 +84,16 @@ export function describeCheck(c: { name: string; params?: Record<string, unknown
       ]
     case 'eio.reference':
       return [`\`${p.field}\` points at an active ${p.subtype} token.`]
+    case 'eio.component':
+      return [
+        'Every Eidos value it reads is in Mero; Mero links the component to each, so a value in use can’t be retired.',
+        `Every component it uses is in Mero, under ${p.under}, and none of them uses it back: uses go one way.`,
+        'No file is listed by another component’s meron: every file of a package belongs to exactly one.',
+        'A component names its states; the package’s own files have none.',
+        'No group of its states gives a type name another component’s already gives, so Mero can always write the types the code uses.',
+        // The rule's versions from 18 Nov ask it; earlier ones did not.
+        ...(p.folders === true ? [`Each file of a component or a shared part sits in a folder named for it, as the code names it: src/Button/ for ${p.under}.button.`] : []),
+      ]
     case 'gov.role':
       return [
         'One Cedar permit, with blanks for who (?principal) and where (?resource).',

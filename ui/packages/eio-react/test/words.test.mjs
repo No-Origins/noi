@@ -8,7 +8,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const read = f => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')
+// A file in its component's folder, named as the file is (Choice.module.css is in Choice/).
+const read = f => readFileSync(new URL(`../src/${f.split('.')[0]}/${f}`, import.meta.url), 'utf8')
 const css = read('Choice.module.css').replace(/\/\*[\s\S]*?\*\//g, '')
 const rule = sel => css.match(new RegExp(`(^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[2] ?? ''
 

@@ -1,7 +1,7 @@
 //! "May they?" Governance finds who is asking, links their grants into the roles it copied from
 //! Mero, adds the rules, and asks Cedar about every resource. No answer, no copy, an unknown action
 //! or any doubt means no, and every answer is recorded.
-use super::{digest, record, Error, Governance, Result, VISITORS};
+use super::{digest, record, Error, Governance, Result, SESSION_DAYS, SESSION_HOURS, VISITORS};
 use crate::{Action, Credential, Target, GOVERNANCE_ACTIONS};
 use cedar_policy::{
     Authorizer, Context, Decision, Entities, Entity, EntityUid, Policy, PolicyId, PolicySet,
@@ -9,7 +9,7 @@ use cedar_policy::{
 };
 use serde::Serialize;
 use serde_json::{json, Value};
-use sqlx::PgConnection;
+use sqlx::{PgConnection, Postgres, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use uuid::Uuid;
@@ -30,8 +30,21 @@ pub struct Answer {
     pub account: Option<Uuid>,
     /// The asker's handle, so a system can write who did it without reading Governance's tables.
     pub handle: Option<String>,
-    /// Where this answer is in the record.
-    pub record: i64,
+    /// Where this answer is in the record. None for an allowed read, which is not recorded (agreed 9
+    /// Nov, finding I): it would make the record a browsing history of everyone, kept forever.
+    pub record: Option<i64>,
+}
+
+/// How a question is confirmed: by nothing, by a touch made for exactly it, or as one of several
+/// questions confirmed together by the touch made for the first (an invite and the roles it gives,
+/// 9 Nov).
+#[derive(Clone, Copy)]
+pub(crate) enum Proof {
+    Nothing,
+    Touch(Uuid),
+    WithTheFirst,
+    /// Only for "what may I do here?": as if a touch were made, since one will be when they act.
+    AsIfTouched,
 }
 
 /// Who is asking, once their credential checks out.
@@ -79,11 +92,78 @@ async fn handle_of(conn: &mut PgConnection, account: Uuid) -> Result<String> {
     )
 }
 
-/// The canonical form of what a touch approves: one action on these resources, in order.
-pub(crate) fn intent(action: &str, targets: &[Target]) -> Value {
+/// The canonical form of what a touch approves: one action on these resources, in order, and what
+/// else it names (9 Nov, step 7): the decision and each proposal at its revision, the role and
+/// place, the invitee and their roles. A touch made for one never counts for another.
+pub(crate) fn intent(action: &str, targets: &[Target], about: Option<&Value>) -> Value {
     let mut resources: Vec<String> = targets.iter().map(Target::label).collect();
     resources.sort();
-    json!({"action": action, "resources": resources})
+    match about {
+        Some(about) if !about.is_null() => {
+            json!({"action": action, "resources": resources, "about": about})
+        }
+        _ => json!({"action": action, "resources": resources}),
+    }
+}
+
+/// One question of a decision: an action on targets, what its touch names beyond them, and how it
+/// is confirmed.
+pub(crate) struct Ask<'a> {
+    action: &'a str,
+    targets: &'a [Target],
+    about: Option<&'a Value>,
+    proof: Proof,
+}
+impl<'a> Ask<'a> {
+    pub(crate) fn new(
+        action: &'a str,
+        targets: &'a [Target],
+        about: Option<&'a Value>,
+        touch: Option<Proof>,
+    ) -> Self {
+        Ask {
+            action,
+            targets,
+            about,
+            proof: touch.unwrap_or(Proof::Nothing),
+        }
+    }
+    /// One of several questions confirmed by the touch made for the first.
+    pub(crate) fn with_the_first(action: &'a str, targets: &'a [Target], touched: bool) -> Self {
+        Ask {
+            action,
+            targets,
+            about: None,
+            proof: if touched {
+                Proof::WithTheFirst
+            } else {
+                Proof::Nothing
+            },
+        }
+    }
+}
+
+/// The first question, with its touch and what it names, then the rest confirmed with it.
+pub(crate) fn together<'a>(
+    first: (&'a str, &'a [Target]),
+    about: Option<&'a Value>,
+    touch: Option<Uuid>,
+    then: &'a [(&'a str, Vec<Target>)],
+) -> Vec<Ask<'a>> {
+    let mut asks = vec![Ask::new(first.0, first.1, about, touch.map(Proof::Touch))];
+    asks.extend(
+        then.iter()
+            .map(|(a, t)| Ask::with_the_first(a, t, touch.is_some())),
+    );
+    asks
+}
+
+/// A refused question: who asked, why, and what, for the record.
+pub(crate) struct Refusal {
+    account: Option<Uuid>,
+    failure: Failure,
+    action: String,
+    labels: Vec<String>,
 }
 
 impl Governance {
@@ -111,6 +191,19 @@ impl Governance {
                 .await?;
                 let (account, kind) =
                     row.ok_or_else(|| Error::Refused("no live session: sign in again".into()))?;
+                // A session runs on while it is used (agreed 9 Nov): each use moves its end to
+                // SESSION_HOURS away, never past SESSION_DAYS after signing in. Written at most every
+                // few minutes, not on every request.
+                sqlx::query(
+                    "UPDATE gov.sessions SET expires_at = LEAST(now() + make_interval(hours => $2), started_at + make_interval(days => $3))
+                     WHERE token_hash = $1 AND expires_at < now() + make_interval(hours => $2) - interval '5 minutes'
+                       AND expires_at < started_at + make_interval(days => $3)",
+                )
+                .bind(&hash)
+                .bind(SESSION_HOURS as i32)
+                .bind(SESSION_DAYS as i32)
+                .execute(&mut *conn)
+                .await?;
                 Ok(Asker {
                     account,
                     kind,
@@ -141,7 +234,9 @@ impl Governance {
         }
     }
 
-    /// "May they?" Every resource must be allowed. Records the answer either way.
+    /// "May they?" Every resource must be allowed. Records the answer, except an allowed read (agreed
+    /// 9 Nov): every change, every other question and every refusal is recorded. `about` is what a
+    /// touch names beyond the places (step 7): which decision on which proposals, which role where.
     pub async fn may(
         &self,
         credential: &Credential,
@@ -149,24 +244,29 @@ impl Governance {
         targets: &[Target],
         touch: Option<Uuid>,
     ) -> Result<Answer> {
-        let labels: Vec<String> = targets.iter().map(Target::label).collect();
-        let mut tx = self.pool.begin().await?;
-        match self
-            .decide(&mut tx, credential, action, targets, touch)
+        self.may_about(credential, action, targets, touch, None)
             .await
-        {
-            Ok((account, determined)) => {
-                let seq = record(
-                    &mut tx,
-                    "decision",
-                    Some(account),
-                    Some(action),
-                    &labels,
-                    true,
-                    "allowed",
-                    json!({"policies": determined}),
-                )
-                .await?;
+    }
+    pub async fn may_about(
+        &self,
+        credential: &Credential,
+        action: &str,
+        targets: &[Target],
+        touch: Option<Uuid>,
+        about: Option<&Value>,
+    ) -> Result<Answer> {
+        self.ask_alone(
+            credential,
+            &[Ask::new(action, targets, about, touch.map(Proof::Touch))],
+        )
+        .await
+    }
+
+    /// A decision on its own, in its own transaction.
+    async fn ask_alone(&self, credential: &Credential, asks: &[Ask<'_>]) -> Result<Answer> {
+        let mut tx = self.pool.begin().await?;
+        match self.decide_all(&mut tx, credential, asks).await {
+            Ok((account, seqs)) => {
                 let handle = handle_of(tx.as_mut(), account).await?;
                 tx.commit().await?;
                 Ok(Answer {
@@ -174,36 +274,191 @@ impl Governance {
                     reason: "allowed".into(),
                     account: Some(account),
                     handle: Some(handle),
-                    record: seq,
+                    record: seqs.first().copied().flatten(),
                 })
             }
-            Err((account, reason)) => {
+            Err(no) => {
                 // Nothing a refused request touched is kept, but the refusal itself is recorded.
                 tx.rollback().await?;
-                let mut conn = self.pool.acquire().await?;
-                let seq = record(
+                self.refused(no).await
+            }
+        }
+    }
+
+    /// A decision inside the transaction that does what it decides (9 Nov, step 7): an owner's
+    /// action is decided where it is written, not one step before. Refused, the transaction is
+    /// undone and the refusal recorded.
+    pub(crate) async fn decide_in<'t>(
+        &'t self,
+        mut tx: Transaction<'t, Postgres>,
+        credential: &Credential,
+        asks: &[Ask<'_>],
+    ) -> Result<(Transaction<'t, Postgres>, Uuid)> {
+        match self.decide_all(tx.as_mut(), credential, asks).await {
+            Ok((account, _)) => Ok((tx, account)),
+            Err(no) => {
+                tx.rollback().await?;
+                let answer = self.refused(no).await?;
+                Err(Error::Refused(answer.reason))
+            }
+        }
+    }
+
+    /// Decides every question, recording each allowed one (but an allowed read) where it is decided.
+    async fn decide_all(
+        &self,
+        conn: &mut PgConnection,
+        credential: &Credential,
+        asks: &[Ask<'_>],
+    ) -> std::result::Result<(Uuid, Vec<Option<i64>>), Refusal> {
+        let mut who = None;
+        let mut seqs = vec![];
+        for ask in asks {
+            let labels: Vec<String> = ask.targets.iter().map(Target::label).collect();
+            let refusal = |account: Option<Uuid>, failure: Failure| Refusal {
+                account,
+                failure,
+                action: ask.action.to_string(),
+                labels: labels.clone(),
+            };
+            let (account, determined) = self
+                .decide(
+                    &mut *conn,
+                    credential,
+                    ask.action,
+                    ask.targets,
+                    ask.proof,
+                    ask.about,
+                )
+                .await
+                .map_err(|(account, failure)| refusal(account, failure))?;
+            who = Some(account);
+            seqs.push(if ask.action == "read" {
+                None
+            } else {
+                Some(
+                    record(
+                        &mut *conn,
+                        "decision",
+                        Some(account),
+                        Some(ask.action),
+                        &labels,
+                        true,
+                        "allowed",
+                        json!({"policies": determined}),
+                    )
+                    .await
+                    .map_err(|e| refusal(Some(account), Failure::Broken(e)))?,
+                )
+            });
+        }
+        let account = who.ok_or_else(|| Refusal {
+            account: None,
+            failure: Failure::No("nothing was asked".into()),
+            action: String::new(),
+            labels: vec![],
+        })?;
+        Ok((account, seqs))
+    }
+
+    /// Records a refusal on its own connection, after its transaction is undone, and answers no; or,
+    /// when Governance itself failed, records only that it said no and returns the error.
+    async fn refused(&self, no: Refusal) -> Result<Answer> {
+        let reason = match no.failure {
+            Failure::No(reason) => reason,
+            Failure::Broken(e) => {
+                self.note_broken(no.account, &no.action, &no.labels).await;
+                return Err(e);
+            }
+        };
+        let mut conn = self.pool.acquire().await?;
+        // A signed-out look that is refused is not recorded (10 Nov): anyone could fill the record,
+        // which is kept forever, by loading pages. Everything else refused still is.
+        let look = matches!(no.action.as_str(), "read" | "read-review");
+        let seq = if look && no.account == Some(super::VISITORS) {
+            None
+        } else {
+            Some(
+                record(
                     &mut conn,
                     "decision",
-                    account,
-                    Some(action),
-                    &labels,
+                    no.account,
+                    Some(&no.action),
+                    &no.labels,
                     false,
                     &reason,
                     json!({}),
                 )
-                .await?;
-                let handle = match account {
-                    Some(a) => Some(handle_of(&mut conn, a).await?),
-                    None => None,
-                };
-                Ok(Answer {
-                    allowed: false,
-                    reason,
-                    account,
-                    handle,
-                    record: seq,
-                })
-            }
+                .await?,
+            )
+        };
+        let handle = match no.account {
+            Some(a) => Some(handle_of(&mut conn, a).await?),
+            None => None,
+        };
+        Ok(Answer {
+            allowed: false,
+            reason,
+            account: no.account,
+            handle,
+            record: seq,
+        })
+    }
+
+    /// "What may they do here?" (agreed 9 Nov, step 6): so a page shows only the buttons its viewer
+    /// may use. Each question is decided as if confirmed with a touch, since one will be when they
+    /// act, and nothing is recorded: nothing is done with these answers. The real question is asked,
+    /// and recorded, when they act.
+    pub async fn may_preview(
+        &self,
+        credential: &Credential,
+        questions: &[(String, Vec<Target>)],
+    ) -> Result<Vec<bool>> {
+        if questions.len() > MAX_PREVIEW {
+            return Err(Error::Invalid(format!(
+                "at most {MAX_PREVIEW} questions at once"
+            )));
+        }
+        let mut tx = self.pool.begin().await?;
+        let mut answers = Vec::with_capacity(questions.len());
+        for (action, targets) in questions {
+            answers.push(
+                match self
+                    .decide(
+                        &mut tx,
+                        credential,
+                        action,
+                        targets,
+                        Proof::AsIfTouched,
+                        None,
+                    )
+                    .await
+                {
+                    Ok(_) => true,
+                    Err((_, Failure::No(_))) => false,
+                    Err((_, Failure::Broken(e))) => return Err(e),
+                },
+            );
+        }
+        // Only a sign-in's end may have moved, as on any use.
+        tx.commit().await?;
+        Ok(answers)
+    }
+
+    /// Records that Governance failed to decide, if it can: a refusal with no inner reason.
+    async fn note_broken(&self, account: Option<Uuid>, action: &str, labels: &[String]) {
+        if let Ok(mut conn) = self.pool.acquire().await {
+            let _ = record(
+                &mut conn,
+                "decision",
+                account,
+                Some(action),
+                labels,
+                false,
+                BROKEN,
+                json!({}),
+            )
+            .await;
         }
     }
 
@@ -215,17 +470,18 @@ impl Governance {
         credential: &Credential,
         action: &str,
         targets: &[Target],
-        touch: Option<Uuid>,
-    ) -> std::result::Result<(Uuid, Vec<String>), (Option<Uuid>, String)> {
+        proof: Proof,
+        about: Option<&Value>,
+    ) -> std::result::Result<(Uuid, Vec<String>), (Option<Uuid>, Failure)> {
         let asker = self
             .asker(conn, credential)
             .await
-            .map_err(|e| (None, refusal(e)))?;
+            .map_err(|e| (None, Failure::from(e)))?;
         let who = Some(asker.account);
         if !declared(action) {
             return Err((
                 who,
-                format!("{action} is not an action any system declares"),
+                format!("{action} is not an action any system declares").into(),
             ));
         }
         if targets.is_empty() {
@@ -237,31 +493,32 @@ impl Governance {
         }
         for t in targets {
             if let Target::Path(p) = t {
-                super::check_scope(p).map_err(|e| (who, refusal(e)))?;
+                super::check_scope(p).map_err(|e| (who, Failure::from(e)))?;
             }
         }
-        let fresh = match touch {
-            Some(id) => self
-                .use_touch(conn, &asker, id, &intent(action, targets))
+        let fresh = match proof {
+            Proof::Touch(id) => self
+                .use_touch(conn, &asker, id, &intent(action, targets, about))
                 .await
-                .map_err(|e| (who, refusal(e)))?,
-            None => false,
+                .map_err(|e| (who, Failure::from(e)))?,
+            Proof::WithTheFirst | Proof::AsIfTouched => true,
+            Proof::Nothing => false,
         };
         let policies = self
             .policy_set(conn, asker.account)
             .await
-            .map_err(|e| (who, refusal(e)))?;
+            .map_err(|e| (who, Failure::from(e)))?;
         let grants = self
             .live_grants(conn, asker.account)
             .await
-            .map_err(|e| (who, refusal(e)))?;
+            .map_err(|e| (who, Failure::from(e)))?;
         let schema = crate::cedar::schema();
         let action_uid = quoted("Action", action);
         let context = Context::from_json_value(
             json!({"fresh_signature": fresh}),
             Some((schema, &action_uid)),
         )
-        .map_err(|e| (who, format!("context: {e}")))?;
+        .map_err(|e| (who, format!("context: {e}").into()))?;
         let principal = quoted("Account", &asker.account.to_string());
         let mut determined = HashSet::new();
         for target in targets {
@@ -308,7 +565,7 @@ impl Governance {
             }
             entities.append(&mut extra);
             let entities = Entities::from_entities(entities, Some(schema))
-                .map_err(|e| (who, format!("entities: {e}")))?;
+                .map_err(|e| (who, format!("entities: {e}").into()))?;
             let request = Request::new(
                 principal.clone(),
                 action_uid.clone(),
@@ -316,7 +573,7 @@ impl Governance {
                 context.clone(),
                 Some(schema),
             )
-            .map_err(|e| (who, format!("{action} does not apply here: {e}")))?;
+            .map_err(|e| (who, format!("{action} does not apply here: {e}").into()))?;
             let response = Authorizer::new().is_authorized(&request, &policies, &entities);
             let reasons: Vec<String> = response
                 .diagnostics()
@@ -348,7 +605,7 @@ impl Governance {
                             .join(", ")
                     )
                 };
-                return Err((who, why));
+                return Err((who, why.into()));
             }
             determined.extend(reasons);
         }
@@ -428,37 +685,68 @@ impl Governance {
         id: Uuid,
         intent: &Value,
     ) -> Result<bool> {
+        self.take_touch(conn, asker, id, intent).await.map(|_| true)
+    }
+
+    /// Uses a touch, as `use_touch`, and says which passkey made it, when Governance knows (touches
+    /// made before 9 Nov didn't keep it).
+    pub(crate) async fn take_touch(
+        &self,
+        conn: &mut PgConnection,
+        asker: &Asker,
+        id: Uuid,
+        intent: &Value,
+    ) -> Result<Option<Uuid>> {
         let Some(session) = &asker.session else {
             return Err(Error::Refused("only a signed-in person can touch".into()));
         };
-        let used = sqlx::query(
+        let used: Option<Option<Uuid>> = sqlx::query_scalar(
             "UPDATE gov.touches SET used_at = now()
-             WHERE id = $1 AND account = $2 AND session = $3 AND intent = $4 AND used_at IS NULL AND expires_at > now()",
+             WHERE id = $1 AND account = $2 AND session = $3 AND intent = $4 AND used_at IS NULL AND expires_at > now()
+             RETURNING passkey",
         )
         .bind(id)
         .bind(asker.account)
         .bind(session)
         .bind(intent)
-        .execute(conn)
-        .await?
-        .rows_affected();
-        if used == 1 {
-            Ok(true)
-        } else {
-            Err(Error::Refused(
-                "the touch is used, expired, or was for something else".into(),
-            ))
-        }
+        .fetch_optional(conn)
+        .await?;
+        used.ok_or_else(|| {
+            Error::Refused("the touch is used, expired, or was for something else".into())
+        })
     }
 }
 
-fn refusal(e: Error) -> String {
-    match e {
-        Error::Refused(r) | Error::Invalid(r) => r,
-        Error::NotFound(r) => format!("not found: {r}"),
-        other => format!("Governance could not decide, so no: {other}"),
+/// Why a question wasn't allowed: a refusal, whose reason is safe to show and keep; or Governance
+/// itself failing (its database, say), which is an error, not an answer: its inner reason goes to
+/// the log and the Problems page, never into the record or to the asker (architecture review, 9 Nov).
+pub(crate) enum Failure {
+    No(String),
+    Broken(Error),
+}
+impl From<Error> for Failure {
+    fn from(e: Error) -> Self {
+        match e {
+            Error::Refused(r) | Error::Invalid(r) => Failure::No(r),
+            Error::NotFound(r) => Failure::No(format!("not found: {r}")),
+            other => Failure::Broken(other),
+        }
     }
 }
+impl From<String> for Failure {
+    fn from(r: String) -> Self {
+        Failure::No(r)
+    }
+}
+impl From<&str> for Failure {
+    fn from(r: &str) -> Self {
+        Failure::No(r.into())
+    }
+}
+/// At most this many questions in one "what may they do here?".
+const MAX_PREVIEW: usize = 50;
+/// What the record keeps when Governance failed: that it said no, never why.
+const BROKEN: &str = "Governance could not decide, so no";
 
 #[cfg(test)]
 mod tests {
@@ -481,18 +769,33 @@ mod tests {
         let a = intent(
             "review",
             &[Target::Path("noi.b".into()), Target::Path("noi.a".into())],
+            None,
         );
         let b = intent(
             "review",
             &[Target::Path("noi.a".into()), Target::Path("noi.b".into())],
+            None,
         );
         assert_eq!(a, b);
         assert_ne!(
             a,
             intent(
                 "update",
-                &[Target::Path("noi.a".into()), Target::Path("noi.b".into())]
+                &[Target::Path("noi.a".into()), Target::Path("noi.b".into())],
+                None,
             )
+        );
+        // What else it names (step 7): a touch to approve is not one to send back.
+        let places = [Target::Path("noi.a".into())];
+        let approve = json!({"decision": "approve", "proposals": ["p@1"]});
+        let send_back = json!({"decision": "send-back", "proposals": ["p@1"]});
+        assert_ne!(
+            intent("review", &places, Some(&approve)),
+            intent("review", &places, Some(&send_back))
+        );
+        assert_eq!(
+            intent("review", &places, Some(&Value::Null)),
+            intent("review", &places, None)
         );
     }
 }

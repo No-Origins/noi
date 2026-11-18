@@ -1,0 +1,25 @@
+{
+  "path": "noi.eio.color.palette.world-water",
+  "name": "World water",
+  "classification": {
+    "type": "token",
+    "subtype": "color"
+  },
+  "semantics": {
+    "definition": "A colour only the 3D world uses, for the water's own colour: a blue at OKLCH lightness 0.456, chroma 0.079, hue 228.925. Taken as it is from the world page (17 Nov).",
+    "responsibility": "Provide this colour for the 3D world's colour roles to use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "world",
+    "value": {
+      "colorSpace": "oklch",
+      "components": [
+        0.456,
+        0.079,
+        228.925
+      ],
+      "hex": "#1A5F7A"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "path": "noi.eio.color.world.dust",
+  "name": "Dust colour",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The loose grains of dust lying where the land dissolves. Eidos's own grey, in place of a grey of the world's own (17 Nov); which grey is a guess, not agreed.",
+    "responsibility": "Give the 3D world this colour by its meaning, so its drawing code reads a role, never a palette colour."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "world": true
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.neutral-600"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-600"
+    }
+  }
+}

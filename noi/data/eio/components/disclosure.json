@@ -1,0 +1,49 @@
+{
+  "path": "noi.eio.components.disclosure",
+  "name": "Disclosure",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A fold-open section: a real details element, with an arrow that turns and a label.",
+    "responsibility": "Be the one disclosure every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Keep something out of the way until it is asked for.",
+    "states": {
+      "interaction": {
+        "open": "open, its arrow turned",
+        "hover": "hovered",
+        "focus": "focused, with the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.focus",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.motion.duration.ms100",
+      "noi.eio.motion.duration.ms200",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.inline",
+      "noi.eio.type.style.label"
+    ],
+    "uses": [
+      "noi.eio.components.icon"
+    ],
+    "files": [
+      {
+        "path": "src/Disclosure/Disclosure.module.css",
+        "sha256": "c6c39c3db4592dfdec73bbbd17b33bda431f69e10df0fe0beabf3348a8dd1279"
+      },
+      {
+        "path": "src/Disclosure/Disclosure.tsx",
+        "sha256": "7dcd402d77782945e4ad1df33b1289d3e60df925b1a17ef3df8f6bf224ae404a"
+      }
+    ]
+  }
+}

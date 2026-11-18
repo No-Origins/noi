@@ -27,6 +27,8 @@ vocabulary!(Predicate { Contains => "contains", DependsOn => "depends-on", Imple
 vocabulary!(Impact { NonBreaking => "non-breaking", Breaking => "breaking", Unknown => "unknown" });
 
 impl MeronState {
+    /// Forward one step at a time, and one way back: a deprecated meron may be reinstated to
+    /// active (agreed 8 Nov; the first design's "reinstatement"). Retired stays final.
     pub fn can_transition(self, next: Self) -> bool {
         matches!(
             (self, next),
@@ -34,6 +36,7 @@ impl MeronState {
                 | (Self::Registered, Self::Active)
                 | (Self::Active, Self::Deprecated)
                 | (Self::Deprecated, Self::Retired)
+                | (Self::Deprecated, Self::Active)
         )
     }
 }
@@ -453,9 +456,12 @@ mod tests {
         ];
         for (i, a) in states.iter().enumerate() {
             for (j, b) in states.iter().enumerate() {
-                assert_eq!(a.can_transition(*b), j == i + 1);
+                // The one way back: reinstating a deprecated meron.
+                let reinstate = *a == MeronState::Deprecated && *b == MeronState::Active;
+                assert_eq!(a.can_transition(*b), j == i + 1 || reinstate);
             }
         }
+        assert!(!MeronState::Retired.can_transition(MeronState::Active));
         let states = [
             ReleaseState::Planned,
             ReleaseState::Experimental,

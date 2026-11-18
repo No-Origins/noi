@@ -1,0 +1,61 @@
+{
+  "path": "noi.eio.components.badge",
+  "name": "Badge",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A small pill for a state, a status or a plain fact, and the Count beside a tab or a row.",
+    "responsibility": "Be the one badge every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Say a state, a status or a number at a glance, always in words: colour is never alone.",
+    "states": {
+      "tone": {
+        "neutral": "a plain fact",
+        "danger": "danger, with its icon",
+        "warning": "warning, with its icon",
+        "success": "success, with its icon"
+      },
+      "state": {
+        "active": "a meron that is active, as a dot",
+        "proposed": "a meron that is proposed, as a dot",
+        "deprecated": "a meron that is deprecated, as a dot"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.color.action.on-secondary",
+      "noi.eio.color.action.primary",
+      "noi.eio.color.action.secondary",
+      "noi.eio.color.border.default",
+      "noi.eio.color.surface.raised",
+      "noi.eio.color.text.danger",
+      "noi.eio.color.text.faint",
+      "noi.eio.color.text.primary",
+      "noi.eio.color.text.success",
+      "noi.eio.color.text.warning",
+      "noi.eio.radius.pill",
+      "noi.eio.size.control.small",
+      "noi.eio.size.dot",
+      "noi.eio.space.gap.inline",
+      "noi.eio.type.style.label"
+    ],
+    "uses": [
+      "noi.eio.components.icon"
+    ],
+    "files": [
+      {
+        "path": "src/Badge/Badge.module.css",
+        "sha256": "557524ba893689aacec3de7e739452de0a9854f7105790fe8a0941cc517c5a7f"
+      },
+      {
+        "path": "src/Badge/Badge.tsx",
+        "sha256": "3b08a50ff71a8578b9bc71e7c3e899c3c192b5282574741ada284c3eaaaf7e67"
+      }
+    ]
+  }
+}

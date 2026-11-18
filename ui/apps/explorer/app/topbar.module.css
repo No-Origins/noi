@@ -29,9 +29,14 @@ a.brand::before {
   top: calc(50% - var(--eio-size-target-minimum) / 2);
   height: var(--eio-size-target-minimum);
 }
-/* Beside the name where two panes fit. */
+/* Beside the name where two panes fit. With Hyperbase's there are five tabs (15 Nov): they sit
+   closer to the name, and each is a little narrower, so the row still fits the narrowest window
+   that has two panes. */
 .tabsInline {
-  margin-left: calc(var(--eio-space-gap-group) + var(--eio-space-gap-inline));
+  margin-left: var(--eio-space-gap-inline);
+}
+.tabsInline a {
+  padding: 0 calc(var(--eio-space-inset-control) - var(--eio-space-gap-inline) * 0.75);
 }
 /* The live count and Theme, at the end of the row. */
 .end {
@@ -73,8 +78,8 @@ a.brand::before {
   align-items: center;
   gap: var(--eio-space-gap-inline);
 }
-/* The tabs across the menu, sharing its width equally: all four in a row where they fit, two and two
-   on a phone. A column is never narrower than three targets. */
+/* The tabs across the menu, sharing its width equally: all five in a row where they fit, two to a
+   row on a phone. A column is never narrower than three targets. */
 .tabsRow nav {
   width: 100%;
   display: grid;

@@ -93,6 +93,27 @@ impl Window {
         self.allow_at(key, Instant::now())
     }
 
+    /// How long this key must wait, if it is full, without counting a try (9 Nov: failed sign-ins
+    /// are counted after they fail, and checked before the next).
+    pub fn waits(&self, key: &str) -> Option<Duration> {
+        self.waits_at(key, Instant::now())
+    }
+
+    fn waits_at(&self, key: &str, now: Instant) -> Option<Duration> {
+        let mut seen = self.seen.lock().unwrap_or_else(|e| e.into_inner());
+        let tries = seen.get_mut(key)?;
+        while tries
+            .front()
+            .is_some_and(|t| now.duration_since(*t) >= self.per)
+        {
+            tries.pop_front();
+        }
+        (tries.len() >= self.max).then(|| {
+            let oldest = *tries.front().expect("full, so not empty");
+            self.per.saturating_sub(now.duration_since(oldest))
+        })
+    }
+
     fn allow_at(&self, key: &str, now: Instant) -> Result<(), Duration> {
         let mut seen = self.seen.lock().unwrap_or_else(|e| e.into_inner());
         // Forget keys that have gone quiet, so the map stays small.
@@ -137,6 +158,22 @@ mod tests {
         assert!(
             w.allow_at("b", t0 + Duration::from_secs(10)).is_ok(),
             "each key counts on its own"
+        );
+        assert_eq!(
+            w.waits_at("a", t0 + Duration::from_secs(20)),
+            Some(Duration::from_secs(40)),
+            "full: how long, without counting"
+        );
+        assert_eq!(w.waits_at("b", t0 + Duration::from_secs(20)), None);
+        assert_eq!(
+            w.waits_at("c", t0),
+            None,
+            "a key never seen waits for nothing"
+        );
+        assert_eq!(
+            w.waits_at("a", t0 + Duration::from_secs(61)),
+            None,
+            "the oldest try has gone"
         );
         assert!(
             w.allow_at("a", t0 + Duration::from_secs(60)).is_ok(),

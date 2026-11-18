@@ -1,0 +1,37 @@
+{
+  "path": "noi.eio.components.world.drawing",
+  "name": "Shared 3D drawing",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The drawing code every element of the 3D world shares: the programs that run on the graphics card, with the one rule for the edge of the world; the helpers that hand shapes to it; and the sums for the eye.",
+    "responsibility": "Hold what several Eidos components share, once. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "shared-part",
+    "job": "Draw every element of the 3D world the same way.",
+    "states": {},
+    "reads": [
+      "noi.eio.world.circles.dash",
+      "noi.eio.world.ripples.behind"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/drawing/gl.ts",
+        "sha256": "937ba66368eb11f594d8e25ef60d0507b0d67926227d48e158725279958d33ad"
+      },
+      {
+        "path": "src/drawing/glsl.ts",
+        "sha256": "b5316d57fa9af0e0997435900cc14755dfa3a7aa546d9395fcdfe756b40054f3"
+      },
+      {
+        "path": "src/drawing/math.ts",
+        "sha256": "31d9704cdcb4092d289725ce924934aa3068c04177ae26c34eca26effee16dcd"
+      }
+    ]
+  }
+}

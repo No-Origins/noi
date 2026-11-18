@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.movement.jump",
+  "name": "Jump height",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How high a character jumps. The old project's number, brought at your word (17 Nov).",
+    "responsibility": "Move a character."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "old project"
+  },
+  "spec": {
+    "m": 1.2
+  }
+}

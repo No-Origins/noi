@@ -26,16 +26,8 @@
   text-decoration-color: currentColor;
 }
 
-/* ——— Navigator ——— */
-.navigator {
-  display: flex;
-  flex-direction: column;
-  gap: var(--eio-space-gap-stack);
-}
-.tree {
-  display: flex;
-  flex-direction: column;
-}
+/* ——— Navigator ———
+   The list itself is Eidos's Sidebar; this is a row's text sample. */
 .aa {
   display: inline-block;
   width: var(--eio-size-icon-default);
@@ -66,31 +58,6 @@
 }
 .titleAction {
   margin-left: auto;
-}
-/* A link that looks like a secondary button, for actions that open a page. */
-.linkButton {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--eio-space-gap-inline);
-  min-height: var(--eio-size-control-default);
-  padding: 0 var(--eio-space-inset-card);
-  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
-  border-radius: var(--eio-radius-button);
-  color: var(--eio-color-text-primary);
-  text-decoration: none;
-  transition-property: background-color, border-color, color;
-  transition-duration: var(--eio-motion-duration-ms100);
-  transition-timing-function: var(--eio-motion-easing-standard);
-}
-/* Its target reaches the minimum, like a button's (measured from inside the border). */
-.linkButton::before {
-  content: '';
-  position: absolute;
-  inset: calc((var(--eio-size-control-default) - var(--eio-size-target-minimum)) / 2 - var(--eio-border-width-default)) 0;
-}
-.linkButton:hover {
-  background: var(--eio-color-state-hover);
 }
 .crumbs {
   color: var(--eio-color-text-muted);
@@ -174,25 +141,6 @@
   color: var(--eio-color-text-faint);
 }
 
-/* Links to other merons. */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--eio-space-gap-inline);
-  min-height: var(--eio-size-target-minimum);
-  padding: 0 var(--eio-space-inset-control);
-  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
-  border-radius: var(--eio-radius-button);
-  background: var(--eio-color-surface-card);
-  color: var(--eio-color-text-primary);
-  text-decoration: none;
-  transition-property: background-color, border-color, color;
-  transition-duration: var(--eio-motion-duration-ms100);
-  transition-timing-function: var(--eio-motion-easing-standard);
-}
-.chip:hover {
-  background: var(--eio-color-state-hover);
-}
 .connections {
   display: flex;
   flex-direction: column;
@@ -287,6 +235,9 @@
 }
 .miniBox {
   display: block;
+  /* A big size is drawn no bigger than a control, so the card keeps its shape. */
+  max-width: var(--eio-size-control-default);
+  max-height: var(--eio-size-control-default);
   border: var(--eio-border-width-default) solid var(--eio-color-text-muted);
 }
 .miniCorner {
@@ -294,6 +245,10 @@
   width: calc(var(--eio-size-control-large) * 2);
   height: var(--eio-size-control-large);
   border: var(--eio-border-width-focus) solid var(--eio-color-text-muted);
+}
+/* A fully round corner, as Eidos says it: half the sample's own height. */
+.miniCorner.round {
+  border-radius: calc(var(--eio-size-control-large) / 2);
 }
 .miniLine {
   display: block;
@@ -424,11 +379,24 @@
   display: block;
   border: var(--eio-border-width-default) solid var(--eio-color-text-primary);
 }
+/* A 3D world length beside a person: two bars, one above the other (17 Nov). */
+.lengths {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--eio-space-gap-stack);
+}
+.barPerson {
+  background: var(--eio-color-text-muted);
+}
 .corner {
   display: block;
   width: calc(var(--eio-size-control-large) * 3);
   height: calc(var(--eio-size-control-large) * 2);
   border: var(--eio-border-width-focus) solid var(--eio-color-text-primary);
+}
+.corner.round {
+  border-radius: var(--eio-size-control-large);
 }
 .rule {
   display: block;

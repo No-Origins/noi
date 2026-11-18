@@ -1,0 +1,22 @@
+/* The list beside a page: what sits on top, then the rows, in one column. Where it sits and how it
+   scrolls is the app's; the rows draw themselves (TreeRow). */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.group,
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+/* A group's name sits above its rows, quieter than they are. */
+.groupName {
+  margin: 0;
+  padding: var(--eio-space-gap-inline) 0;
+  color: var(--eio-color-text-muted);
+}
+.empty {
+  margin: 0;
+  color: var(--eio-color-text-muted);
+}

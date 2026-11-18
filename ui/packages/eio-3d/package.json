@@ -1,0 +1,27 @@
+{
+  "name": "@noi/eio-3d",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Eidos's 3D elements for No Origins (the land, the arch, the characters and the rest of the 3D world), drawn on the graphics card from @noi/eio-tokens. Shipped as TypeScript source; apps compile it.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noi/eio-tokens": "workspace:*",
+    "three": "0.187.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/three": "0.187.0",
+    "react": "19.3.1",
+    "typescript": "7.0.2"
+  }
+}

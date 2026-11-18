@@ -1,0 +1,59 @@
+{
+  "path": "noi.eio.components.chip",
+  "name": "Chip",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A small rounded link to one thing in No Origins, such as a meron, a project or a run, with its small picture, its name and a note. Given another site's address, it keeps the sign every outside link has: the arrow after its name, and a new tab. The usual name for this in design systems.",
+    "responsibility": "Be the one chip every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Lead to one thing, showing what it is at a glance: a meron, a project, a run.",
+    "states": {
+      "interaction": {
+        "hover": "hovered",
+        "focus": "focused, with the focus ring"
+      },
+      "link": {
+        "inside": "a thing in No Origins: it opens here",
+        "outside": "another site: the arrow after its name, opening in a new tab"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.border.default",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.state.hover",
+      "noi.eio.color.surface.card",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.motion.duration.ms100",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.radius.pill",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.body",
+      "noi.eio.type.style.caption"
+    ],
+    "uses": [
+      "noi.eio.components.icon",
+      "noi.eio.components.links"
+    ],
+    "files": [
+      {
+        "path": "src/Chip/Chip.module.css",
+        "sha256": "12ac2be41117aefec7944f5b3bd15684af40afd008f50955445462afe49b80d7"
+      },
+      {
+        "path": "src/Chip/Chip.tsx",
+        "sha256": "7756c54a8c28bc7781675e20194f213f8748dd7ee4d64fac91bcc82db52fa490"
+      }
+    ]
+  }
+}

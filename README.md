@@ -38,7 +38,7 @@ pnpm --dir infrastructure/supabase run stack:start    # the shared database
 
 Then follow [noi's README](noi/README.md) for each server's own database login, the migrations, Governance's
 first owner, and starting Mero (port 8787) and Governance (port 8788). The Explorer runs with
-`pnpm --dir ui/apps/explorer dev` on <http://localhost:3000>; sign in there with your passkey.
+`pnpm --dir ui/apps/explorer dev` on port 3000, where each system has its own name (agreed 8 Nov): <http://mero.no-origins.localhost:3000> (Merons, Review), <http://gov.no-origins.localhost:3000> (Governance, sign in), <http://eidos.no-origins.localhost:3000> (the gallery). macOS sends every `*.localhost` name to this Mac, so nothing needs installing; plain `localhost:3000` sends you on. Sign in on gov with your passkey; the sign-in holds on every name. Hosted, the base name is `no-origins.com` (`NOI_DOMAIN`).
 
 ## How a change gets in
 

@@ -32,7 +32,7 @@ pnpm run mero                                   # Mero's API on 127.0.0.1:8787, 
 
 `node scripts/noi-load.mjs data/eio` proposes every meron file in a folder as one batch, as an agent (`NOI_PROPOSER`, default design-agent); you approve it in the Explorer. Merons already in Mero are skipped.
 
-The registry requires Rust stable and PostgreSQL. Node.js 22+ and pnpm 10.33.0 remain the project tooling baseline; the Supabase CLI is owned by shared infrastructure. The Explorer (`../ui/apps/explorer`, http://localhost:3000) is Mero's interface; Mero's own old pages on port 8787 were retired on 7 Nov (archived in `infrastructure/supabase/backups/2026-11-07-step-3-retired/`, with the retired file of names).
+The registry requires Rust stable and PostgreSQL. Node.js 22+ and pnpm 10.33.0 remain the project tooling baseline; the Supabase CLI is owned by shared infrastructure. The Explorer (`../ui/apps/explorer`, http://mero.no-origins.localhost:3000) is Mero's interface; Mero's own old pages on port 8787 were retired on 7 Nov (archived in `infrastructure/supabase/backups/2026-11-07-step-3-retired/`, with the retired file of names).
 
 `.env.example` documents the variables; the program reads environment variables, **not** `.env` files automatically. Keep credentials out of source control.
 
@@ -58,14 +58,18 @@ cargo run --bin noi -- revise PROPOSAL_UUID /tmp/meron.json --agent design-agent
 
 ## Governance
 
-Governance answers "may they?" for every NOI system from its own schema, `gov`. Build it with `cargo build -p noi-gov --features server`; its command is `noi-gov`, also reached as `noi gov`. It needs `NOI_GOV_DATABASE_URL` (its own login, from `governance.local.env`; the operator's for `migrate`) and copies the approved roles and rules from Mero (`NOI_MERO_URL`, default `http://127.0.0.1:8787`) when it starts and after each approval in `noi.gov`.
+Governance answers "may they?" for every NOI system from its own schema, `gov`. Build it with `cargo build -p noi-gov --features server`; its command is `noi-gov`, also reached as `noi gov`. It needs `NOI_GOV_DATABASE_URL` (its own login, from `governance.local.env`; the operator's for `migrate`) and copies the approved roles and rules from Mero (`NOI_MERO_URL`, default `http://127.0.0.1:8787`) when it starts and after each approval in `noi.gov`. Its pages (sign in, add your passkey) are in the one app, on gov's own name: `NOI_GOV_PAGES`, default `http://gov.<NOI_DOMAIN>:3000/`. `NOI_DOMAIN` is the base name, `no-origins.localhost` on this Mac and `no-origins.com` hosted: passkeys belong to it, so one passkey signs in on gov and touches on mero. One-time links open on gov, so run the app to use one.
+
+Anyone may sign up on gov (agreed 8 Nov): an email, a handle and a name. Governance emails a link; opening it confirms the email, makes the account with Observer in all of `noi` (reading, nothing more) and adds the passkey. "Lost your passkey?" emails a link that adds a new one. Neither form says whether an email has an account, and no address goes into the record or a log. Email goes where `NOI_GOV_MAIL` says: on this Mac `smtp://127.0.0.1:55325`, the mail catcher in the database stack, which sends nothing and shows every email at http://localhost:55324. Without it, signing up and lost-passkey links are refused.
 
 ```sh
 noi gov migrate                                  # schema gov (administrative)
 noi gov copy                                     # copy the roles and rules approved in Mero
-noi gov serve                                    # http://localhost:8788 (open by name, not 127.0.0.1)
+noi gov serve                                    # its API on 127.0.0.1:8788; its pages are in the app
 noi gov setup --handle HANDLE --name "Your name"  # once: the first owner and a 10-minute passkey link
 noi gov passkey add HANDLE                       # a new first-passkey link, only while there is none
+noi gov passkey add HANDLE --another             # a link for another passkey, such as one for a new name (recorded)
+noi gov account email HANDLE EMAIL               # a person's email (recorded without the address)
 ```
 
 See "Governance's server" in `docs/architecture.md`.

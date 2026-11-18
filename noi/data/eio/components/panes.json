@@ -1,0 +1,44 @@
+{
+  "path": "noi.eio.components.panes",
+  "name": "Panes",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A list and the page for what is chosen in it, laid out by the window class, with WhenOnePane and WhenTwoPanes to show something in only one of the two layouts.",
+    "responsibility": "Be the one panes every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Lay out a list beside its page where the window is wide, and the page alone where it is not.",
+    "states": {
+      "window": {
+        "one": "one pane: the page fills the window",
+        "two": "two panes side by side, the list a third of the width"
+      }
+    },
+    "reads": [
+      "noi.eio.layout.window.compact",
+      "noi.eio.layout.window.expanded",
+      "noi.eio.layout.window.medium",
+      "noi.eio.size.width.page",
+      "noi.eio.space.gap.pane",
+      "noi.eio.space.margin.compact",
+      "noi.eio.space.margin.expanded",
+      "noi.eio.space.margin.medium"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Panes/Panes.module.css",
+        "sha256": "7606fed2f7d97c808deb1ab68421fc98fe7ff763ecf1575229e0f3a74a9bf936"
+      },
+      {
+        "path": "src/Panes/Panes.tsx",
+        "sha256": "94de2e1f7398c915d18d1855e85e35cf0d200e5e36c339777131836b69a765f5"
+      }
+    ]
+  }
+}

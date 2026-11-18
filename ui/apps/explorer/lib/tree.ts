@@ -7,7 +7,7 @@ export type Preview =
   | { kind: 'swatch'; color: string }
   | { kind: 'role'; light: string; dark: string }
   | { kind: 'text'; font: string; weight: number }
-  | { kind: 'icon'; name: 'layers' | 'doc' | 'drop' | 'comp' | 'agent' | 'fit' }
+  | { kind: 'icon'; name: 'layers' | 'doc' | 'drop' | 'comp' | 'agent' | 'fit' | 'arrow' }
 
 export interface TreeNode {
   path: string
@@ -27,6 +27,7 @@ const GROUPS: Record<string, string> = {
   state: 'State', type: 'Typography', font: 'Fonts', style: 'Text styles', space: 'Spacing', scale: 'Scale', gap: 'Gaps',
   inset: 'Insets', margin: 'Margins', size: 'Sizes', control: 'Controls', icon: 'Icons', target: 'Targets', width: 'Widths',
   layout: 'Layout', window: 'Windows', radius: 'Corners', inv: 'Invariants', motion: 'Motion', duration: 'Durations', easing: 'Curves',
+  world: '3D world', ripples: 'Lime ripples',
 }
 const groupName = (path: string) => {
   const seg = path.split('.').pop()!
@@ -48,6 +49,8 @@ export function preview(idx: Index, m: Meron | undefined): Preview {
   if (m.classification.type === 'invariant') return { kind: 'icon', name: 'doc' }
   if (m.classification.type === 'component') return { kind: 'icon', name: 'comp' }
   if (m.classification.type === 'agent') return { kind: 'icon', name: 'agent' }
+  if (sub === 'length') return { kind: 'icon', name: 'fit' }
+  if (sub === 'time' || sub === 'speed') return { kind: 'icon', name: 'arrow' }
   return { kind: 'icon', name: sub === 'window' ? 'fit' : 'drop' }
 }
 

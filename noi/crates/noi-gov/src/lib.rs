@@ -53,6 +53,9 @@ pub struct Actor {
 #[serde(rename_all = "kebab-case")]
 pub enum Action {
     Read,
+    /// Read Review: what waits, and who proposed it (agreed 9 Nov, step 6). Its own action, so
+    /// reading merons can be opened to everyone signed out while Review stays closed to them.
+    ReadReview,
     Propose,
     Update,
     EvolveBreaking,
@@ -64,11 +67,15 @@ pub enum Action {
     TransitionRelease,
     /// Approve, send back or reject proposals. Maintainers only.
     Review,
+    /// Propose a role or rule whose Cedar the form didn't write (9 Nov, step 7). Governance's own
+    /// action, not one of Mero's, so only owners hold it; it needs a fresh touch, so agents never can.
+    WriteCedar,
 }
 impl Action {
     /// Every action Mero declares. Cedar roles and rules may name only these, and Governance's own.
-    pub const ALL: [Action; 11] = [
+    pub const ALL: [Action; 12] = [
         Action::Read,
+        Action::ReadReview,
         Action::Propose,
         Action::Update,
         Action::EvolveBreaking,
@@ -84,6 +91,7 @@ impl Action {
     pub fn as_str(self) -> &'static str {
         match self {
             Action::Read => "read",
+            Action::ReadReview => "read-review",
             Action::Propose => "propose",
             Action::Update => "update",
             Action::EvolveBreaking => "evolve-breaking",
@@ -94,6 +102,7 @@ impl Action {
             Action::Release => "release",
             Action::TransitionRelease => "transition-release",
             Action::Review => "review",
+            Action::WriteCedar => "write-cedar",
         }
     }
 }
@@ -242,5 +251,47 @@ mod tests {
             now(grant.authorize(&request)),
             Decision::Deny { .. }
         ));
+    }
+}
+
+/// How current a copy of Governance's roles and rules is (9 Nov, step 7): every rule meron under
+/// noi.gov, by path, revision and state, in order. Mero says its own; Governance keeps the one it
+/// copied; when they differ, Governance copies again before it answers.
+pub fn rules_version<'a>(merons: impl IntoIterator<Item = (&'a str, i64, &'a str)>) -> String {
+    let mut held: Vec<String> = merons
+        .into_iter()
+        .map(|(path, revision, state)| format!("{path}@{revision}:{state}"))
+        .collect();
+    held.sort();
+    held.join(",")
+}
+
+#[cfg(test)]
+mod rules_version_tests {
+    #[test]
+    fn the_same_rules_in_any_order_are_one_version() {
+        let a = super::rules_version([
+            ("noi.gov.roles.b", 2, "active"),
+            ("noi.gov.roles.a", 1, "active"),
+        ]);
+        let b = super::rules_version([
+            ("noi.gov.roles.a", 1, "active"),
+            ("noi.gov.roles.b", 2, "active"),
+        ]);
+        assert_eq!(a, b);
+        assert_ne!(
+            a,
+            super::rules_version([
+                ("noi.gov.roles.a", 1, "active"),
+                ("noi.gov.roles.b", 3, "active")
+            ])
+        );
+        assert_ne!(
+            a,
+            super::rules_version([
+                ("noi.gov.roles.a", 1, "active"),
+                ("noi.gov.roles.b", 2, "deprecated")
+            ])
+        );
     }
 }

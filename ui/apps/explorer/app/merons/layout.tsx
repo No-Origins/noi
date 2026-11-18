@@ -10,14 +10,15 @@ import styles from './merons.module.css'
 export const dynamic = 'force-dynamic'
 
 export default async function MeronsLayout({ children }: { children: ReactNode }) {
-  // Mero answers only those Governance allows; anyone else is asked to sign in.
+  // Mero answers only those Governance allows; anyone else is asked to sign in. The badge's count is
+  // asked alongside, and never throws.
+  let s, waiting
   try {
-    await snapshot()
+    ;[s, waiting] = await Promise.all([snapshot(), waitingCount()])
   } catch (e) {
     if (e instanceof Refused) return <SignedOut reason={e.message} />
     throw e
   }
-  const [s, waiting] = await Promise.all([snapshot(), waitingCount()])
   const nodes = tree(s, index(s))
   // The tree: beside the page where two panes fit, in the menu where one pane fills the window.
   const list = <Navigator nodes={nodes} />

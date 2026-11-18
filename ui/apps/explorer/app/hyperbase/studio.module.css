@@ -1,0 +1,838 @@
+/* Hyperbase Studio's pages (15 Nov, the mock). They place Eidos's parts and never draw a control;
+   every value is a token; no window width is written here (the panes follow --eio-window-*).
+   What Eidos has no part for yet is drawn here and listed in Planning/studio-mock-notes.md:
+   a meter, a run's steps, a thread, a computer with who is in it, a dial, a canvas. */
+
+/* ——— Layout: Studio's own list beside the page, as Governance has ——— */
+.left {
+  position: sticky;
+  top: var(--explorer-bar);
+  max-height: calc(100dvh - var(--explorer-bar));
+  overflow-y: auto;
+  padding: var(--eio-space-gap-pane) 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+}
+.right {
+  padding: var(--eio-space-gap-pane) 0 var(--eio-space-gap-section);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-section);
+  min-width: 0;
+}
+.navRow {
+  position: relative;
+  min-height: var(--eio-size-target-minimum);
+  padding: 0 var(--eio-space-inset-control);
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border-radius: var(--eio-radius-field);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  transition-property: background-color, color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.navRow:hover {
+  background: var(--eio-color-state-highlight);
+}
+.navSelected,
+.navSelected:hover {
+  background: var(--eio-color-state-hover);
+  font-weight: var(--eio-type-style-heading-weight);
+}
+.navName {
+  flex: 1;
+  min-width: 0;
+}
+.navIcon {
+  display: grid;
+  place-items: center;
+  color: var(--eio-color-text-muted);
+}
+
+/* ——— The mark on every page: this is a mock ——— */
+.mock {
+  border-bottom: var(--eio-border-width-default) dashed var(--eio-color-border-input);
+  background: var(--eio-color-surface-raised);
+}
+.mockInner {
+  max-width: var(--eio-size-width-page);
+  margin: 0 auto;
+  padding: var(--eio-space-gap-inline) var(--eio-window-margin);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.mockWords {
+  flex: 1 1 calc(var(--eio-size-width-reading) / 2);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lookingAs {
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  color: var(--eio-color-text-muted);
+  white-space: nowrap;
+}
+/* The mock's own controls on a page, such as "Show the next step": dashed, so they are not taken
+   for a part of the real page. */
+.mockControl {
+  padding: var(--eio-space-gap-inline) var(--eio-space-inset-control);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+  border: var(--eio-border-width-default) dashed var(--eio-color-border-input);
+  border-radius: var(--eio-radius-card);
+  color: var(--eio-color-text-muted);
+}
+.mockControl > p {
+  flex: 1 1 calc(var(--eio-size-width-reading) / 3);
+  min-width: 0;
+}
+
+/* ——— A page: its head, then sections ——— */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.titleRow h1 {
+  overflow-wrap: anywhere;
+}
+.titleEnd {
+  margin-left: auto;
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+  min-width: 0;
+}
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.sectionEnd {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.muted {
+  color: var(--eio-color-text-muted);
+}
+.faint {
+  color: var(--eio-color-text-faint);
+}
+.good {
+  color: var(--eio-color-text-success);
+}
+.bad {
+  color: var(--eio-color-text-danger);
+}
+.warn {
+  color: var(--eio-color-text-warning);
+}
+.wrapAnywhere {
+  overflow-wrap: anywhere;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+  min-width: 0;
+}
+.tight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  min-width: 0;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.inlineLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--eio-color-text-faint);
+}
+.inlineLink:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ——— Rows in a card: what it is, its facts, and its buttons at the end ——— */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+  padding: var(--eio-space-gap-stack) 0;
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  min-width: 0;
+}
+.row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.row:last-child {
+  padding-bottom: 0;
+}
+.rowIcon {
+  align-self: flex-start;
+  width: var(--eio-size-control-small);
+  height: var(--eio-size-control-small);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--eio-color-text-muted);
+}
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: 0;
+  flex: 1 1 calc(var(--eio-size-width-reading) / 2.5);
+  overflow-wrap: anywhere;
+}
+.rowEnd {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.rowLabel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--eio-space-gap-inline) / 2) var(--eio-space-gap-inline);
+  color: var(--eio-color-text-muted);
+}
+/* What opens under a row when its button is pressed: an answer to write, a thing to confirm. */
+.rowBelow {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  min-width: 0;
+}
+/* A whole row that is a link: a project in the list, a run, a team. */
+.linkRow {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+  min-height: var(--eio-size-target-minimum);
+  padding: var(--eio-space-gap-stack) var(--eio-space-inset-card);
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  transition-property: background-color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.linkRow:first-child {
+  border-top: 0;
+}
+.linkRow:hover {
+  background: var(--eio-color-state-highlight);
+}
+/* A card whose rows reach its edges, so a link row's hover fills the row. */
+.list {
+  display: flex;
+  flex-direction: column;
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-card);
+  overflow: hidden;
+}
+.rowFacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--eio-space-gap-inline) / 2) var(--eio-space-gap-stack);
+  color: var(--eio-color-text-muted);
+}
+
+/* ——— A meter: so many of so many, drawn ——— */
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: calc(var(--eio-size-target-minimum) * 2);
+}
+.meterTrack {
+  height: var(--eio-size-dot);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-border-default);
+  overflow: hidden;
+}
+.meterFill {
+  height: 100%;
+  width: calc(var(--part) * 100%);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-action-primary);
+}
+.meterNear .meterFill {
+  background: var(--eio-color-text-warning);
+}
+/* Small tiles of facts, each with a label, a value and perhaps a meter. */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--eio-size-width-reading) / 3.5)), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--eio-size-width-reading) / 2)), 1fr));
+  gap: var(--eio-space-gap-group);
+  align-items: start;
+}
+
+/* ——— Ticks: done-means lines, a plan's tasks, checks ——— */
+.ticks {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.tick {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--eio-space-gap-inline);
+  min-width: 0;
+}
+.tickMark {
+  height: var(--eio-type-style-body-line-height);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--eio-color-text-faint);
+}
+.tickDone .tickMark {
+  color: var(--eio-color-text-success);
+}
+.tickNow .tickMark {
+  color: var(--eio-color-text-primary);
+}
+.tickBad .tickMark {
+  color: var(--eio-color-text-danger);
+}
+.tickText {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--eio-space-gap-inline);
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+/* A dot for what is going on now. */
+.nowDot {
+  width: var(--eio-size-dot);
+  height: var(--eio-size-dot);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-action-primary);
+}
+
+/* ——— A run's steps, as they happen: a line down the page, a mark on it for each step ——— */
+.steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.step {
+  position: relative;
+  display: flex;
+  gap: var(--eio-space-gap-stack);
+  padding-bottom: var(--eio-space-gap-inline);
+  min-width: 0;
+}
+/* The line joins a step's mark to the next one's. */
+.step::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--eio-size-control-small) / 2);
+  top: calc((var(--eio-size-target-minimum) + var(--eio-size-control-small)) / 2);
+  bottom: calc((var(--eio-size-control-small) - var(--eio-size-target-minimum)) / 2);
+  width: var(--eio-border-width-default);
+  background: var(--eio-color-border-default);
+}
+.step:last-child::before {
+  display: none;
+}
+.stepMark {
+  margin-top: calc((var(--eio-size-target-minimum) - var(--eio-size-control-small)) / 2);
+  width: var(--eio-size-control-small);
+  height: var(--eio-size-control-small);
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-surface-card);
+  color: var(--eio-color-text-muted);
+}
+.stepOutside .stepMark {
+  border-color: var(--eio-color-action-secondary);
+  color: var(--eio-color-text-primary);
+}
+.stepYou .stepMark {
+  background: var(--eio-color-action-primary);
+  border-color: var(--eio-color-action-primary);
+  color: var(--eio-color-action-on-primary);
+}
+.stepBody {
+  flex: 1;
+  min-width: 0;
+}
+.stepLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--eio-space-gap-inline);
+  color: var(--eio-color-text-primary);
+  text-transform: none;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.stepMore {
+  padding: 0 0 var(--eio-space-gap-inline) calc(var(--eio-size-icon-small) + var(--eio-space-gap-inline));
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  color: var(--eio-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ——— The thread: everything said in a project ——— */
+.thread {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.said {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--eio-space-gap-inline);
+  min-width: 0;
+}
+.saidBody {
+  flex: 1;
+  min-width: 0;
+  padding: var(--eio-space-gap-inline) var(--eio-space-inset-control);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-page);
+  overflow-wrap: anywhere;
+}
+/* A person's words are an order: drawn apart from the agents' words, which are content. */
+.saidYou .saidBody {
+  border-color: var(--eio-color-action-primary);
+  background: var(--eio-color-state-highlight);
+}
+.saidWho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--eio-space-gap-inline) / 2) var(--eio-space-gap-inline);
+  color: var(--eio-color-text-muted);
+}
+.saidIcon {
+  height: var(--eio-size-target-minimum);
+  width: var(--eio-size-control-small);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--eio-color-text-muted);
+}
+
+/* ——— Computers: a box for each, and who is in it ——— */
+.computers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--eio-size-width-reading) / 2.2)), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+.computer {
+  padding: var(--eio-space-inset-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-focus) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-check);
+  background: var(--eio-color-surface-page);
+  min-width: 0;
+}
+/* A marked computer: a run that read the web has worked in it. Never by color alone: it says so. */
+.computerMarked {
+  border-style: dashed;
+  border-color: var(--eio-color-text-warning);
+}
+.computerHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eio-space-gap-inline);
+}
+.agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-inline);
+}
+/* An agent is drawn as an oval, as on the agreed pages. Its loop runs in Hyperbase, outside the box. */
+.agent {
+  min-height: var(--eio-size-control-default);
+  padding: 0 var(--eio-space-inset-control);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-surface-card);
+}
+.agentPen {
+  border-color: var(--eio-color-action-primary);
+}
+
+/* ——— Look inside: the files, the change so far, what is running. Read only. ——— */
+.inside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+  padding-top: var(--eio-space-gap-inline);
+}
+.files {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.file {
+  padding-left: calc(var(--depth, 0) * var(--eio-space-gap-stack));
+  min-height: var(--eio-size-control-small);
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  overflow-wrap: anywhere;
+}
+.code {
+  padding: var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-page);
+  overflow-x: auto;
+  white-space: pre;
+}
+/* A picture of a page an agent built: taken by Hyperbase's checks, never the page itself. The
+   mock draws a stand-in for the picture. */
+.picture {
+  padding: var(--eio-space-inset-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-check);
+  background: var(--eio-color-surface-page);
+}
+.pictureBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-inline);
+}
+.pictureChip {
+  height: var(--eio-size-control-small);
+  width: calc(var(--eio-size-target-minimum) * 1.5);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-pill);
+}
+.pictureLine {
+  height: var(--eio-size-dot);
+  width: calc(var(--part) * 100%);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-border-default);
+}
+
+/* ——— A pass, cut four ways ——— */
+.cuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--eio-size-target-minimum) * 2.5)), 1fr));
+  gap: var(--eio-space-gap-inline);
+}
+.cut {
+  min-height: var(--eio-size-control-default);
+  padding: 0 var(--eio-space-inset-control);
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-pill);
+  color: var(--eio-color-text-success);
+}
+.cutOff {
+  color: var(--eio-color-text-faint);
+  border-style: dashed;
+}
+.cut > span {
+  color: var(--eio-color-text-primary);
+}
+.cutOff > span {
+  color: var(--eio-color-text-muted);
+}
+
+/* ——— A dial: off, ask me, by a guideline; and "nobody" for what needs no yes ——— */
+.dials {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+.dial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline) var(--eio-space-gap-stack);
+}
+.dialWhat {
+  flex: 1 1 calc(var(--eio-size-target-minimum) * 3);
+  min-width: 0;
+}
+.dialStops {
+  display: flex;
+  flex-wrap: wrap;
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-field);
+  overflow: hidden;
+}
+.dialStop {
+  min-height: var(--eio-size-control-small);
+  padding: calc(var(--eio-space-gap-inline) / 2) var(--eio-space-gap-inline);
+  display: grid;
+  place-items: center;
+  color: var(--eio-color-text-faint);
+}
+.dialOn {
+  background: var(--eio-color-action-secondary);
+  color: var(--eio-color-action-on-secondary);
+}
+
+/* ——— Handing over: the talk on one side, the brief filling in on the other ——— */
+.talk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.bubble {
+  max-width: 90%;
+  align-self: flex-start;
+  padding: var(--eio-space-gap-inline) var(--eio-space-inset-control);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-page);
+  overflow-wrap: anywhere;
+}
+.bubbleYou {
+  align-self: flex-end;
+  border-color: var(--eio-color-action-primary);
+  background: var(--eio-color-state-highlight);
+}
+.sayRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+/* Safari sizes a field by its input's own width unless told it may shrink. */
+.sayRow > label {
+  flex: 1 1 calc(var(--eio-size-target-minimum) * 3);
+  min-width: 0;
+}
+.briefLine {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: 0;
+}
+.briefHead {
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  color: var(--eio-color-text-muted);
+}
+.filled {
+  color: var(--eio-color-text-success);
+  display: inline-grid;
+  place-items: center;
+}
+.fill {
+  width: 100%;
+}
+
+/* ——— Score: the kept tasks down the page, a column for each model and version ——— */
+.scoreGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(var(--columns), var(--eio-size-control-default));
+  align-items: stretch;
+}
+.scoreCell {
+  min-height: var(--eio-size-control-default);
+  display: grid;
+  place-items: center;
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.scoreName {
+  min-height: var(--eio-size-control-default);
+  padding: calc(var(--eio-space-gap-inline) / 2) var(--eio-space-gap-inline) calc(var(--eio-space-gap-inline) / 2) 0;
+  display: flex;
+  align-items: center;
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.scoreHead {
+  border-top: 0;
+  color: var(--eio-color-text-muted);
+}
+.scoreSet {
+  grid-column: 1 / -1;
+  padding-top: var(--eio-space-gap-stack);
+  color: var(--eio-color-text-muted);
+}
+.scoreNow {
+  background: var(--eio-color-state-highlight);
+}
+.legend {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+}
+.legend > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--eio-space-gap-inline);
+}
+.versus {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--eio-size-target-minimum) * 3)), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+
+/* ——— Space: a canvas of your own. How it is really drawn is left for later; this is a stand-in. ——— */
+.canvas {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-card);
+  background-color: var(--eio-color-surface-page);
+  background-image:
+    linear-gradient(var(--eio-color-border-default) var(--eio-border-width-default), transparent var(--eio-border-width-default)),
+    linear-gradient(90deg, var(--eio-color-border-default) var(--eio-border-width-default), transparent var(--eio-border-width-default));
+  background-size: var(--eio-space-gap-section) var(--eio-space-gap-section);
+  overflow: hidden;
+}
+/* A thing on the canvas: placed by its three dimensions. What is further away is drawn smaller. */
+.thing {
+  position: absolute;
+  left: calc(var(--x) * 100%);
+  top: calc(var(--y) * 100%);
+  transform: translate(-50%, -50%) scale(calc(1.1 - var(--z) * 0.35));
+  padding: var(--eio-space-gap-inline);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-input);
+  border-radius: var(--eio-radius-check);
+  background: var(--eio-color-surface-card);
+  white-space: nowrap;
+}
+.thingBuilding {
+  border-style: dashed;
+  color: var(--eio-color-text-muted);
+}
+.thingShared {
+  border-color: var(--eio-color-action-primary);
+}
+.thingShape {
+  width: var(--eio-size-control-large);
+  height: var(--eio-size-control-large);
+  display: grid;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  place-content: center;
+  color: var(--eio-color-text-muted);
+}
+.shapeList {
+  grid-template-columns: 1fr;
+}
+.shapeList > i {
+  width: var(--eio-size-control-default);
+  height: calc(var(--eio-size-dot) / 2);
+  background: currentColor;
+  border-radius: var(--eio-radius-pill);
+}
+.shapeKeys {
+  grid-template-columns: repeat(3, var(--eio-size-dot));
+}
+.shapeGrid {
+  grid-template-columns: repeat(4, var(--eio-size-dot));
+  gap: calc(var(--eio-border-width-focus));
+}
+.shapeKeys > i,
+.shapeGrid > i {
+  width: var(--eio-size-dot);
+  height: var(--eio-size-dot);
+  background: currentColor;
+  border-radius: var(--eio-border-width-focus);
+}
+.shapeGrid > i:nth-child(3n) {
+  background: var(--eio-color-action-primary);
+}
+.ways {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--eio-size-width-reading) / 3)), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+.way {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: 0;
+}

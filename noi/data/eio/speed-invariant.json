@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.inv.speed",
+  "name": "Speed invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos speed in metres a second must meet.",
+    "responsibility": "Say how fast things move in the 3D world, in metres a second."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "speed"
+    },
+    "schema": {
+      "title": "Eidos speed",
+      "type": "object",
+      "required": [
+        "m_per_s"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "m_per_s": {
+          "description": "A speed in the 3D world, in metres a second, to the tenth: more than 0, at most 1,000.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "multipleOf": 0.1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "path": "noi.eio.components.world.character-drawing",
+  "name": "Character drawing",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The code that draws the characters with three.js, into the same picture as the land, and the numbers they carry: their height, how they move, their flight into a system, and the eye that follows them.",
+    "responsibility": "Hold what several Eidos components share, once. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "shared-part",
+    "job": "Draw any of the characters, standing, walking or running, at Eidos’s height.",
+    "states": {
+      "motion": {
+        "stand": "standing plainly, arms down",
+        "walk": "walking",
+        "run": "running"
+      },
+      "measure": {
+        "height": "Character height",
+        "stepUp": "Highest step without a jump",
+        "walk": "Walk",
+        "run": "Run",
+        "fly": "Fly",
+        "rise": "Rise and sink",
+        "jump": "Jump height",
+        "hover": "Hover height",
+        "ceiling": "Flight ceiling",
+        "jumpHeight": "Flight jump height",
+        "jumpTime": "Flight jump time",
+        "topSpeed": "Flight top speed",
+        "catchUp": "Eye catch-up time",
+        "leastIn": "Least time in a gateway",
+        "dark": "Going dark",
+        "onFoot": "Eye on foot",
+        "eyeJump": "Eye in the jump",
+        "chase": "Eye in fast flight",
+        "eyeGateway": "Eye in a gateway"
+      }
+    },
+    "reads": [
+      "noi.eio.world.character.height",
+      "noi.eio.world.character.step-up",
+      "noi.eio.world.eye.chase",
+      "noi.eio.world.eye.gateway",
+      "noi.eio.world.eye.jump",
+      "noi.eio.world.eye.on-foot",
+      "noi.eio.world.flight.catch-up",
+      "noi.eio.world.flight.dark",
+      "noi.eio.world.flight.jump-height",
+      "noi.eio.world.flight.jump-time",
+      "noi.eio.world.flight.least-in",
+      "noi.eio.world.flight.top-speed",
+      "noi.eio.world.movement.ceiling",
+      "noi.eio.world.movement.fly",
+      "noi.eio.world.movement.hover",
+      "noi.eio.world.movement.jump",
+      "noi.eio.world.movement.rise",
+      "noi.eio.world.movement.run",
+      "noi.eio.world.movement.walk"
+    ],
+    "uses": [
+      "noi.eio.components.world.clay",
+      "noi.eio.components.world.drawing",
+      "noi.eio.components.world.fairy-bot",
+      "noi.eio.components.world.mannequin"
+    ],
+    "files": [
+      {
+        "path": "src/character-drawing/character-measures.ts",
+        "sha256": "2e9cbef78531002d5fbe83c2a6922ad2df72ab23a6644dd24dc88166511c848e"
+      },
+      {
+        "path": "src/character-drawing/characters.ts",
+        "sha256": "3d7b2dfd32a35e496934ce44e9b2d9ec87f7fd98faa2431cbf3461f5ca94e5ee"
+      }
+    ]
+  }
+}

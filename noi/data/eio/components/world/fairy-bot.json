@@ -1,0 +1,39 @@
+{
+  "path": "noi.eio.components.world.fairy-bot",
+  "name": "The Fairy Bot",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The Fairy Bot, a character of the old No Origins project, made with Meshy.ai: its model, its look and its wings, as small copies.",
+    "responsibility": "Be the one the fairy bot every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Be a person in the 3D world.",
+    "states": {
+      "clips": {
+        "walking": "walking",
+        "running": "running"
+      }
+    },
+    "reads": [],
+    "uses": [],
+    "files": [
+      {
+        "path": "assets/characters/fairy-bot/fairy-bot.glb",
+        "sha256": "cd8bc72aa4708f49e6c9812cca0af199c4df9b7385aa0b5727631ffdf77c30cb"
+      },
+      {
+        "path": "assets/characters/fairy-bot/fairy-bot.jpg",
+        "sha256": "3b93f1dbe490cc787e75547a05b6bc3b4d8e20c45aba75972f97c80ab2a75fb5"
+      },
+      {
+        "path": "assets/characters/fairy-bot/wings.glb",
+        "sha256": "717913bcf39131f0767f44107ab476113c363d0e7f735fac703200573392c9de"
+      }
+    ]
+  }
+}

@@ -3,7 +3,7 @@
 //! whose contrast was checked. The output is deterministic: the same merons give the same files.
 use crate::{Case, FontSpec, Oklch, RoleSpec, StyleSpec};
 use serde_json::{json, Map, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const PREFIX: &str = "noi.eio.";
 
@@ -12,6 +12,46 @@ pub struct TokenSource<'a> {
     pub path: &'a str,
     pub subtype: &'a str,
     pub spec: &'a Value,
+    /// Deprecated in Mero: it stays in every file, marked, so what reads it keeps working while it
+    /// moves off (18 Nov). A retired value is not given at all.
+    pub deprecated: bool,
+}
+
+/// What a deprecated value says, in each file that can say it.
+const DEPRECATED: &str = "deprecated in Mero: move off it before it retires";
+
+/// tokens.ts is the JSON tree as a TypeScript object; each deprecated value's property gets its
+/// own `@deprecated` line, so editors strike it through where code reads it. Reads the pretty
+/// JSON line by line, keeping the path of keys it is inside.
+fn mark_deprecated_in_ts(json: &str, deprecated: &BTreeSet<String>) -> String {
+    if deprecated.is_empty() {
+        return json.to_string();
+    }
+    let mut out = vec![];
+    let mut inside: Vec<String> = vec![];
+    for line in json.lines() {
+        let t = line.trim_start();
+        if t.starts_with('}') || t.starts_with(']') {
+            inside.pop();
+        }
+        if let Some(rest) = t.strip_prefix('"') {
+            if let Some((name, after)) = rest.split_once("\": ") {
+                let mut here = inside.clone();
+                here.push(name.to_string());
+                if deprecated.contains(&here.join(".")) {
+                    let pad = &line[..line.len() - t.len()];
+                    out.push(format!("{pad}/** @deprecated Move off it before it retires: it is deprecated in Mero. */"));
+                }
+                if after.ends_with('{') || after.ends_with('[') {
+                    inside.push(name.to_string());
+                }
+            }
+        } else if (t == "{" || t == "[") && !out.is_empty() {
+            inside.push(String::new());
+        }
+        out.push(line.to_string());
+    }
+    out.join("\n")
 }
 
 /// The generated package files.
@@ -65,7 +105,8 @@ fn insert(tree: &mut Map<String, Value>, path: &str, value: Value) {
 /// Roles become CSS variables in both themes; palette colors are only in the typed object, so
 /// components cannot reach past a role to a palette color. Window classes become media queries that
 /// switch the `--eio-window-*` variables. Motion durations and curves become variables, and every
-/// duration drops to 0 when the system asks for reduced motion.
+/// duration drops to 0 when the system asks for reduced motion. The 3D world's lengths, times and
+/// speeds are only in the typed object and the JSON.
 pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     let mut sources: Vec<&TokenSource> = sources.iter().collect();
     sources.sort_by_key(|s| s.path);
@@ -91,8 +132,13 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     let (mut root, mut light, mut dark, mut classes) = (vec![], vec![], vec![], vec![]);
     let mut windows: Vec<(u64, &str, u64)> = vec![];
     let mut durations = vec![];
+    let mut deprecated = BTreeSet::new();
     for s in &sources {
         let (path, spec) = (s.path, s.spec);
+        let marks = (root.len(), light.len(), dark.len(), classes.len());
+        if s.deprecated {
+            deprecated.insert(key(path).to_string());
+        }
         match s.subtype {
             "color" => insert(
                 &mut tree,
@@ -235,8 +281,36 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
                     }),
                 );
             }
+            // The 3D world's values (17 Nov): a length in metres, a time in seconds, a speed in
+            // metres a second. Code that draws in 3D reads them, CSS never does, so they go into
+            // tokens.ts and tokens.json only.
+            "length" | "time" | "speed" => {
+                let field = match s.subtype {
+                    "length" => "m",
+                    "time" => "s",
+                    _ => "m_per_s",
+                };
+                let v = spec[field]
+                    .as_f64()
+                    .ok_or_else(|| format!("{path} has no {field} value"))?;
+                insert(&mut tree, path, num(v));
+            }
             // The system meron and its invariants are not tokens.
             _ => {}
+        }
+        // A deprecated value's lines say so (18 Nov).
+        if s.deprecated {
+            let note = format!(" /* {DEPRECATED} */");
+            for line in root[marks.0..]
+                .iter_mut()
+                .chain(&mut light[marks.1..])
+                .chain(&mut dark[marks.2..])
+            {
+                line.push_str(&note);
+            }
+            for class in &mut classes[marks.3..] {
+                class.insert_str(0, &format!("/* {path}: {DEPRECATED} */\n"));
+            }
         }
     }
 
@@ -289,7 +363,7 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
         )
     };
 
-    const HEAD: &str = "@noi/eio-tokens: Eidos tokens for No Origins apps.\nGenerated by `noi export eio` from the active merons in Mero. Do not edit by hand.";
+    const HEAD: &str = "@noi/eio-tokens: Eidos tokens for No Origins apps.\nGenerated by `noi export eio` from the active merons in Mero (and the deprecated ones, marked). Do not edit by hand.";
     let indent = |lines: &[String]| {
         lines
             .iter()
@@ -308,10 +382,24 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
         classes.join("\n\n"),
     );
     let tree = Value::Object(tree);
-    let json = format!(
-        "{}\n",
-        serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())?
-    );
+    let pretty = serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())?;
+    // tokens.json keeps every value's shape; the deprecated ones are listed beside them.
+    let json = if deprecated.is_empty() {
+        format!("{pretty}\n")
+    } else {
+        let mut listed = tree.clone();
+        listed
+            .as_object_mut()
+            .expect("the tree is an object")
+            .insert(
+                "$deprecated".into(),
+                json!(deprecated.iter().collect::<Vec<_>>()),
+            );
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&listed).map_err(|e| e.to_string())?
+        )
+    };
     let windows = if tree.pointer("/layout/window").is_some() {
         "\nexport type WindowClass = keyof typeof tokens.layout.window\n\n/** The window class for a width in CSS pixels: the widest class whose minimum width fits. */\nexport function windowClass(width: number): WindowClass {\n  const classes = Object.entries(tokens.layout.window) as [WindowClass, { minWidth: number }][]\n  return classes.filter(([, w]) => width >= w.minWidth).sort((a, b) => b[1].minWidth - a[1].minWidth)[0][0]\n}\n"
     } else {
@@ -320,7 +408,7 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     let ts = format!(
         "// {}\n\nexport const tokens = {} as const\n\nexport type Tokens = typeof tokens\n{windows}\nexport default tokens\n",
         HEAD.replace('\n', "\n// "),
-        json.trim_end(),
+        mark_deprecated_in_ts(&pretty, &deprecated),
     );
     Ok(TokenFiles { css, ts, json })
 }
@@ -328,6 +416,76 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_deprecated_value_stays_marked_in_every_file() {
+        let lime = json!({"family":"brand","value":{"colorSpace":"oklch","components":[0.896,0.196,119.552],"hex":"#CEEE38"}});
+        let role = json!({"light":{"ref":"noi.eio.color.palette.lime"},"dark":{"ref":"noi.eio.color.palette.lime"}});
+        let (small, large) = (json!({"px":16}), json!({"px":24}));
+        let source = |path, subtype, spec, deprecated| TokenSource {
+            path,
+            subtype,
+            spec,
+            deprecated,
+        };
+        let files = export_tokens(&[
+            source("noi.eio.color.palette.lime", "color", &lime, false),
+            source("noi.eio.color.action.primary", "color-role", &role, true),
+            source("noi.eio.size.icon.small", "size", &small, true),
+            source("noi.eio.size.icon.large", "size", &large, false),
+        ])
+        .unwrap();
+        let note = "/* deprecated in Mero: move off it before it retires */";
+        assert!(files
+            .css
+            .contains(&format!("  --eio-size-icon-small: 16px; {note}\n")));
+        assert!(
+            files.css.contains("  --eio-size-icon-large: 24px;\n"),
+            "the others say nothing"
+        );
+        assert!(files
+            .css
+            .contains(&format!("  --eio-color-action-primary: #CEEE38; {note}\n")));
+        let tag = "/** @deprecated Move off it before it retires: it is deprecated in Mero. */";
+        assert!(
+            files
+                .ts
+                .contains(&format!("      {tag}\n      \"small\": 16")),
+            "{}",
+            files.ts
+        );
+        assert!(
+            files
+                .ts
+                .contains(&format!("      {tag}\n      \"primary\": {{\n")),
+            "{}",
+            files.ts
+        );
+        assert_eq!(
+            files.ts.matches("@deprecated").count(),
+            2,
+            "a role's own lines are not marked again"
+        );
+        assert!(!files.ts.contains("$deprecated"));
+        let json: Value = serde_json::from_str(&files.json).unwrap();
+        assert_eq!(
+            json["size"]["icon"]["small"],
+            json!(16),
+            "its value keeps its shape"
+        );
+        assert_eq!(
+            json["$deprecated"],
+            json!(["color.action.primary", "size.icon.small"])
+        );
+        // Nothing deprecated: the files are as they always were.
+        let plain =
+            export_tokens(&[source("noi.eio.size.icon.small", "size", &small, false)]).unwrap();
+        assert!(
+            !plain.css.contains("deprecated in Mero")
+                && !plain.ts.contains("@deprecated")
+                && !plain.json.contains("$deprecated")
+        );
+    }
 
     #[test]
     fn exports_roles_in_both_themes_and_styles_as_classes() {
@@ -348,56 +506,67 @@ mod tests {
                 path: "noi.eio.color.palette.lime",
                 subtype: "color",
                 spec: &lime,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.color.palette.white",
                 subtype: "color",
                 spec: &white,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.color.palette.black",
                 subtype: "color",
                 spec: &black,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.color.text.primary",
                 subtype: "color-role",
                 spec: &role,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.color.state.hover",
                 subtype: "color-role",
                 spec: &hover,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.type.font.geist-mono",
                 subtype: "font-family",
                 spec: &font,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.type.size.px12",
                 subtype: "font-size",
                 spec: &size,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.type.style.label",
                 subtype: "text-style",
                 spec: &style,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.radius.button",
                 subtype: "radius",
                 spec: &full,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.space.scale.px24",
                 subtype: "space",
                 spec: &scale,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.space.gap.group",
                 subtype: "space-role",
                 spec: &gap,
+                deprecated: false,
             },
         ];
         let files = export_tokens(&sources).unwrap();
@@ -454,41 +623,49 @@ mod tests {
                 path: "noi.eio.space.scale.px16",
                 subtype: "space",
                 spec: &s16,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.space.scale.px24",
                 subtype: "space",
                 spec: &s24,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.space.margin.compact",
                 subtype: "space-role",
                 spec: &m16,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.space.margin.medium",
                 subtype: "space-role",
                 spec: &m24,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.space.margin.expanded",
                 subtype: "space-role",
                 spec: &m24,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.layout.window.expanded",
                 subtype: "window",
                 spec: &expanded,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.layout.window.compact",
                 subtype: "window",
                 spec: &compact,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.layout.window.medium",
                 subtype: "window",
                 spec: &medium,
+                deprecated: false,
             },
         ];
         let css = export_tokens(&sources).unwrap().css;
@@ -518,16 +695,19 @@ mod tests {
                 path: "noi.eio.motion.duration.ms300",
                 subtype: "duration",
                 spec: &ms300,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.motion.duration.ms100",
                 subtype: "duration",
                 spec: &ms100,
+                deprecated: false,
             },
             TokenSource {
                 path: "noi.eio.motion.easing.standard",
                 subtype: "easing",
                 spec: &standard,
+                deprecated: false,
             },
         ];
         let files = export_tokens(&sources).unwrap();
@@ -543,9 +723,54 @@ mod tests {
         assert!(export_tokens(&[TokenSource {
             path: "noi.eio.motion.easing.bad",
             subtype: "easing",
-            spec: &bad
+            spec: &bad,
+            deprecated: false,
         }])
         .is_err());
+    }
+
+    #[test]
+    fn world_lengths_times_and_speeds_are_typed_values_only() {
+        let (tall, gap, fast) = (json!({"m":56}), json!({"s":0.6}), json!({"m_per_s":1.4}));
+        let sources = [
+            TokenSource {
+                path: "noi.eio.world.arch.height",
+                subtype: "length",
+                spec: &tall,
+                deprecated: false,
+            },
+            TokenSource {
+                path: "noi.eio.world.flight.jump",
+                subtype: "time",
+                spec: &gap,
+                deprecated: false,
+            },
+            TokenSource {
+                path: "noi.eio.world.character.walk",
+                subtype: "speed",
+                spec: &fast,
+                deprecated: false,
+            },
+        ];
+        let files = export_tokens(&sources).unwrap();
+        assert!(
+            !files.css.contains("world"),
+            "no CSS for the 3D world's values"
+        );
+        let tree: Value = serde_json::from_str(&files.json).unwrap();
+        assert_eq!(tree["world"]["arch"]["height"], 56);
+        assert_eq!(tree["world"]["flight"]["jump"], 0.6);
+        assert_eq!(tree["world"]["character"]["walk"], 1.4);
+        assert!(files.ts.contains("\"height\": 56"));
+        let wrong = json!({"px":56});
+        assert!(export_tokens(&[TokenSource {
+            path: "noi.eio.world.arch.height",
+            subtype: "length",
+            spec: &wrong,
+            deprecated: false,
+        }])
+        .err()
+        .is_some_and(|e| e.contains("has no m value")));
     }
 
     #[test]
@@ -555,6 +780,7 @@ mod tests {
             path: "noi.eio.color.text.primary",
             subtype: "color-role",
             spec: &role,
+            deprecated: false,
         }];
         assert!(export_tokens(&sources).is_err());
     }

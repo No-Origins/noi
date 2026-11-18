@@ -13,7 +13,8 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const EXPLORER = process.env.EXPLORER_URL ?? 'http://localhost:3000'
+// Mero's own name (8 Nov); a page of another system is sent on to its name, which the browser follows.
+const EXPLORER = process.env.EXPLORER_URL ?? 'http://mero.no-origins.localhost:3000'
 const MERO = process.env.MERO_URL ?? 'http://127.0.0.1:8787'
 const tokens = JSON.parse(readFileSync(new URL('../../../packages/eio-tokens/tokens.json', import.meta.url), 'utf8'))
 const MINIMUM = tokens.size.target.minimum
@@ -28,7 +29,12 @@ const get = async url => {
   if (!res?.ok) throw new Error(`${url} is not answering: start the explorer and mero launch settings first`)
   return res.json()
 }
-const [registry, reviewState] = await Promise.all([get(`${MERO}/api/registry`), get(`${MERO}/api/review`)])
+// Signed out, Review is closed (9 Nov, step 6): its own page asks to sign in, and its batches are left
+// out; the Merons are open to everyone.
+const [registry, reviewState] = await Promise.all([
+  get(`${MERO}/api/registry`),
+  fetch(`${MERO}/api/review`).then(r => (r.ok ? r.json() : { writable: false, batches: [] })),
+])
 const hrefOf = path => `/merons/${path.split('.').join('/')}`
 const merons = registry.merons.filter(m => m.lifecycle.state !== 'retired').sort((a, b) => a.identity.path.localeCompare(b.identity.path))
 const kinds = new Map()
@@ -42,6 +48,30 @@ const ROUTES = [
   '/merons',
   '/review',
   '/eidos',
+  '/gov',
+  '/at/hiddenstack',
+  '/gov/account/sign-in',
+  '/gov/account/sign-up',
+  '/gov/account/lost',
+  '/gov/account/link#a-link-token',
+  '/gov/account/email#a-link-token',
+  // Hyperbase Studio's pages (15 Nov): a mock, filled with made-up data, so they need no sign-in.
+  '/hyperbase',
+  '/hyperbase/projects',
+  '/hyperbase/projects/new',
+  '/hyperbase/projects/explorer-filters-7',
+  '/hyperbase/orders',
+  '/hyperbase/teams',
+  '/hyperbase/teams/build',
+  '/hyperbase/runs',
+  '/hyperbase/runs/412',
+  '/hyperbase/score',
+  '/hyperbase/space',
+  // What was agreed on 16 Nov: a cap reached, a draft, and the space as its person sees it.
+  '/hyperbase?cap=project',
+  '/hyperbase/projects/new?draft=review-tab',
+  '/hyperbase/projects/calculator?as=person',
+  '/hyperbase/space?as=person',
   ...[...kinds.values()].map(m => hrefOf(m.identity.path)),
   ...(group ? [hrefOf(group)] : []),
   ...(reviewState.writable ? [`${hrefOf([...kinds.values()].find(m => m.lifecycle.state === 'active').identity.path)}?change`] : []),
@@ -53,8 +83,11 @@ function chromePath() {
   if (process.env.CHROME) return process.env.CHROME
   const cache = join(homedir(), 'Library/Caches/ms-playwright')
   const shell = existsSync(cache) && readdirSync(cache).filter(d => d.startsWith('chromium_headless_shell-')).sort().at(-1)
-  const path = shell && join(cache, shell, 'chrome-headless-shell-mac-arm64/chrome-headless-shell')
-  if (!path || !existsSync(path)) throw new Error('No Chrome found: set CHROME to a Chrome or headless shell binary')
+  // Playwright has kept the shell at both of these, depending on its version.
+  const path = shell && ['chrome-headless-shell-mac-arm64/chrome-headless-shell', 'chrome-mac/headless_shell']
+    .map(p => join(cache, shell, p))
+    .find(p => existsSync(p))
+  if (!path) throw new Error('No Chrome found: set CHROME to a Chrome or headless shell binary')
   return path
 }
 

@@ -108,7 +108,8 @@ enabled = true
 # Port to use for the email testing server web interface.
 port = 55324
 # Uncomment to expose additional ports for testing user applications that send emails.
-# smtp_port = 55325
+# Open since 9 Nov: Governance sends its sign-up and lost-passkey emails here (NOI_GOV_MAIL).
+smtp_port = 55325
 # pop3_port = 55326
 # admin_email = "admin@email.com"
 # sender_name = "Admin"

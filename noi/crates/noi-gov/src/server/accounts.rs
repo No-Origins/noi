@@ -2,8 +2,10 @@
 //! made by an owner. Everything else an owner does is asked of Governance like any other action,
 //! with a fresh touch.
 use super::{
-    check_handle, check_scope, record, secret, Credential, Error, Governance, Result, Target,
-    FIRST_PASSKEY_MINUTES, INVITATION_HOURS, MAINTAINER, OWNER, VISITORS,
+    check_email, check_handle, check_scope,
+    decide::{together, Ask, Proof},
+    record, secret, Credential, Error, Governance, Result, Target, FIRST_PASSKEY_MINUTES,
+    INVITATION_HOURS, MAINTAINER, OWNER, VISITORS,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -34,10 +36,39 @@ pub(crate) async fn account_by_handle(
         .ok_or_else(|| Error::NotFound(format!("no account has the handle {handle}")))
 }
 
-/// A new account: its handle is reserved for good, even after the account closes.
+/// A new account: its handle is reserved for good, even after the account closes. A person's
+/// email is checked and kept in lowercase; one account per email.
 #[allow(clippy::too_many_arguments)]
-async fn new_account(
+pub(crate) async fn new_account(
     conn: &mut PgConnection,
+    handle: &str,
+    display_name: &str,
+    kind: &str,
+    state: &str,
+    made_by: Option<Uuid>,
+    email: Option<&str>,
+    agent: Option<(Uuid, &str, &str)>,
+) -> Result<Uuid> {
+    new_account_as(
+        conn,
+        Uuid::new_v4(),
+        handle,
+        display_name,
+        kind,
+        state,
+        made_by,
+        email,
+        agent,
+    )
+    .await
+}
+
+/// As `new_account`, with its ID chosen already: a sign-up's, which its passkey carries (9 Nov).
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn new_account_as(
+    conn: &mut PgConnection,
+    id: Uuid,
+
     handle: &str,
     display_name: &str,
     kind: &str,
@@ -63,7 +94,20 @@ async fn new_account(
             "{handle} is taken, now or before: handles are never reused"
         )));
     }
-    let id = Uuid::new_v4();
+    let email = email.map(check_email).transpose()?;
+    if kind == "person" && email.is_none() {
+        return Err(Error::Invalid("a person's account needs an email".into()));
+    }
+    if let Some(email) = &email {
+        let used: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM gov.accounts WHERE lower(email) = $1)")
+                .bind(email)
+                .fetch_one(&mut *conn)
+                .await?;
+        if used {
+            return Err(Error::Invalid("that email has an account already".into()));
+        }
+    }
     let (sponsor, purpose, vouched_by) = match agent {
         Some((s, p, v)) => (Some(s), Some(p), Some(v)),
         None => (None, None, None),
@@ -93,7 +137,7 @@ async fn new_account(
 }
 
 /// A grant of a role Governance holds as active; deprecated roles get no new grants.
-async fn add_grant(
+pub(crate) async fn add_grant(
     conn: &mut PgConnection,
     account: Uuid,
     spec: &GrantSpec,
@@ -139,10 +183,24 @@ async fn add_grant(
     Ok(id)
 }
 
+/// The app's pages Governance's emails and links point at, under gov's own name (under /account
+/// since 9 Nov).
+pub(crate) const SIGN_IN_PAGE: &str = "account/sign-in";
+const LINK_PAGE: &str = "account/link";
+
+/// A one-time link's address: the app's Add your passkey page, with the token after `#`, which a
+/// browser never sends, so no server's log sees it.
+pub(crate) fn link_url(pages: &url::Url, token: &str) -> String {
+    pages
+        .join(&format!("{LINK_PAGE}#{token}"))
+        .expect("a link path")
+        .to_string()
+}
+
 /// A one-time link: what it is for, whose it is, how long it lasts.
 pub(crate) async fn new_link(
     conn: &mut PgConnection,
-    origin: &url::Url,
+    pages: &url::Url,
     purpose: &str,
     account: Uuid,
     by: Option<Uuid>,
@@ -159,16 +217,13 @@ pub(crate) async fn new_link(
     .bind(minutes as i32)
     .execute(&mut *conn)
     .await?;
-    Ok(origin
-        .join(&format!("link/{token}"))
-        .expect("a link path")
-        .to_string())
+    Ok(link_url(pages, &token))
 }
 
 impl Governance {
     /// The first owner: an account, Maintainer and Owner in all of NOI, and a link for the first
     /// passkey. Refused once anyone holds Owner.
-    pub async fn setup(&self, handle: &str, display_name: &str) -> Result<Setup> {
+    pub async fn setup(&self, handle: &str, display_name: &str, email: &str) -> Result<Setup> {
         let mut tx = self.write().await?;
         let owners: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM gov.grants WHERE role = $1 AND ended_at IS NULL",
@@ -188,7 +243,7 @@ impl Governance {
             "person",
             "invited",
             None,
-            None,
+            Some(email),
             None,
         )
         .await?;
@@ -212,7 +267,7 @@ impl Governance {
         }
         let link = new_link(
             tx.as_mut(),
-            &self.config.origin,
+            &self.config.pages,
             "first-passkey",
             account,
             None,
@@ -254,7 +309,7 @@ impl Governance {
         }
         let link = new_link(
             tx.as_mut(),
-            &self.config.origin,
+            &self.config.pages,
             "first-passkey",
             account,
             None,
@@ -276,36 +331,117 @@ impl Governance {
         Ok(link)
     }
 
-    /// Asks "may they?" for an owner action on one target, with the touch they made for it.
-    async fn owner_may(
-        &self,
-        credential: &Credential,
-        action: &str,
-        target: Target,
-        touch: Option<Uuid>,
-    ) -> Result<Uuid> {
-        let answer = self.may(credential, action, &[target], touch).await?;
-        match (answer.allowed, answer.account) {
-            (true, Some(by)) => Ok(by),
-            _ => Err(Error::Refused(answer.reason)),
+    /// A link for another passkey, for an account that has one already: such as a passkey for a
+    /// new name, since a passkey belongs to one (agreed 8 Nov). Only this Mac's command line makes
+    /// it, and the record keeps it.
+    pub async fn another_passkey_link(&self, handle: &str) -> Result<String> {
+        let mut tx = self.write().await?;
+        let (account, kind, state) = account_by_handle(tx.as_mut(), handle).await?;
+        if kind != "person" || state != "active" {
+            return Err(Error::Refused(format!("{handle} cannot add a passkey")));
         }
+        let has: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM gov.passkeys WHERE account = $1 AND removed_at IS NULL)",
+        )
+        .bind(account)
+        .fetch_one(tx.as_mut())
+        .await?;
+        if !has {
+            return Err(Error::Refused(format!(
+                "{handle} has no passkey yet: make a link for the first one"
+            )));
+        }
+        let link = new_link(
+            tx.as_mut(),
+            &self.config.pages,
+            "another-passkey",
+            account,
+            None,
+            FIRST_PASSKEY_MINUTES,
+        )
+        .await?;
+        record(
+            tx.as_mut(),
+            "another-passkey-link",
+            Some(account),
+            None,
+            &[],
+            true,
+            "a link for another passkey, from this Mac's command line",
+            json!({ "domain": self.config.domain }),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(link)
     }
 
-    /// Invites a person: a handle, a display name and first grants. They make their own passkey from
-    /// a link that works once, for 24 hours.
+    /// A person's email, set from this Mac's command line: how the first owner gets theirs (agreed
+    /// 8 Nov). The record keeps that it was set, never the address.
+    pub async fn set_email(&self, handle: &str, email: &str) -> Result<()> {
+        let email = check_email(email)?;
+        let mut tx = self.write().await?;
+        let (account, kind, _) = account_by_handle(tx.as_mut(), handle).await?;
+        if kind != "person" {
+            return Err(Error::Invalid(format!(
+                "{handle} is not a person: only people have an email"
+            )));
+        }
+        let used: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM gov.accounts WHERE lower(email) = $1 AND id <> $2)",
+        )
+        .bind(&email)
+        .bind(account)
+        .fetch_one(tx.as_mut())
+        .await?;
+        if used {
+            return Err(Error::Invalid(
+                "that email belongs to another account".into(),
+            ));
+        }
+        sqlx::query("UPDATE gov.accounts SET email = $2 WHERE id = $1")
+            .bind(account)
+            .bind(&email)
+            .execute(tx.as_mut())
+            .await?;
+        record(
+            tx.as_mut(),
+            "email-set",
+            Some(account),
+            None,
+            &[],
+            true,
+            "email set from this Mac's command line",
+            json!({}),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Invites a person: a handle, a display name and first grants, each of which the inviter must
+    /// be allowed to grant there. They make their own passkey from a link that works once, for 24
+    /// hours.
     pub async fn invite(
         &self,
         credential: &Credential,
         touch: Option<Uuid>,
         handle: &str,
         display_name: &str,
-        email: Option<&str>,
+        email: &str,
         grants: &[GrantSpec],
     ) -> Result<String> {
-        let by = self
-            .owner_may(credential, "invite", Target::Path("noi".into()), touch)
-            .await?;
-        let mut tx = self.write().await?;
+        // Each role it gives is asked for too, in its place, with the same touch: inviting alone
+        // must not hand out roles one may not grant (architecture review, 9 Nov). The touch names
+        // the invitee and the roles (step 7), and it is all decided where it is written.
+        let then: Vec<(&str, Vec<Target>)> = grants
+            .iter()
+            .map(|g| ("grant", vec![Target::Path(g.scope.clone())]))
+            .collect();
+        let about = invite_about(handle, grants);
+        let noi = [Target::Path("noi".into())];
+        let asks = together(("invite", &noi), Some(&about), touch, &then);
+        let tx = self.write().await?;
+        let (mut tx, by) = self.decide_in(tx, credential, &asks).await?;
         let account = new_account(
             tx.as_mut(),
             handle,
@@ -313,7 +449,7 @@ impl Governance {
             "person",
             "invited",
             Some(by),
-            email,
+            Some(email),
             None,
         )
         .await?;
@@ -322,7 +458,7 @@ impl Governance {
         }
         let link = new_link(
             tx.as_mut(),
-            &self.config.origin,
+            &self.config.pages,
             "invitation",
             account,
             Some(by),
@@ -356,10 +492,21 @@ impl Governance {
         sponsor: &str,
         vouched_by: &str,
     ) -> Result<Uuid> {
-        let by = self
-            .owner_may(credential, "add-agent", Target::Path("noi".into()), touch)
+        let about = json!({ "handle": handle });
+        let noi = [Target::Path("noi".into())];
+        let tx = self.write().await?;
+        let (mut tx, by) = self
+            .decide_in(
+                tx,
+                credential,
+                &[Ask::new(
+                    "add-agent",
+                    &noi,
+                    Some(&about),
+                    touch.map(Proof::Touch),
+                )],
+            )
             .await?;
-        let mut tx = self.write().await?;
         let (sponsor_id, kind, state) = account_by_handle(tx.as_mut(), sponsor).await?;
         if kind != "person" || state != "active" {
             return Err(Error::Invalid(format!(
@@ -419,10 +566,22 @@ impl Governance {
                 "visitors may be granted reading, and nothing more".into(),
             ));
         }
-        let by = self
-            .owner_may(credential, "grant", Target::Account(account), touch)
+        // The touch names the role and the place (step 7), decided where it is written.
+        let about = grant_about(spec);
+        let whom = [Target::Account(account)];
+        let tx = self.write().await?;
+        let (mut tx, by) = self
+            .decide_in(
+                tx,
+                credential,
+                &[Ask::new(
+                    "grant",
+                    &whom,
+                    Some(&about),
+                    touch.map(Proof::Touch),
+                )],
+            )
             .await?;
-        let mut tx = self.write().await?;
         let id = add_grant(tx.as_mut(), account, spec, Some(by)).await?;
         record(
             tx.as_mut(),
@@ -452,10 +611,39 @@ impl Governance {
                 .fetch_optional(&self.pool)
                 .await?
                 .ok_or_else(|| Error::NotFound(format!("no live grant {grant}")))?;
-        let by = self
-            .owner_may(credential, "end-grant", Target::Account(account), touch)
+        let about = json!({ "grant": grant });
+        let whom = [Target::Account(account)];
+        let tx = self.write().await?;
+        let (mut tx, by) = self
+            .decide_in(
+                tx,
+                credential,
+                &[Ask::new(
+                    "end-grant",
+                    &whom,
+                    Some(&about),
+                    touch.map(Proof::Touch),
+                )],
+            )
             .await?;
-        let mut tx = self.write().await?;
+        // Someone must always be able to change access: the last Owner in all of noi stays (10 Nov).
+        // Refused here, the decision above is undone with it, so the touch is not spent.
+        let last_owner: bool = sqlx::query_scalar(
+            "SELECT g.role = $2 AND g.scope = 'noi' AND NOT EXISTS (
+                 SELECT 1 FROM gov.grants o JOIN gov.accounts a ON a.id = o.account
+                 WHERE o.id <> g.id AND o.role = $2 AND o.scope = 'noi' AND o.ended_at IS NULL
+                   AND a.kind = 'person' AND a.state = 'active')
+             FROM gov.grants g WHERE g.id = $1",
+        )
+        .bind(grant)
+        .bind(OWNER)
+        .fetch_one(tx.as_mut())
+        .await?;
+        if last_owner {
+            return Err(Error::Refused(
+                "this is the last owner: give Owner to someone else first".into(),
+            ));
+        }
         sqlx::query("UPDATE gov.grants SET ended_at = now(), ended_by = $2, end_reason = 'ended by an owner' WHERE id = $1 AND ended_at IS NULL")
             .bind(grant)
             .bind(by)
@@ -487,10 +675,20 @@ impl Governance {
             let mut conn = self.pool.acquire().await?;
             account_by_handle(&mut conn, handle).await?.0
         };
-        let by = self
-            .owner_may(credential, "end-session", Target::Account(account), touch)
+        let whom = [Target::Account(account)];
+        let tx = self.write().await?;
+        let (mut tx, by) = self
+            .decide_in(
+                tx,
+                credential,
+                &[Ask::new(
+                    "end-session",
+                    &whom,
+                    None,
+                    touch.map(Proof::Touch),
+                )],
+            )
             .await?;
-        let mut tx = self.write().await?;
         let sessions = sqlx::query("UPDATE gov.sessions SET ended_at = now(), ended_by = $2 WHERE account = $1 AND ended_at IS NULL")
             .bind(account)
             .bind(by)
@@ -537,7 +735,9 @@ impl Governance {
         }))
     }
 
-    /// Whether a role grants only reading: visitors may hold nothing else.
+    /// Whether a role grants only reading: visitors may hold nothing else. Reading Review counts as
+    /// reading (9 Nov, step 6: Observer holds both); signed out, rule 5 still refuses it at every
+    /// request, so visitors who hold Observer read merons only.
     async fn reading_only(&self, role: &str) -> Result<bool> {
         let cedar: Option<String> =
             sqlx::query_scalar("SELECT cedar FROM gov.policies WHERE path = $1 AND kind = 'role'")
@@ -553,6 +753,24 @@ impl Governance {
             cedar_policy::ActionConstraint::In(list) => list,
             cedar_policy::ActionConstraint::Any => return Ok(false),
         };
-        Ok(!named.is_empty() && named.iter().all(|a| a.id().unescaped() == "read"))
+        Ok(!named.is_empty()
+            && named
+                .iter()
+                .all(|a| matches!(a.id().unescaped(), "read" | "read-review")))
     }
+}
+
+/// What a touch for giving a role names beyond the account (9 Nov, step 7): the role and the place.
+pub fn grant_about(spec: &GrantSpec) -> Value {
+    json!({ "role": spec.role, "scope": spec.scope })
+}
+
+/// What a touch for an invite names (9 Nov, step 7): the handle, and each role and place it gives.
+pub fn invite_about(handle: &str, grants: &[GrantSpec]) -> Value {
+    let mut roles: Vec<String> = grants
+        .iter()
+        .map(|g| format!("{}@{}", g.role, g.scope))
+        .collect();
+    roles.sort();
+    json!({ "handle": handle, "roles": roles })
 }

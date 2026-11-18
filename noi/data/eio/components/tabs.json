@@ -1,0 +1,58 @@
+{
+  "path": "noi.eio.components.tabs",
+  "name": "Tabs",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A row of pill tabs, each a real link, so it opens in a new tab and works without scripts.",
+    "responsibility": "Be the one tabs every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Move between an app’s main views.",
+    "states": {
+      "state": {
+        "other": "another view",
+        "selected": "the view on screen now, filled with the primary action colour"
+      },
+      "interaction": {
+        "hover": "hovered",
+        "focus": "focused, with the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.action.on-primary",
+      "noi.eio.color.action.primary",
+      "noi.eio.color.border.default",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.state.hover",
+      "noi.eio.color.text.primary",
+      "noi.eio.motion.duration.ms100",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.radius.button",
+      "noi.eio.size.control.default",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.label"
+    ],
+    "uses": [
+      "noi.eio.components.badge"
+    ],
+    "files": [
+      {
+        "path": "src/Tabs/Tabs.module.css",
+        "sha256": "5e362191f24c40947e414dec1391a0782826f05739333d3c5d297b7399a9b7f7"
+      },
+      {
+        "path": "src/Tabs/Tabs.tsx",
+        "sha256": "a5156d1bf73971913a7d9d6b343ad105598b0be9dd22e72aa0f1f44c8558a0c2"
+      }
+    ]
+  }
+}

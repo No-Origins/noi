@@ -23,16 +23,20 @@ const PLURAL: Record<string, string> = {
   color: 'palette colors', 'color-role': 'color roles', 'font-family': 'fonts', 'font-size': 'font sizes',
   'text-style': 'text styles', space: 'spacing steps', 'space-role': 'spacing roles', size: 'sizes',
   radius: 'corners', 'border-width': 'border widths', window: 'windows', invariant: 'invariants', system: 'systems',
+  length: 'lengths', time: 'times', speed: 'speeds',
+  component: 'components', 'shared-part': 'shared parts', package: 'for a package’s own files',
 }
-const kindOf = (m: Meron) => m.classification.subtype && m.classification.type === 'token' ? m.classification.subtype : m.classification.type
+const kindOf = (m: Meron) =>
+  m.classification.type === 'component' ? m.spec?.part ?? 'component'
+    : m.classification.subtype && m.classification.type === 'token' ? m.classification.subtype : m.classification.type
 
 /** A small picture of a meron's value, for cards: bars for spacing, boxes for sizes and corners. */
 function Mini({ idx, m }: { idx: Index; m: Meron }) {
   const sub = m.classification.subtype
   const px = sub === 'space-role' ? idx.byPath.get(m.spec.ref)?.spec.px : m.spec?.px
   if (sub === 'space' || sub === 'space-role') return <i className={styles.miniBar} style={{ width: px }} aria-hidden />
-  if (sub === 'size') return <i className={styles.miniBox} style={{ width: Math.min(px, 40), height: Math.min(px, 40) }} aria-hidden />
-  if (sub === 'radius') return <i className={styles.miniCorner} style={{ borderRadius: m.spec.full ? 9999 : m.spec.px }} aria-hidden />
+  if (sub === 'size') return <i className={styles.miniBox} style={{ width: px, height: px }} aria-hidden />
+  if (sub === 'radius') return <i className={cx(styles.miniCorner, m.spec.full && styles.round)} style={m.spec.full ? undefined : { borderRadius: m.spec.px }} aria-hidden />
   if (sub === 'border-width') return <i className={styles.miniLine} style={{ height: px }} aria-hidden />
   return null
 }
@@ -76,6 +80,7 @@ export function KindView({ s, idx, nodes, m }: { s: Snapshot; idx: Index; nodes:
   if (m.classification.type === 'system') return <ChildCards idx={idx} nodes={nodes} parent={m.identity.path} />
   if (m.classification.type === 'invariant') return <InvariantView s={s} idx={idx} m={m} />
   if (m.classification.type === 'rule' && typeof m.spec?.cedar === 'string') return <CedarView s={s} m={m} />
+  if (m.classification.type === 'component') return <ComponentView s={s} idx={idx} nodes={nodes} m={m} />
   switch (m.classification.subtype) {
     case 'color': return <ColorView m={m} />
     case 'color-role': return <ColorRoleView s={s} idx={idx} m={m} />
@@ -90,6 +95,9 @@ export function KindView({ s, idx, nodes, m }: { s: Snapshot; idx: Index; nodes:
     case 'window': return <WindowView m={m} />
     case 'duration': return <DurationView m={m} />
     case 'easing': return <EasingView m={m} />
+    case 'length': return <LengthView m={m} />
+    case 'time': return <TimeView m={m} />
+    case 'speed': return <SpeedView m={m} />
     // Kinds without a view yet still show their record and spec below.
     default: return null
   }
@@ -311,7 +319,7 @@ export function SizeView({ m }: { m: Meron }) {
 export function RadiusView({ m }: { m: Meron }) {
   return (
     <>
-      <div className={styles.stage}><i className={styles.corner} style={{ borderRadius: m.spec.full ? 9999 : m.spec.px }} aria-hidden /></div>
+      <div className={styles.stage}><i className={cx(styles.corner, m.spec.full && styles.round)} style={m.spec.full ? undefined : { borderRadius: m.spec.px }} aria-hidden /></div>
       <Facts items={[['Corner', m.spec.full ? 'Full' : `${m.spec.px} px`, m.spec.full ? 'Round ends: a pill' : undefined]]} />
     </>
   )
@@ -368,6 +376,52 @@ export function EasingView({ m }: { m: Meron }) {
       </div>
       <Facts items={[['Curve', `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})`, 'Starts quickly, settles gently'], ['Overshoot', 'None', 'It stays between its start and its end']]} />
     </>
+  )
+}
+
+// ——— The 3D world: lengths in metres, times in seconds, speeds in metres a second (17 Nov) ———
+
+const PERSON_M = 1.8
+const plain = (x: number) => x.toLocaleString('en-GB', { maximumFractionDigits: 2 })
+
+/** A length beside a person 6 feet tall, both drawn to the scale of the longer one. */
+export function LengthView({ m }: { m: Meron }) {
+  const metres = m.spec.m as number
+  const most = Math.max(metres, PERSON_M)
+  const times = metres / PERSON_M
+  return (
+    <>
+      <div className={cx(styles.stage, styles.lengths)}>
+        <i className={styles.bar} style={{ width: `${(metres / most) * 100}%` }} aria-hidden />
+        <i className={cx(styles.bar, styles.barPerson)} style={{ width: `${(PERSON_M / most) * 100}%` }} aria-hidden />
+      </div>
+      <Facts items={[
+        ['Length', `${plain(metres)} m`, 'Lime: this length. Grey: a person 6 feet tall, 1.8 m'],
+        ['Beside a person', times >= 1 ? `${plain(times)} times as long` : `${plain(times * 100)}% as long`, 'One tile of the world is one metre'],
+      ]} />
+    </>
+  )
+}
+
+export function TimeView({ m }: { m: Meron }) {
+  const s = m.spec.s as number
+  return (
+    <>
+      <div className={styles.stage}>
+        <MotionSample seconds={s} />
+      </div>
+      <Facts items={[['Time', `${plain(s)} s`, 'A time in the 3D world. A control’s motion is a duration, 50 to 300 ms'], ['Reduced motion', '0 s', 'With the system setting on, the sample does not move']]} />
+    </>
+  )
+}
+
+export function SpeedView({ m }: { m: Meron }) {
+  const v = m.spec.m_per_s as number
+  return (
+    <Facts items={[
+      ['Speed', `${plain(v)} m/s`, `About ${plain(Math.round(v * 3.6))} km an hour`],
+      ['Across 100 metres', `${plain(100 / v)} s`, 'How long it takes at this speed'],
+    ]} />
   )
 }
 
@@ -445,5 +499,150 @@ export function InvariantView({ s, idx, m }: { s: Snapshot; idx: Index; m: Meron
         </ul>
       </Card>
     </div>
+  )
+}
+
+// ——— Components (Components in Mero, agreed 17 Nov) ———
+
+interface ComponentSpec {
+  package: string
+  part: 'component' | 'shared-part' | 'package'
+  job: string
+  /** By key, in groups of what varies (agreed 18 Nov). The first shape, a list of sentences, was dropped
+   * from the rule on 18 Nov; it is still shown here because older revisions and past batches hold it. */
+  states: string[] | Record<string, Record<string, string>>
+  reads: string[]
+  uses: string[]
+  files: { path: string; sha256: string }[]
+}
+
+const PART: Record<ComponentSpec['part'], [string, string]> = {
+  component: ['Component', 'one component'],
+  'shared-part': ['Shared part', 'a part several components share'],
+  package: ['Package files', 'the files that belong to no one component'],
+}
+
+// Where a 3D element of @noi/eio-3d is drawn: the page of its values in the 3D world.
+const DRAWN: Record<string, string> = {
+  arch: 'arch', land: 'land', pool: 'pool', steps: 'steps', gateway: 'gateway',
+  clay: 'character', mannequin: 'character', 'fairy-bot': 'character', 'character-drawing': 'character',
+}
+
+/** A component's meron: its contract and the fingerprints of its files. The code is in git. */
+export function ComponentView({ s, idx, nodes, m }: { s: Snapshot; idx: Index; nodes: TreeNode[]; m: Meron }) {
+  const c = m.spec as ComponentSpec
+  const usedBy = s.merons.filter(x => x.classification.type === 'component' && (x.spec?.uses ?? []).includes(m.identity.path))
+  // The values it reads, by kind: colour roles, spacing roles, text styles…
+  const groups = new Map<string, string[]>()
+  for (const p of c.reads) {
+    const v = idx.byPath.get(p)
+    const kind = v?.classification.subtype ?? 'missing'
+    groups.set(kind, [...(groups.get(kind) ?? []), p])
+  }
+  const seg = m.identity.path.split('.').pop()!
+  const drawn = m.identity.path.startsWith('noi.eio.components.world.') && DRAWN[seg]
+    ? nodes.find(n => n.path === `noi.eio.world.${DRAWN[seg]}`)
+    : undefined
+  const chip = (p: string) => {
+    const x = idx.byPath.get(p)
+    return x
+      ? <MeronChip key={p} idx={idx} m={x} />
+      : <code key={p} className={cx(styles.muted, 'eio-type-style-mono')}>{p} (not in Mero)</code>
+  }
+  return (
+    <>
+      <Facts
+        small
+        items={[
+          ['What it is', PART[c.part][0], `In ${c.package}: ${PART[c.part][1]}`],
+          ['Files', String(c.files.length), 'Their fingerprints are here; the code is in git'],
+          ['Reads', String(c.reads.length), c.reads.length === 1 ? 'Eidos value' : 'Eidos values'],
+          ['Uses', String(c.uses.length), c.uses.length === 1 ? 'other component' : 'other components'],
+        ]}
+      />
+      <Section title="What it is for">
+        <p className="eio-type-style-body">{c.job}</p>
+        {drawn && (
+          <p className={cx(styles.muted, 'eio-type-style-body')}>
+            See it drawn on <Link className={styles.inline} href={hrefOf(drawn.path)}>{drawn.name}</Link>, in the 3D world.
+          </p>
+        )}
+      </Section>
+      {Array.isArray(c.states) && c.states.length > 0 && (
+        <Section title={`States it shows · ${c.states.length}`}>
+          <ul className={cx(styles.sentences, 'eio-type-style-body')}>{c.states.map(t => <li key={t}>{t}</li>)}</ul>
+        </Section>
+      )}
+      {!Array.isArray(c.states) && Object.keys(c.states).length > 0 && (
+        <Section title={`States it shows · ${Object.values(c.states).reduce((n, g) => n + Object.keys(g).length, 0)}`}>
+          <p className={cx(styles.muted, 'eio-type-style-caption')}>
+            By key, as its code names them: Mero writes them as types the code must use, so a key the code lacks, or one you never approved, fails the build. What happens to it is checked in its style file.
+          </p>
+          <dl className={styles.connections}>
+            {Object.entries(c.states).map(([group, keys]) => (
+              <div key={group} className={styles.connRow}>
+                <dt className={cx(styles.muted, 'eio-type-style-label')}>{group === 'interaction' ? 'What happens to it' : title(group)}</dt>
+                <dd>
+                  <ul className={styles.fields}>
+                    {Object.entries(keys).map(([key, words]) => (
+                      <li key={key} className={styles.fieldRow}>
+                        <code className="eio-type-style-mono">{key}</code>
+                        <span className="eio-type-style-body">{words}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      )}
+      {c.reads.length > 0 && (
+        <Section title={`Eidos values it reads · ${c.reads.length}`}>
+          <p className={cx(styles.muted, 'eio-type-style-caption')}>
+            Mero links the component to each of these, so a value in use can’t be retired, and a change to one lists this component.
+          </p>
+          <dl className={styles.connections}>
+            {[...groups].map(([kind, paths]) => (
+              <div key={kind} className={styles.connRow}>
+                <dt className={cx(styles.muted, 'eio-type-style-label')}>{kind === 'missing' ? 'Not in Mero' : title(PLURAL[kind] ?? kind)}</dt>
+                <dd className={styles.chips}>{paths.map(chip)}</dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      )}
+      {(c.uses.length > 0 || usedBy.length > 0) && (
+        <Section title="Other components">
+          <dl className={styles.connections}>
+            {c.uses.length > 0 && (
+              <div className={styles.connRow}>
+                <dt className={cx(styles.muted, 'eio-type-style-label')}>It uses</dt>
+                <dd className={styles.chips}>{c.uses.map(chip)}</dd>
+              </div>
+            )}
+            {usedBy.length > 0 && (
+              <div className={styles.connRow}>
+                <dt className={cx(styles.muted, 'eio-type-style-label')}>Used by</dt>
+                <dd className={styles.chips}>{usedBy.map(x => <MeronChip key={x.identity.uid} idx={idx} m={x} />)}</dd>
+              </div>
+            )}
+          </dl>
+        </Section>
+      )}
+      <Section title={`Its files · ${c.files.length}`}>
+        <p className={cx(styles.muted, 'eio-type-style-caption')}>
+          Each with its fingerprint: a SHA-256 of the file, which changes if one byte of it does. Mero keeps the fingerprint of the version you approved, never the code.
+        </p>
+        <ul className={styles.fields}>
+          {c.files.map(f => (
+            <li key={f.path} className={styles.fieldRow}>
+              <code className="eio-type-style-mono">{f.path}</code>
+              <span className={cx(styles.muted, 'eio-type-style-mono')} title={f.sha256}>{f.sha256.slice(0, 16)}…</span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </>
   )
 }

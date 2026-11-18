@@ -1,0 +1,73 @@
+/* Governance's sign-in pages: one card in the reading width. They place Eidos components and
+   never draw them. */
+.page {
+  max-width: var(--eio-size-width-reading);
+  margin: 0 auto;
+  padding: var(--eio-space-gap-section) var(--eio-window-margin);
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eio-space-gap-inline);
+}
+.muted {
+  color: var(--eio-color-text-muted);
+}
+.below {
+  margin-top: var(--eio-space-gap-group);
+}
+
+/* Governance's home and profiles (9 Nov): sections of cards in the reading width, each line what it
+   is, its facts, and a link at the end. Placed as the Eidos designs place them. */
+.reading {
+  max-width: var(--eio-size-width-reading);
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-section);
+}
+.page.reading {
+  margin: 0 auto;
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+/* On a phone a line's words take the whole width and its end drops below. */
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--eio-space-gap-stack);
+  padding: var(--eio-space-gap-stack) 0;
+  border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
+}
+.line:first-of-type {
+  border-top: 0;
+}
+.lineText {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: 0;
+  flex: 1 1 calc(var(--eio-size-width-reading) / 3);
+}
+.lineEnd {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+.mono {
+  overflow-wrap: anywhere;
+}

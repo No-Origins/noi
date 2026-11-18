@@ -285,6 +285,199 @@ fn eio_motion_passes_its_invariants() {
 }
 
 #[test]
+fn eio_world_kinds_take_the_worlds_numbers() {
+    // The 3D world's three kinds (17 Nov): a length in metres, a time in seconds, a speed in metres
+    // a second. Every number below is one the world page uses today.
+    let length = invariant("length-invariant.json");
+    let time = invariant("time-invariant.json");
+    let speed = invariant("speed-invariant.json");
+    for m in [
+        56.0, 40.0, 4.0, 0.35, 1.6, 0.3, 0.6, 1.8, 41.44, 112.0, 256.0, 2400.0,
+    ] {
+        length
+            .check(&json!({ "m": m }))
+            .unwrap_or_else(|e| panic!("{m} m: {e}"));
+    }
+    for s in [0.6, 0.8, 1.0, 1.6, 4.0, 10.0, 0.12] {
+        time.check(&json!({ "s": s }))
+            .unwrap_or_else(|e| panic!("{s} s: {e}"));
+    }
+    for v in [1.4, 4.0, 5.0, 45.0, 135.0, 150.0] {
+        speed
+            .check(&json!({ "m_per_s": v }))
+            .unwrap_or_else(|e| panic!("{v} m/s: {e}"));
+    }
+    // What the schemas refuse: nothing, less than nothing, finer than they hold, too much, or
+    // another kind's unit.
+    for bad in [
+        json!({"m": 0}),
+        json!({"m": -1}),
+        json!({"m": 0.005}),
+        json!({"m": 20000}),
+        json!({"px": 4}),
+    ] {
+        assert!(length.check(&bad).is_err(), "{bad}");
+    }
+    for bad in [
+        json!({"s": 0}),
+        json!({"s": 0.004}),
+        json!({"s": 700}),
+        json!({"ms": 300}),
+    ] {
+        assert!(time.check(&bad).is_err(), "{bad}");
+    }
+    for bad in [
+        json!({"m_per_s": 0}),
+        json!({"m_per_s": 1.25}),
+        json!({"m_per_s": 2000}),
+    ] {
+        assert!(speed.check(&bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn eio_world_values_pass_their_invariants() {
+    // The 3D world's values (17 Nov): two colours of a new family, ten colour roles, and the
+    // numbers that set its look, each under the invariant of its kind.
+    let token = invariant("color-token-invariant.json");
+    let role = invariant("color-role-invariant.json");
+    let mut colors = HashMap::new();
+    let lime: NewMeron = serde_json::from_str(include_str!("../../../data/eio/lime.json")).unwrap();
+    let mut all = data("palette");
+    all.push(lime);
+    let world = data("world/palette");
+    assert_eq!(
+        world.len(),
+        2,
+        "only the water's two blues: the greys are Eidos's own (17 Nov)"
+    );
+    for c in &world {
+        c.validate().unwrap();
+        assert!(token.applies_to.covers(&c.classification), "{}", c.path);
+        token
+            .check(&c.spec)
+            .unwrap_or_else(|e| panic!("{}: {e}", c.path));
+        assert_eq!(c.spec["family"], "world", "{}", c.path);
+        // Mero writes the hex from the OKLCH numbers: it must be the hex the world page uses.
+        let back = Oklch::from_palette_spec(&c.spec).unwrap().hex();
+        assert_eq!(back, c.spec["value"]["hex"].as_str().unwrap(), "{}", c.path);
+    }
+    all.extend(world);
+    for c in &all {
+        token
+            .check(&c.spec)
+            .unwrap_or_else(|e| panic!("{}: {e}", c.path));
+        colors.insert(c.path.clone(), Oklch::from_palette_spec(&c.spec).unwrap());
+    }
+    let roles = data("world/roles");
+    assert_eq!(roles.len(), 10, "no stand-in figure (17 Nov)");
+    let resolved: HashMap<String, Resolved> = colors
+        .iter()
+        .map(|(path, c)| (path.clone(), Resolved::Palette(*c)))
+        .collect();
+    for r in &roles {
+        r.validate().unwrap();
+        assert!(r.path.starts_with("noi.eio.color.world."), "{}", r.path);
+        assert!(role.applies_to.covers(&r.classification), "{}", r.path);
+        role.check(&r.spec)
+            .unwrap_or_else(|e| panic!("{}: {e}", r.path));
+        let (light, dark) = RoleSpec::parse(&r.spec)
+            .unwrap()
+            .colors(&|p| colors.get(p).copied())
+            .unwrap_or_else(|e| panic!("{}: {e}", r.path));
+        assert_eq!(
+            light.hex(),
+            dark.hex(),
+            "the world is dark: one colour in both themes"
+        );
+        noi_eio::check_role(&r.spec, &role.checks[0].params, &|p| {
+            resolved.get(p).copied()
+        })
+        .unwrap_or_else(|e| panic!("{}: {e}", r.path));
+    }
+    let kinds: HashMap<&str, InvariantSpec> = [
+        ("length", invariant("length-invariant.json")),
+        ("time", invariant("time-invariant.json")),
+        ("speed", invariant("speed-invariant.json")),
+    ]
+    .into_iter()
+    .collect();
+    let mut numbers = vec![];
+    for group in [
+        "land",
+        "edge",
+        "circles",
+        "pool",
+        "wall",
+        "steps",
+        "arch",
+        "gateway",
+        "ripples",
+        "character",
+        "movement",
+        "flight",
+        "eye",
+    ] {
+        numbers.extend(data(&format!("world/{group}")));
+    }
+    assert_eq!(numbers.len(), 44);
+    for n in &numbers {
+        n.validate().unwrap();
+        assert!(n.path.starts_with("noi.eio.world."), "{}", n.path);
+        let kind = &kinds[n.classification.subtype.as_deref().unwrap()];
+        assert!(kind.applies_to.covers(&n.classification), "{}", n.path);
+        kind.check(&n.spec)
+            .unwrap_or_else(|e| panic!("{}: {e}", n.path));
+        // Decision 4: a guess says so where people read it.
+        if n.metadata["number"] == "guess" {
+            assert!(n.semantics.definition.contains("guess"), "{}", n.path);
+        }
+    }
+    // Agreed numbers keep their agreed values.
+    let value = |path: &str| {
+        let n = numbers.iter().find(|n| n.path == path).unwrap();
+        n.spec
+            .as_object()
+            .unwrap()
+            .values()
+            .next()
+            .unwrap()
+            .as_f64()
+            .unwrap()
+    };
+    assert_eq!(value("noi.eio.world.circles.radius"), 4.0);
+    assert_eq!(value("noi.eio.world.wall.height"), 0.6);
+    assert_eq!(value("noi.eio.world.arch.thickness"), 4.0);
+    assert_eq!(value("noi.eio.world.ripples.gap"), 1.0);
+    // Your word (17 Nov): one fixed height to fly to, everywhere.
+    assert_eq!(value("noi.eio.world.movement.ceiling"), 100.0);
+    // And they all export: roles as CSS variables, numbers only into the typed tree.
+    let mut merons: Vec<&NewMeron> = all.iter().chain(&roles).chain(&numbers).collect();
+    merons.sort_by(|a, b| a.path.cmp(&b.path));
+    let sources: Vec<TokenSource> = merons
+        .iter()
+        .map(|m| TokenSource {
+            path: &m.path,
+            subtype: m.classification.subtype.as_deref().unwrap_or(""),
+            spec: &m.spec,
+            deprecated: false,
+        })
+        .collect();
+    let files = export_tokens(&sources).unwrap();
+    assert!(files.css.contains("  --eio-color-world-land: #0A0A0A;"));
+    assert!(files.css.contains("  --eio-color-world-water: #1A5F7A;"));
+    assert!(
+        !files.css.contains("--eio-world-"),
+        "no CSS for lengths, times, speeds"
+    );
+    let tree: Value = serde_json::from_str(&files.json).unwrap();
+    assert_eq!(tree["world"]["arch"]["height"], 56);
+    assert_eq!(tree["world"]["arch"]["reach"], 41.44);
+    assert_eq!(tree["world"]["movement"]["walk"], 1.4);
+    assert_eq!(tree["world"].as_object().unwrap().len(), 13);
+}
+
+#[test]
 fn eio_files_export_to_tokens() {
     let mut merons = vec![];
     for dir in [
@@ -312,6 +505,7 @@ fn eio_files_export_to_tokens() {
             path: &m.path,
             subtype: m.classification.subtype.as_deref().unwrap_or(""),
             spec: &m.spec,
+            deprecated: false,
         })
         .collect();
     let files = export_tokens(&sources).unwrap();

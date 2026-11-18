@@ -5,15 +5,21 @@ mod accounts;
 mod copy;
 mod decide;
 pub mod http;
+mod mail;
+mod own;
 mod passkeys;
 mod runs;
+mod sign_up;
 mod views;
 
 pub use crate::{Credential, Target};
-pub use accounts::{GrantSpec, Setup};
+pub use accounts::{grant_about, invite_about, GrantSpec, Setup};
 pub use copy::Copied;
 pub use decide::Answer;
+pub use mail::{Mail, Mailer};
+pub use own::{Change, EMAIL_SENT};
 pub use runs::{new_voucher_key, vouch, Vouch};
+pub use sign_up::SENT;
 pub use views::{device_label, RecordFilter};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -30,18 +36,35 @@ use webauthn_rs::{Webauthn, WebauthnBuilder};
 pub const VISITORS: Uuid = Uuid::from_u128(0x00000000_0000_4000_8000_000000000001);
 /// The cookie a signed-in browser carries. Pages never see it: it is HttpOnly and SameSite strict.
 pub const SESSION_COOKIE: &str = "noi_session";
+/// A session ends after this many hours unused; each use moves the end, up to `SESSION_DAYS` after
+/// signing in (agreed 9 Nov). The cookie lasts that longest time; Governance decides when it ends.
 pub(crate) const SESSION_HOURS: i64 = 12;
+pub(crate) const SESSION_DAYS: i64 = 30;
 pub(crate) const RUN_TOKEN_MINUTES: i64 = 15;
 pub(crate) const TOUCH_SECONDS: i64 = 60;
 pub(crate) const CEREMONY_MINUTES: i64 = 5;
 pub(crate) const FIRST_PASSKEY_MINUTES: i64 = 10;
 pub(crate) const INVITATION_HOURS: i64 = 24;
-/// After this many failed sign-ins and touches in `WAIT_MINUTES`, a person waits that long (agreed 8 Nov).
+/// A link sent by email, to confirm a sign-up or add a passkey when one is lost (agreed 8 Nov).
+pub(crate) const EMAIL_LINK_MINUTES: i64 = 30;
+/// At most this many sign-ups an hour to one email, and from one address (agreed 8 Nov).
+pub const SIGN_UPS_PER_HOUR_TO_AN_EMAIL: i64 = 3;
+pub const SIGN_UPS_PER_HOUR_FROM_AN_ADDRESS: i64 = 5;
+/// At most this many lost-passkey emails an hour to one account.
+pub const LOST_LINKS_PER_HOUR: i64 = 3;
+/// At most this many new emails an hour for one account, each a link sent to it (9 Nov).
+pub const EMAIL_CHANGES_PER_HOUR: i64 = 3;
+/// After this many failed touches in `WAIT_MINUTES`, that person waits that long (agreed 8 Nov). Only
+/// a signed-in person can fail a touch. Failed sign-ins slow down whoever is trying instead, at the
+/// door, so nobody can lock someone else out (agreed 9 Nov, finding 1); see `http`.
 pub const FAILED_TOUCHES: i64 = 5;
+pub const FAILED_SIGN_INS: usize = 5;
 pub const WAIT_MINUTES: i32 = 15;
 /// Role paths the first owner holds.
 pub const MAINTAINER: &str = "noi.gov.roles.maintainer";
 pub const OWNER: &str = "noi.gov.roles.owner";
+/// What everyone who signs up holds, in all of noi: reading, and nothing more (agreed 8 Nov).
+pub const OBSERVER: &str = "noi.gov.roles.observer";
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -63,6 +86,9 @@ pub enum Error {
     /// Too many tries (agreed 8 Nov): the reason says how long to wait.
     #[error("{0}")]
     TooMany(String),
+    /// Email could not be sent. Never names an address.
+    #[error("mail: {0}")]
+    Mail(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 impl From<webauthn_rs::prelude::WebauthnError> for Error {
@@ -71,11 +97,20 @@ impl From<webauthn_rs::prelude::WebauthnError> for Error {
     }
 }
 
-/// Where Governance is reached, which origins may use passkeys, and where Mero is.
+/// Where Governance is reached, where its pages are, and where Mero is.
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Governance's own address, such as http://localhost:8788. Passkeys need a name, not an IP.
+    /// Governance's own address, such as http://localhost:8788. It answers only its API there.
     pub origin: Url,
+    /// Where Governance's pages are: in the one app, on gov's own name, such as
+    /// http://gov.no-origins.localhost:3000/ (agreed 8 Nov). One-time links open there.
+    pub pages: Url,
+    /// The base name every system's pages are under: no-origins.localhost on this Mac,
+    /// no-origins.com hosted (agreed 8 Nov). Passkeys belong to it, so one passkey works on every
+    /// subdomain: signing in on gov, a touch on mero.
+    pub domain: String,
+    /// Where email goes: links to confirm a sign-up and to add a lost passkey.
+    pub mail: Mailer,
     /// Mero's read API, for copying the approved roles and rules.
     pub mero: Option<Url>,
 }
@@ -85,6 +120,8 @@ pub struct Governance {
     pool: PgPool,
     webauthn: Arc<Webauthn>,
     config: Config,
+    /// One copy of the roles and rules at a time, when a question finds the last one stale.
+    copying: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Governance {
@@ -93,7 +130,7 @@ impl Governance {
     pub(crate) async fn not_locked(&self, conn: &mut PgConnection, account: Uuid) -> Result<()> {
         let (failed, wait): (i64, Option<f64>) = sqlx::query_as(
             "SELECT count(*), ceil(extract(epoch FROM max(at) + make_interval(mins => $2) - now()) / 60)::float8
-             FROM gov.record WHERE account = $1 AND kind IN ('sign-in','touch') AND NOT allowed
+             FROM gov.record WHERE account = $1 AND kind = 'touch' AND NOT allowed
              AND at > now() - make_interval(mins => $2)",
         )
         .bind(account)
@@ -143,6 +180,29 @@ impl Governance {
         }
     }
 
+    /// Clears what has expired (agreed 9 Nov, step 7; finding C): unfinished sign-ups and new emails
+    /// after a day, prompts and touches a day after they ended, links a week after, sign-ins a month
+    /// after they ended. Runs every hour, so a quiet site is cleared too. The record keeps what
+    /// happened. Returns how many rows went.
+    pub async fn tidy(&self) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
+        let mut gone = 0;
+        for clear in [
+            "DELETE FROM gov.sign_ups WHERE made_at < now() - interval '1 day'",
+            "DELETE FROM gov.email_changes WHERE made_at < now() - interval '1 day'",
+            "DELETE FROM gov.ceremonies WHERE expires_at < now() - interval '1 day'",
+            "DELETE FROM gov.touches WHERE expires_at < now() - interval '1 day'",
+            "DELETE FROM gov.links l WHERE expires_at < now() - interval '7 days'
+               AND NOT EXISTS (SELECT 1 FROM gov.ceremonies c WHERE c.link = l.token_hash)",
+            "DELETE FROM gov.sessions s WHERE least(coalesce(ended_at, expires_at), expires_at) < now() - interval '30 days'
+               AND NOT EXISTS (SELECT 1 FROM gov.touches t WHERE t.session = s.token_hash)",
+        ] {
+            gone += sqlx::query(clear).execute(tx.as_mut()).await?.rows_affected();
+        }
+        tx.commit().await?;
+        Ok(gone)
+    }
+
     /// Whether the database answers, and whether a copy of the roles and rules is there to decide with.
     pub async fn readiness(&self) -> (bool, bool) {
         match sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM gov.policies)")
@@ -154,26 +214,43 @@ impl Governance {
         }
     }
 
-    pub async fn connect(url: &str, config: Config) -> Result<Self> {
+    pub async fn connect(url: &str, mut config: Config) -> Result<Self> {
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .acquire_timeout(Duration::from_secs(5))
             .connect(url)
             .await?;
-        let rp_id = config
-            .origin
+        // A folder, so a link is made inside it: …/ + link → …/link.
+        if !config.pages.path().ends_with('/') {
+            let folder = format!("{}/", config.pages.path());
+            config.pages.set_path(&folder);
+        }
+        let host = config
+            .pages
             .host_str()
-            .ok_or_else(|| Error::Invalid("Governance's origin needs a host name".into()))?
-            .to_string();
-        // Every port on the same name: Governance's own pages and the Explorer share passkeys.
-        let webauthn = WebauthnBuilder::new(&rp_id, &config.origin)?
+            .ok_or_else(|| Error::Invalid("Governance's pages need a host name".into()))?;
+        let domain = config.domain.trim_matches('.').to_ascii_lowercase();
+        if domain.is_empty() || !(host == domain || host.ends_with(&format!(".{domain}"))) {
+            return Err(Error::Invalid(format!(
+                "Governance's pages ({host}) are not under the base name ({domain})"
+            )));
+        }
+        // The base name itself, in the pages' scheme: every name under it, on any port, may use a
+        // passkey (gov to sign in, mero to touch); a name outside it may not.
+        let rp_origin = Url::parse(&format!("{}://{domain}", config.pages.scheme()))
+            .map_err(|e| Error::Invalid(format!("the base name: {e}")))?;
+        // Passkeys belong to the base name: every subdomain under it, on any port, shares them.
+        let webauthn = WebauthnBuilder::new(&domain, &rp_origin)?
             .rp_name("No Origins")
+            .allow_subdomains(true)
             .allow_any_port(true)
             .build()?;
+        config.domain = domain;
         Ok(Self {
             pool,
             webauthn: Arc::new(webauthn),
             config,
+            copying: Arc::default(),
         })
     }
 
@@ -261,6 +338,31 @@ pub(crate) async fn record(
     .bind(detail)
     .fetch_one(conn)
     .await?)
+}
+
+/// An email, as Governance keeps it: trimmed and in lowercase, one @, a dot in its domain, and
+/// nothing that could break a line. The reason never repeats the address.
+pub(crate) fn check_email(email: &str) -> Result<String> {
+    let email = email.trim().to_lowercase();
+    let ok = (3..=254).contains(&email.len())
+        && email.matches('@').count() == 1
+        && !email
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || "<>(),;:\\\"[]".contains(c))
+        && email.split_once('@').is_some_and(|(local, domain)| {
+            !local.is_empty()
+                && domain.contains('.')
+                && !domain.starts_with('.')
+                && !domain.ends_with('.')
+                && !domain.contains("..")
+        });
+    if ok {
+        Ok(email)
+    } else {
+        Err(Error::Invalid(
+            "that is not an email address Governance can use".into(),
+        ))
+    }
 }
 
 /// A handle: lowercase letters, digits and single hyphens, 3 to 40 characters.

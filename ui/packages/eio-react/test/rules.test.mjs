@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url'
 const SRC = fileURLToPath(new URL('../src/', import.meta.url))
 const TOKENS = readFileSync(new URL('../../eio-tokens/tokens.css', import.meta.url), 'utf8')
 const defined = new Set([...TOKENS.matchAll(/^\s*(--eio-[a-z0-9-]+):/gm)].map(m => m[1]))
-const sheets = readdirSync(SRC).filter(f => f.endsWith('.module.css')).map(f => ({
+// Every style file, in each component's folder.
+const sheets = readdirSync(SRC, { recursive: true }).filter(f => f.endsWith('.module.css')).map(f => ({
   file: f,
   css: readFileSync(join(SRC, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''),
 }))

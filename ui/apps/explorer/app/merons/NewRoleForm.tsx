@@ -6,13 +6,15 @@ import { useActionState, type ReactNode } from 'react'
 import { Button, Field, TextArea } from '@noi/eio-react'
 import { proposeNewRole } from '../review/actions'
 import { Message } from '../review/Decide'
+import { useCedarTouch } from './cedar-touch'
 import styles from '../review/review.module.css'
 
 export function NewRoleForm({ editor, back }: { editor: ReactNode; back: string }) {
   const [state, action, pending] = useActionState(proposeNewRole, {})
+  const { submit, said } = useCedarTouch(action, form => ({ role: String(form.get('name') ?? '') }))
   const label = (text: string) => <span className={[styles.muted, 'eio-type-style-label'].join(' ')}>{text}</span>
   return (
-    <form action={action} className={styles.form}>
+    <form action={submit} className={styles.form}>
       <label className={styles.row}>
         {label('Name')}
         <Field label="Name" name="name" placeholder="Proposer" required />
@@ -34,6 +36,7 @@ export function NewRoleForm({ editor, back }: { editor: ReactNode; back: string 
         <Field label="Why" name="rationale" placeholder="What this role is for. Review reads this first." required />
       </label>
       <Message state={state} />
+      {said}
       <div className={styles.buttons}>
         <Button variant="primary" icon="arrow" type="submit" disabled={pending}>
           {pending ? 'Checking…' : 'Send to Review'}

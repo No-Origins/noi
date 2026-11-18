@@ -1,0 +1,38 @@
+{
+  "path": "noi.eio.components.world.pool",
+  "name": "Pool",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The round pool and the low white wall round it. The water moves and mirrors what stands round it.",
+    "responsibility": "Be the one pool every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Be the middle of the 3D world.",
+    "states": {
+      "measure": {
+        "pool-radius": "the pool’s radius",
+        "wall-height": "the wall’s height",
+        "wall-width": "the wall’s width"
+      }
+    },
+    "reads": [
+      "noi.eio.world.pool.radius",
+      "noi.eio.world.wall.height",
+      "noi.eio.world.wall.width"
+    ],
+    "uses": [
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/pool/pool.ts",
+        "sha256": "bfbe5313329ba556f15dc1fe67ce6790048d611f5726c00978b1ed1e6c313493"
+      }
+    ]
+  }
+}

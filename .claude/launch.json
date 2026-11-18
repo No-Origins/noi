@@ -9,7 +9,8 @@
         "ui/apps/explorer",
         "dev"
       ],
-      "port": 3000
+      "port": 3000,
+      "url": "http://mero.no-origins.localhost:3000"
     },
     {
       "name": "mero",
@@ -25,7 +26,7 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd noi && set -a && . ./governance.local.env && set +a && exec ./target/debug/noi-gov serve"
+        "cd noi && set -a && . ./governance.local.env && set +a && NOI_GOV_MAIL=smtp://127.0.0.1:55325 exec ./target/debug/noi-gov serve"
       ],
       "port": 8788
     }

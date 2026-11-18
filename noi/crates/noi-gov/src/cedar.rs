@@ -19,7 +19,7 @@ pub const RULE_CHECK: &str = "gov.rule";
 /// Governance's own actions, on accounts, passkeys, grants and sessions. Governance's server
 /// carries them out; they are declared here so the owner role can name them. `view` (7 Nov) sees
 /// accounts, roles and the record and changes nothing; the fresh-touch rule exempts it.
-pub const GOVERNANCE_ACTIONS: [&str; 8] = [
+pub const GOVERNANCE_ACTIONS: [&str; 9] = [
     "invite",
     "add-agent",
     "change-account",
@@ -28,6 +28,7 @@ pub const GOVERNANCE_ACTIONS: [&str; 8] = [
     "end-grant",
     "end-session",
     "view",
+    "write-cedar",
 ];
 
 /// The actions a role names, as written: a system's name stands for every action it declares.

@@ -1,0 +1,82 @@
+{
+  "path": "noi.eio.components.button",
+  "name": "Button",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A real button: keyboards and screen readers work, it shows the focus ring and has a 44 px touch target. Given an address, a real link instead.",
+    "responsibility": "Be the one button every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Do something when pressed, or take you somewhere: the one main action, the other strong one, or any other.",
+    "states": {
+      "variant": {
+        "primary": "for the one main action",
+        "secondary": "for the other strong one",
+        "plain": "for the rest"
+      },
+      "size": {
+        "default": "40 px",
+        "large": "48 px, for a screen’s single big action"
+      },
+      "width": {
+        "content": "as wide as its words",
+        "wide": "as wide as its container"
+      },
+      "link": {
+        "inside": "a link to a place in No Origins: still a button, the arrow after its words",
+        "action": "a link that does something: its icon, or a picture of who, instead of the arrow",
+        "outside": "a link to a place outside No Origins: words with a dashed underline and the arrow, in a new tab"
+      },
+      "interaction": {
+        "hover": "hovered",
+        "focus": "focused, with the focus ring",
+        "disabled": "disabled"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.action.on-primary",
+      "noi.eio.color.action.on-secondary",
+      "noi.eio.color.action.primary",
+      "noi.eio.color.action.secondary",
+      "noi.eio.color.border.default",
+      "noi.eio.color.border.input",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.state.hover",
+      "noi.eio.color.surface.page",
+      "noi.eio.color.text.faint",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.motion.duration.ms100",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.radius.button",
+      "noi.eio.size.control.default",
+      "noi.eio.size.control.large",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.group",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.label"
+    ],
+    "uses": [
+      "noi.eio.components.icon",
+      "noi.eio.components.links"
+    ],
+    "files": [
+      {
+        "path": "src/Button/Button.module.css",
+        "sha256": "d363d07583f6c1913445f8537903b69dcec767bb3bcc80b46c6318b1b5eddac1"
+      },
+      {
+        "path": "src/Button/Button.tsx",
+        "sha256": "2ffb3ddff0f12f64b2e1253ee080546b3acc7ebfcf23477f9dbb53080fdcbc37"
+      }
+    ]
+  }
+}

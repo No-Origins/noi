@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.inv.length",
+  "name": "Length invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos length in metres must meet.",
+    "responsibility": "Measure the 3D world in metres: one tile is one metre, and a person is 1.8 metres tall."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "length"
+    },
+    "schema": {
+      "title": "Eidos length",
+      "type": "object",
+      "required": [
+        "m"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "m": {
+          "description": "A length in the 3D world, in metres, to the centimetre: more than 0, at most 10,000. One tile is one metre.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000,
+          "multipleOf": 0.01
+        }
+      }
+    }
+  }
+}

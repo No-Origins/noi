@@ -1,51 +1,141 @@
 // Talks to Governance's server for a touch, as you. Server-side only: your sign-in is
 // Governance's HttpOnly cookie, passed on from here; pages never see it.
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { cache } from 'react'
+import { errorOf, notAnswering, READ_MS, WRITE_MS } from './backend'
+import { DOMAIN, isLocal } from './hosts'
+import { SESSION, sessionFrom, visitorOf, type Session } from './session'
 
 const GOVERNANCE_API = process.env.GOVERNANCE_API ?? 'http://127.0.0.1:8788'
 
 export type Answer<T> = { ok: true; data: T } | { ok: false; error: string }
 
-async function post<T>(path: string, body: unknown): Promise<Answer<T>> {
-  const token = (await cookies()).get('noi_session')?.value
-  if (!token) return { ok: false, error: 'Signed out: sign in at Governance first.' }
+const SIGNED_OUT = 'Signed out: sign in first.'
+/** What the app says when Governance doesn't answer at all, as opposed to answering no. */
+export const NOT_ANSWERING = notAnswering('Governance')
+
+/** The one way this server asks Governance (found 9 Nov: it was written out five times): JSON in
+    and out, never cached, never longer than a time limit, Governance's own words when it says no
+    (plain ones when it fails), and the session cookies it sets.
+    With a body it posts; without one it gets. */
+async function call<T>(path: string, headers: Record<string, string>, body?: unknown): Promise<(Answer<T> & { ok: true; setCookies: string[] }) | { ok: false; error: string }> {
   try {
     const res = await fetch(`${GOVERNANCE_API}${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: `noi_session=${token}` },
-      body: JSON.stringify(body),
+      method: body === undefined ? 'GET' : 'POST',
+      headers: body === undefined ? headers : { 'content-type': 'application/json', ...headers },
+      body: body === undefined ? undefined : JSON.stringify(body),
       cache: 'no-store',
+      signal: AbortSignal.timeout(body === undefined ? READ_MS : WRITE_MS),
     })
     const data = await res.json().catch(() => ({}))
-    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Governance answered ${res.status}` }
+    return res.ok ? { ok: true, data, setCookies: res.headers.getSetCookie() } : { ok: false, error: errorOf('Governance', res.status, data.error) }
   } catch {
-    return { ok: false, error: 'Governance isn’t answering. Is `noi gov serve` running?' }
+    return { ok: false, error: NOT_ANSWERING }
   }
 }
+
+/** Your session, as Governance takes it. Undefined when you're signed out. */
+async function yours(): Promise<Record<string, string> | undefined> {
+  const token = (await cookies()).get(SESSION)?.value
+  return token ? { cookie: `${SESSION}=${token}` } : undefined
+}
+
+/** Asks as you; signed out, it says so without asking. */
+async function asYou<T>(path: string, body?: unknown, more: Record<string, string> = {}): Promise<Answer<T>> {
+  const session = await yours()
+  if (!session) return { ok: false, error: SIGNED_OUT }
+  const r = await call<T>(path, { ...more, ...session }, body)
+  return r.ok ? { ok: true, data: r.data } : r
+}
+/** Your browser's name for itself, so Governance can say where something was done. */
+async function browser(): Promise<Record<string, string>> {
+  return { 'user-agent': (await headers()).get('user-agent') ?? 'a browser' }
+}
+const post = <T>(path: string, body: unknown) => asYou<T>(path, body)
+const get = <T>(path: string) => asYou<T>(path)
 
 export type Target = { path: string } | { account: string }
 /** WebAuthn request options in JSON, and the ceremony they belong to. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface Started { ceremony: string; options: any }
 
-/** Starts a touch for exactly this action on these places. */
-export const touchStart = (action: string, targets: Target[]) => post<Started>('/api/touch/start', { action, targets })
+/** What Governance answers before anyone is signed in, and the session it makes, if it makes one. */
+export type Opened<T> = { ok: true; data: T; session?: Session } | { ok: false; error: string }
+
+/** Asks Governance with no sign-in: to start or finish signing in, or a one-time link. Your
+    browser's name for itself goes along, so your Profile can say where you signed in. */
+async function opening<T>(path: string, body: unknown): Promise<Opened<T>> {
+  const h = await headers()
+  // Who is visiting, for Governance's limits on starts and sign-ups from one address: only from a
+  // header the hosting service sets (see visitorOf), never one the visitor can write.
+  const visitor = visitorOf(name => h.get(name), process.env.NOI_VISITOR_HEADER)
+  const r = await call<T>(path, { ...(await browser()), ...(visitor ? { 'x-noi-visitor': visitor } : {}) }, body)
+  return r.ok ? { ok: true, data: r.data, session: sessionFrom(r.setCookies) } : r
+}
+
+/** Starts signing in (agreed 9 Nov): with no handle, Governance asks for any passkey of No Origins
+    and the one picked says whose it is; with a handle, for one of that person's. */
+export const signInStart = (handle?: string) => opening<Started>('/api/sign-in/start', handle ? { handle } : {})
+/** Finishes it with the passkey's answer; Governance makes a session if it checks out. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const signInFinish = (ceremony: string, credential: any) => opening<{ ok: true }>('/api/sign-in/finish', { ceremony, credential })
+/** Starts a sign-up (agreed 8 Nov): Governance emails a link to confirm, or says it can't. */
+export const signUpStart = (email: string, handle: string, display_name: string) =>
+  opening<{ ok: true; said: string }>('/api/sign-up/start', { email, handle, display_name })
+/** A lost passkey: Governance emails a link to the account with that email, if there is one. */
+export const lostStart = (email: string) => opening<{ ok: true; said: string }>('/api/lost/start', { email })
+/** Starts adding a first passkey, with a one-time link's token. */
+export const linkStart = (token: string) => opening<Started>('/api/link/start', { token })
+/** Keeps the new passkey's public half, under the name you gave it, and signs you in. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const linkFinish = (ceremony: string, credential: any, name: string) => opening<{ ok: true }>('/api/link/finish', { ceremony, credential, name })
+
+/** The sign-in cookie belongs to the base name, so gov, mero and eidos share it (agreed 8 Nov):
+    HttpOnly, and HTTPS-only once the base name is a real one. SameSite lax (9 Nov): Safari treats
+    gov and mero under .localhost as two sites and kept a strict cookie back when signing in sent
+    you on to mero. Lax still keeps it off other sites' background requests and forms; the app's
+    forms also check where they come from. */
+const where = { domain: DOMAIN, path: '/', httpOnly: true, sameSite: 'lax', secure: !isLocal() } as const
+
+/** Gives your browser the session Governance made, for as long as Governance made it. */
+export async function keep(session: Session) {
+  ;(await cookies()).set(SESSION, session.token, { ...where, maxAge: session.maxAge })
+}
+
+/** Who is signed in on this browser: their handle and name. Undefined when no one is. */
+export async function signedIn(): Promise<{ handle: string; display_name: string } | undefined> {
+  const r = await get<{ handle: string; display_name: string } | null>('/api/me')
+  return r.ok ? (r.data ?? undefined) : undefined
+}
+
+/** Ends your sign-in at Governance, then forgets it here. If Governance doesn't answer, you stay
+    signed in rather than seem signed out while the session goes on. */
+export async function signOut(): Promise<Answer<null>> {
+  if (await yours()) {
+    const r = await post<{ ok: true }>('/api/sign-out', {})
+    if (!r.ok) return r
+  }
+  ;(await cookies()).set(SESSION, '', { ...where, maxAge: 0 })
+  return { ok: true, data: null }
+}
+
+/** "What may I do here?" (agreed 9 Nov, step 6): yes or no for each question, as if confirmed with a
+    touch (you will be when you act), and not recorded. Signed out, it asks as a visitor. Anything
+    but an answer reads as no; the real question is asked when you act. */
+export async function mayHere(questions: { action: string; targets: Target[] }[]): Promise<boolean[]> {
+  if (!questions.length) return []
+  const r = await call<{ answers: boolean[] }>('/api/may/preview', (await yours()) ?? {}, { questions })
+  return r.ok && r.data.answers.length === questions.length ? r.data.answers : questions.map(() => false)
+}
+
+/** Starts a touch for exactly this action on these places, and what else it names (9 Nov, step 7):
+    the decision and each proposal, the role and place, the new agent. */
+export const touchStart = (action: string, targets: Target[], about?: unknown) =>
+  post<Started>('/api/touch/start', about === undefined ? { action, targets } : { action, targets, about })
 /** Finishes it with the passkey's answer; Governance gives back the touch, good once, for a minute. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const touchFinish = (ceremony: string, credential: any) => post<{ touch: string }>('/api/touch/finish', { ceremony, credential })
-
-async function get<T>(path: string): Promise<Answer<T>> {
-  const token = (await cookies()).get('noi_session')?.value
-  if (!token) return { ok: false, error: 'Signed out: sign in at Governance first.' }
-  try {
-    const res = await fetch(`${GOVERNANCE_API}${path}`, { headers: { cookie: `noi_session=${token}` }, cache: 'no-store' })
-    const data = await res.json().catch(() => ({}))
-    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Governance answered ${res.status}` }
-  } catch {
-    return { ok: false, error: 'Governance isn’t answering. Is `noi gov serve` running?' }
-  }
-}
 
 /** Your roles, from your Profile: each role's name and where you hold it. */
 export async function myRoles(): Promise<{ role: string; scope: string }[]> {
@@ -54,11 +144,16 @@ export async function myRoles(): Promise<{ role: string; scope: string }[]> {
 
 /** You, from your Profile: your handle and your roles. Undefined when signed out. */
 export async function me(): Promise<{ handle: string; roles: { role: string; scope: string }[] } | undefined> {
-  const r = await get<{ handle: string; roles: { role: string; scope: string }[] }>('/api/profile')
+  const r = await profile()
   return r.ok ? r.data : undefined
 }
 
-export interface Account { id: string; handle: string; display_name: string; kind: string; state: string; sponsor: string | null; roles: number }
+/** An account as Accounts lists it (owners): the roles held and where, and when it last signed in
+    (an agent: its last run). */
+export interface Account {
+  id: string; handle: string; display_name: string; kind: string; state: string; since: string; sponsor: string | null
+  roles: number; held: { role: string; path: string; scope: string }[]; last_signed_in: string | null
+}
 /** Every account, if you may view them (owners may). */
 export async function accounts(): Promise<Answer<Account[]>> {
   const r = await get<{ accounts: Account[] }>('/api/accounts')
@@ -78,8 +173,124 @@ export async function accountNames(): Promise<Record<string, string>> {
   return r.ok ? Object.fromEntries(r.data.accounts.map(a => [a.id, a.handle])) : {}
 }
 
+/** A role someone holds: which, where, since when and from whom. */
+export interface Held { grant: string; role: string; path: string; scope: string; granted_at: string; granted_by: string | null }
+/** A change to who may do what, from Governance's record (9 Nov). */
+export interface Change {
+  seq: number; at: string; kind: string; by: string | null; whom: string | null
+  role: string | null; scope: string | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  detail: Record<string, any>
+  /** For a copy of Mero's roles and rules: what got a new revision, as "noi.gov.roles.observer@5". */
+  changed?: string[]
+}
+/** What Governance's home shows whoever is looking (agreed 9 Nov). */
+export interface Dashboard {
+  you: null | { handle: string; display_name: string; kind: string; roles: Held[] }
+  /** Whether you may view Governance's data (owners): the rest comes only then. */
+  view?: boolean
+  held?: Record<string, number>
+  changes?: Change[]
+  attention?: { waiting: string[]; problems_today: number }
+}
+
+/** Governance's home for whoever is looking: signed out, it asks with no sign-in. */
+export async function dashboard(): Promise<Answer<Dashboard>> {
+  const r = await call<Dashboard>('/api/dashboard', (await yours()) ?? {})
+  return r.ok ? { ok: true, data: r.data } : r
+}
+
+/** Someone's public profile (agreed 9 Nov): handle, name, person or agent, since when; for an agent,
+    also its sponsor and what it is for (agreed 9 Nov, step 5). */
+export interface Person { handle: string; display_name: string; kind: string; since: string; sponsor?: string | null; purpose?: string | null }
+export async function person(handle: string): Promise<Answer<Person>> {
+  const r = await call<Person>(`/api/people/${encodeURIComponent(handle)}`, {})
+  return r.ok ? { ok: true, data: r.data } : r
+}
+
+/** One account as owners see it: its roles, passkeys by name, sign-ins and an agent's runs. */
+export interface AccountView extends Person {
+  id: string; state: string; made_by: string | null; sponsor: string | null; purpose: string | null; vouched_by: string | null
+  roles: Held[]
+  passkeys: { name: string; added_at: string; last_used_at: string | null }[]
+  sessions: { device: string; started_at: string; expires_at: string }[]
+  runs: { run: string; started_by: string | null; vouched_by: string; issued_at: string; expires_at: string; live: boolean }[]
+}
+export const accountOf = (handle: string) => get<AccountView>(`/api/accounts/${encodeURIComponent(handle)}`)
+
 /** Governance's problems, newest first, if you may view them (owners may). */
 export async function governanceProblems() {
   const r = await get<{ problems: import('./mero').Problem[] }>('/api/problems?limit=100')
   return r.ok ? { ok: true as const, data: r.data.problems } : r
 }
+
+// ——— Your account (agreed 9 Nov, step 4): yours alone, and every change with a touch ———
+
+/** A change to your own account. Governance makes the touch for exactly it: this passkey, that
+    sign-in. */
+export type OwnChange =
+  | { change: 'add-passkey' }
+  | { change: 'remove-passkey'; passkey: string }
+  | { change: 'end-sign-in'; session: string }
+  | { change: 'end-other-sign-ins' }
+  /** The new address goes with the touch (9 Nov, step 7); Governance keeps only its fingerprint. */
+  | { change: 'change-email'; email: string }
+
+/** Your account as Governance shows it to you: your email, roles, passkeys by name, and where
+    you're signed in, each sign-in with the passkey that made it when Governance knows. */
+export interface Profile {
+  account: string; handle: string; display_name: string; kind: string; state: string; since: string
+  email: string | null
+  roles: Held[]
+  passkeys: { id: string; name: string; added_at: string; last_used_at: string | null }[]
+  sessions: { id: string; device: string; started_at: string; expires_at: string; this: boolean; passkey: string | null; passkey_name: string | null }[]
+}
+/** Read once per request: the layout and the page share it. */
+export const profile = cache(() => get<Profile>('/api/profile'))
+
+/** Starts a touch for one change to your account. */
+export const ownTouchStart = (change: OwnChange) => post<Started>('/api/account/touch/start', change)
+/** With that touch, options for your browser to make another passkey. */
+export const passkeyAddStart = (touch: string) => post<Started>('/api/account/passkeys/start', { touch })
+/** Keeps the passkey your browser made; Governance tells your email, naming this browser. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const passkeyAddFinish = async (ceremony: string, credential: any, name: string) =>
+  asYou<{ passkey: string }>('/api/account/passkeys/finish', { ceremony, credential, name }, await browser())
+export const removePasskeyWith = (touch: string, passkey: string) =>
+  post<{ sign_ins_ended: number }>('/api/account/passkeys/remove', { touch, passkey })
+/** Ends one of your other sign-ins, or, with no session, all of them. */
+export const endSignInsWith = (touch: string, session?: string) =>
+  post<{ ended: number }>('/api/account/sign-ins/end', session ? { touch, session } : { touch })
+/** Sends a link to a new email; the answer is the same whether or not it has an account. */
+export const emailChangeStart = (touch: string, email: string) =>
+  post<{ ok: true; said: string }>('/api/account/email/start', { touch, email })
+/** The link sent to a new email: it needs no sign-in, as the link proves the address. */
+export const emailChangeFinish = (token: string) => opening<{ ok: true }>('/api/account/email/finish', { token })
+
+// ——— Roles and the record (agreed 9 Nov, step 5) ———
+
+/** Who holds each role, where and since when, if you may view them (owners may). */
+export interface RoleHeld { path: string; name: string; state: string; revision: number; holders: { handle: string; kind: string; scope: string; granted_at: string }[] }
+export async function rolesHeld(): Promise<Answer<RoleHeld[]>> {
+  const r = await get<{ roles: RoleHeld[] }>('/api/roles')
+  return r.ok ? { ok: true, data: r.data.roles } : r
+}
+
+/** One entry of the record, with what its words need: who, to whom, which role where, and why a
+    refusal was a refusal. */
+export interface RecordEntry extends Change { who: string | null; action: string | null; places: string[]; allowed: boolean; reason: string }
+/** The record page's views: everything (Governance no longer records an allowed read), changes,
+    sign-ins, or refusals; one person's part; older than an entry. */
+export interface RecordQuery { show?: 'everything' | 'changes' | 'sign-ins' | 'refused'; who?: string; before?: number }
+export async function recordPage(q: RecordQuery): Promise<Answer<{ entries: RecordEntry[]; next: number | null }>> {
+  const params = new URLSearchParams()
+  if (q.show) params.set('show', q.show)
+  if (q.who) params.set('who', q.who)
+  if (q.before) params.set('before', String(q.before))
+  return get(`/api/record?${params}`)
+}
+
+/** Ends one of someone's roles, with a fresh touch for end-grant on their account (owners). */
+export const endGrantWith = (touch: string, grant: string) => post<{ ok: true }>('/api/grants/end', { touch, grant })
+/** Ends every sign-in of someone's, and an agent's runs, with a fresh touch for end-session (owners). */
+export const endSessionsWith = (touch: string, handle: string) => post<{ ended: number }>('/api/sessions/end', { touch, handle })

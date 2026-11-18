@@ -3,14 +3,15 @@
   "private": true,
   "description": "The Explorer: the app for Mero, built from @noi/eio-react.",
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev --hostname localhost --port 3000",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "next start --hostname localhost --port 3000",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/styles.test.mjs test/passkey.test.mjs test/sentence.test.mjs",
+    "test": "node --test test/styles.test.mjs test/passkey.test.mjs test/session.test.mjs test/hosts.test.mjs test/sentence.test.mjs test/changes.test.mjs test/lists.test.mjs",
     "test:fit": "node --test test/fit.test.mjs"
   },
   "dependencies": {
+    "@noi/eio-3d": "workspace:*",
     "@noi/eio-react": "workspace:*",
     "@noi/eio-tokens": "workspace:*",
     "next": "16.4.5",

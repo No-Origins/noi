@@ -1,0 +1,52 @@
+{
+  "path": "noi.eio.components.drawer",
+  "name": "Drawer",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A panel that covers the whole window: a modal dialog, so the page behind cannot be reached, and Escape closes it.",
+    "responsibility": "Be the one drawer every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Show an app’s menu, or another panel, where one pane fills the window.",
+    "states": {
+      "arrival": {
+        "grow": "grows out of the button that opened it, and shrinks back into it",
+        "fade": "fades in and out"
+      },
+      "interaction": {
+        "arriving": "arriving, in 300 ms (at once with reduced motion)",
+        "leaving": "leaving, in 200 ms (at once with reduced motion)"
+      }
+    },
+    "reads": [
+      "noi.eio.color.surface.page",
+      "noi.eio.color.text.primary",
+      "noi.eio.layout.window.compact",
+      "noi.eio.layout.window.expanded",
+      "noi.eio.layout.window.medium",
+      "noi.eio.motion.duration.ms200",
+      "noi.eio.motion.duration.ms300",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.space.gap.group",
+      "noi.eio.space.margin.compact",
+      "noi.eio.space.margin.expanded",
+      "noi.eio.space.margin.medium"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Drawer/Drawer.module.css",
+        "sha256": "330f482097258b33d5eff25b4c18ad6f0a4ee95f8de9e7c5f2c7663f72f05ca6"
+      },
+      {
+        "path": "src/Drawer/Drawer.tsx",
+        "sha256": "460e922f22cf6748825fa0918c671fa9c0a99bbbc246df1b3189add0e067c229"
+      }
+    ]
+  }
+}

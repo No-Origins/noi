@@ -1,17 +1,5 @@
 /* Review: one batch, its changes and the decision, and the Change form. Tokens only. */
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--eio-space-gap-stack);
-}
-.group {
-  display: flex;
-  flex-direction: column;
-}
-.groupName {
-  padding: var(--eio-space-gap-inline) 0;
-  color: var(--eio-color-text-muted);
-}
+/* The line on top of the list (Eidos's Sidebar): who is looking, and whether they can decide. */
 .status {
   display: flex;
   align-items: flex-start;
@@ -103,7 +91,7 @@
   border-top: var(--eio-border-width-default) solid var(--eio-color-border-default);
 }
 /* The buttons and the note share the row, and wrap to fill the width when it is narrow. */
-.decision > button {
+.act {
   flex: 1 1 auto;
 }
 .note {
@@ -182,3 +170,27 @@
 .link:hover {
   text-decoration-color: currentColor;
 }
+/* A changed list: what was added, taken away and changed (18 Nov). */
+.listHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--eio-space-gap-inline);
+}
+.listDiff {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+.listLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--eio-space-gap-inline);
+  overflow-wrap: anywhere;
+}
+.listLine > svg {
+  flex: none;
+  align-self: center;
+}
+

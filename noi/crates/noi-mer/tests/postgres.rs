@@ -62,6 +62,7 @@ async fn registry_invariants_on_real_postgres() {
         verify_spacing(&test_url).await;
         verify_layout(&test_url).await;
         verify_shape(&test_url).await;
+        verify_components(&test_url).await;
         verify_review(&test_url).await;
         verify_governance(&test_url).await;
     });
@@ -158,7 +159,7 @@ async fn verify(url: &str) {
         .await
         .unwrap();
     // Every registry migration plus the other application's row.
-    assert_eq!(unmoved, 12);
+    assert_eq!(unmoved, 14);
     metadata
         .execute("DELETE FROM public._sqlx_migrations WHERE version=42")
         .await
@@ -168,7 +169,7 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    assert_eq!(own_count, 11);
+    assert_eq!(own_count, 13);
     assert_eq!(registry.snapshot(&actor).await.unwrap().merons.len(), 3);
     let root = registry.get(&actor, "noi").await.unwrap();
     let root_uid = root.identity.uid;
@@ -337,21 +338,35 @@ async fn verify(url: &str) {
         .transition(&actor, e.identity.uid, 5, MeronState::Deprecated)
         .await
         .unwrap();
+    // The one way back (agreed 8 Nov): reinstated to active, then deprecated again.
+    registry
+        .transition(&actor, e.identity.uid, 6, MeronState::Active)
+        .await
+        .unwrap();
+    registry
+        .transition(&actor, e.identity.uid, 7, MeronState::Deprecated)
+        .await
+        .unwrap();
     assert!(registry
-        .transition(&actor, e.identity.uid, 6, MeronState::Retired)
+        .transition(&actor, e.identity.uid, 8, MeronState::Retired)
         .await
         .is_err());
     registry.unrelate(&actor, edge.uid).await.unwrap();
     registry
-        .transition(&actor, e.identity.uid, 6, MeronState::Retired)
+        .transition(&actor, e.identity.uid, 8, MeronState::Retired)
         .await
         .unwrap();
+    // Retired stays final.
+    assert!(registry
+        .transition(&actor, e.identity.uid, 9, MeronState::Active)
+        .await
+        .is_err());
     assert!(registry
         .relate(&actor, b.identity.uid, Predicate::DependsOn, e.identity.uid)
         .await
         .is_err());
     assert!(registry
-        .rename(&actor, e.identity.uid, 7, "noi.tests.retired")
+        .rename(&actor, e.identity.uid, 9, "noi.tests.retired")
         .await
         .is_err());
     assert!(registry
@@ -1688,6 +1703,316 @@ async fn verify_shape(url: &str) {
         .all(|e| e.lifecycle.state == MeronState::Registered));
 }
 
+/// Components in Mero (agreed 17 Nov): a component's meron holds its contract and fingerprints;
+/// Mero links it to the values it reads and the components it uses, and refuses a file another
+/// component already lists.
+async fn verify_components(url: &str) {
+    const C: &str = "noi.eio.components.";
+    let actor = Actor {
+        subject: "test-developer".into(),
+    };
+    let registry = Registry::connect(url)
+        .await
+        .unwrap()
+        .with_authorizer(Arc::new(
+            LocalDevelopmentGrant::new(actor.subject.clone(), "noi".into()).unwrap(),
+        ));
+    let eio_uid = registry.get(&actor, "noi.eio").await.unwrap().identity.uid;
+    let uid_of = |path: &'static str| {
+        let registry = &registry;
+        let actor = &actor;
+        async move {
+            let e = registry.get(actor, path).await.unwrap();
+            assert_eq!(e.lifecycle.state, MeronState::Registered, "{path}");
+            e.identity.uid
+        }
+    };
+    let icon_small = uid_of("noi.eio.size.icon.small").await;
+    let gap_inline = uid_of("noi.eio.space.gap.inline").await;
+    let file = |name: &str| -> NewMeron {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data/eio")
+            .join(name);
+        let mut e: NewMeron =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        e.authority_scope = Some(eio_uid);
+        e
+    };
+    let fingerprint = |c: char| c.to_string().repeat(64);
+    let component = |name: &str, package: &str, reads: &[&str], uses: &[&str], files: &[&str]| {
+        let mut e = proposal(eio_uid, &format!("{C}{name}"), MeronType::Component);
+        e.spec = json!({
+            "package": package,
+            "part": "component",
+            "job": "A test component.",
+            "states": {"look": {"plain": "as it is"}},
+            "reads": reads,
+            "uses": uses.iter().map(|u| format!("{C}{u}")).collect::<Vec<_>>(),
+            "files": files.iter().map(|f| json!({"path": f, "sha256": fingerprint('a')})).collect::<Vec<_>>(),
+        });
+        e
+    };
+    let register = |e: NewMeron| {
+        let registry = &registry;
+        let actor = &actor;
+        async move {
+            let uid = registry.propose(actor, e).await.unwrap().identity.uid;
+            registry
+                .transition(actor, uid, 1, MeronState::Registered)
+                .await
+                .unwrap();
+            uid
+        }
+    };
+    let refused = |e: NewMeron| {
+        let registry = &registry;
+        let actor = &actor;
+        async move { registry.propose(actor, e).await.unwrap_err().to_string() }
+    };
+
+    // The invariant must say where components live.
+    let mut vague = file("component-invariant.json");
+    vague.spec["checks"][0]["params"] = json!({});
+    let error = refused(vague).await;
+    assert!(
+        error.contains("invalid eio.component parameters"),
+        "{error}"
+    );
+    let invariant = register(file("component-invariant.json")).await;
+
+    const R: &str = "@noi/eio-react";
+    let icon = register(component(
+        "icon",
+        R,
+        &["noi.eio.size.icon.small"],
+        &[],
+        &["src/Icon/Icon.tsx"],
+    ))
+    .await;
+    // A value Eidos lacks, a component still a draft, and code in the meron are refused.
+    let error = refused(component(
+        "odd",
+        R,
+        &["noi.eio.size.icon.huge"],
+        &[],
+        &["src/Odd/Odd.tsx"],
+    ))
+    .await;
+    assert!(
+        error.contains("reads values Eidos does not have: noi.eio.size.icon.huge"),
+        "{error}"
+    );
+    let draft = registry
+        .propose(
+            &actor,
+            component("draft", R, &[], &[], &["src/Draft/Draft.tsx"]),
+        )
+        .await
+        .unwrap()
+        .identity
+        .uid;
+    let error = refused(component("odd", R, &[], &["draft"], &["src/Odd/Odd.tsx"])).await;
+    assert!(
+        error.contains(&format!("{C}draft is not a component in Mero")),
+        "{error}"
+    );
+    let mut code = component("odd", R, &[], &[], &["src/Odd/Odd.tsx"]);
+    code.spec["code"] = json!("export function Odd() {}");
+    refused(code).await;
+    // Each file sits in a folder named for its meron (the rule's `folders`, 18 Nov).
+    let error = refused(component("odd", R, &[], &[], &["src/Icon/Odd.tsx"])).await;
+    assert!(
+        error.contains("its file src/Icon/Odd.tsx is not in its folder"),
+        "{error}"
+    );
+    // A file belongs to one meron only; the same place in another package is another file. With
+    // folders, only a meron named for the same folder could list it.
+    let mut twin = component("world.icon", R, &[], &[], &["src/Icon/Icon.tsx"]);
+    twin.spec["states"] = json!({"measure": {"height": "how tall it stands"}});
+    let error = refused(twin).await;
+    assert!(
+        error.contains(&format!(
+            "src/Icon/Icon.tsx of {R} is already listed by {C}icon"
+        )),
+        "{error}"
+    );
+    // Two components may not give one type name: world.icon's group look would give IconLook, which
+    // icon gives already, and Mero could then not write components.ts after the approval.
+    let error = refused(component(
+        "world.icon",
+        "@noi/eio-3d",
+        &[],
+        &[],
+        &["src/icon/icon.ts"],
+    ))
+    .await;
+    assert!(
+        error.contains(&format!(
+            "its group look gives the type IconLook, which {C}icon gives already"
+        )),
+        "{error}"
+    );
+    let mut world_icon = component("world.icon", "@noi/eio-3d", &[], &[], &["src/icon/icon.ts"]);
+    world_icon.spec["states"] = json!({"measure": {"height": "how tall it stands"}});
+    register(world_icon).await;
+    // A draft lists nothing: only admitted merons own files, so another meron named for its folder may
+    // list its file, and the draft then cannot be registered.
+    let mut draft_twin = component("world.draft", R, &[], &[], &["src/Draft/Draft.tsx"]);
+    draft_twin.spec["states"] = json!({"measure": {"height": "how tall it stands"}});
+    register(draft_twin).await;
+    register(component(
+        "button",
+        R,
+        &["noi.eio.space.gap.inline"],
+        &["icon"],
+        &["src/Button/Button.tsx"],
+    ))
+    .await;
+    let button = registry
+        .get(&actor, &format!("{C}button"))
+        .await
+        .unwrap()
+        .identity
+        .uid;
+    let error = registry
+        .transition(&actor, draft, 1, MeronState::Registered)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(&format!("already listed by {C}world.draft")),
+        "{error}"
+    );
+
+    let snapshot = registry.snapshot(&actor).await.unwrap();
+    let depends_on = |uid: Uuid| -> HashSet<Uuid> {
+        snapshot
+            .relationships
+            .iter()
+            .filter(|r| r.source == uid && r.predicate == Predicate::DependsOn)
+            .map(|r| r.target)
+            .collect()
+    };
+    assert_eq!(depends_on(icon), HashSet::from([icon_small]));
+    assert_eq!(depends_on(button), HashSet::from([icon, gap_inline]));
+    let history = registry.history(&actor, button).await.unwrap();
+    let registered = history
+        .iter()
+        .find(|e| e.action == "meron.transition")
+        .unwrap();
+    assert_eq!(registered.payload["checks"][0]["check"], "eio.component");
+    assert_eq!(
+        registered.payload["checks"][0]["invariant"],
+        json!({"uid": invariant, "revision": 2})
+    );
+    let read = registered.payload["checks"][0]["read"].as_array().unwrap();
+    for uid in [icon, gap_inline] {
+        assert!(read.iter().any(|r| r["uid"] == json!(uid)), "{read:?}");
+    }
+
+    // A new version of a component keeps its own files: they are not "listed by another".
+    let evidence = CompatibilityEvidence {
+        impact: Impact::Breaking,
+        rationale: "A new icon".into(),
+        invariant_checks: vec![],
+        migration_plan: Some("Nothing to move".into()),
+    };
+    let mut newer = component(
+        "icon",
+        R,
+        &["noi.eio.size.icon.small"],
+        &[],
+        &["src/Icon/Icon.tsx", "src/Icon/Icon.module.css"],
+    );
+    newer.spec["files"][0]["sha256"] = json!(fingerprint('b'));
+    registry
+        .update(&actor, icon, 2, newer, evidence)
+        .await
+        .unwrap();
+    // A component in use cannot retire, and neither can a value a component reads.
+    for (revision, state) in [(3, MeronState::Active), (4, MeronState::Deprecated)] {
+        registry
+            .transition(&actor, icon, revision, state)
+            .await
+            .unwrap();
+    }
+    assert!(registry
+        .transition(&actor, icon, 5, MeronState::Retired)
+        .await
+        .is_err());
+    let small = registry
+        .get(&actor, "noi.eio.size.icon.small")
+        .await
+        .unwrap();
+    assert!(registry
+        .transition(&actor, icon_small, small.revision, MeronState::Active)
+        .await
+        .is_ok());
+    let small = registry
+        .get(&actor, "noi.eio.size.icon.small")
+        .await
+        .unwrap();
+    registry
+        .transition(&actor, icon_small, small.revision, MeronState::Deprecated)
+        .await
+        .unwrap();
+    assert!(registry
+        .transition(&actor, icon_small, small.revision + 1, MeronState::Retired)
+        .await
+        .is_err());
+
+    // A component renamed takes its folder with it, in the same batch (18 Nov): renamed alone, it
+    // fails its rule under its new name; renamed with its files moved, both changes pass, in either
+    // order.
+    let tree = register(component("tree", R, &[], &[], &["src/Tree/Tree.tsx"])).await;
+    let revision = registry
+        .get(&actor, &format!("{C}tree"))
+        .await
+        .unwrap()
+        .revision;
+    let rename = Change::Rename {
+        uid: tree,
+        expected_revision: revision,
+        path: format!("{C}tree-row"),
+    };
+    let batch = |changes: Vec<Change>| NewBatch {
+        title: "Tree becomes Tree row".into(),
+        note: None,
+        changes,
+        touch: None,
+    };
+    let alone = registry
+        .propose_batch(&actor, batch(vec![rename.clone()]))
+        .await
+        .unwrap();
+    let outcome = &alone.proposals[0].outcome;
+    assert_eq!(outcome["ok"], json!(false), "{outcome}");
+    let error = outcome["error"].as_str().unwrap();
+    assert!(
+        error.contains(&format!("as {C}tree-row, it does not pass its rule"))
+            && error.contains("its file src/Tree/Tree.tsx is not in its folder"),
+        "{error}"
+    );
+    let moved = Change::Update {
+        uid: tree,
+        expected_revision: revision + 1,
+        meron: component("tree-row", R, &[], &[], &["src/TreeRow/Tree.tsx"]),
+        compatibility: CompatibilityEvidence {
+            impact: Impact::NonBreaking,
+            rationale: "Its files move with its name".into(),
+            invariant_checks: vec!["Its rule, under its new name".into()],
+            migration_plan: None,
+        },
+    };
+    let both = registry
+        .propose_batch(&actor, batch(vec![moved, rename]))
+        .await
+        .unwrap();
+    for p in &both.proposals {
+        assert_eq!(p.outcome["ok"], json!(true), "{}", p.outcome);
+    }
+}
+
 /// Review: proposals wait in batches; Mero holds only what a maintainer approved.
 async fn verify_review(url: &str) {
     const P: &str = "noi.eio.color.palette.";
@@ -1760,6 +2085,7 @@ async fn verify_review(url: &str) {
         title: title.into(),
         note: Some("From the review test".into()),
         changes,
+        touch: None,
     };
 
     // Order inside a batch does not matter: the role comes before the color it reads.
@@ -2033,8 +2359,70 @@ async fn verify_review(url: &str) {
         "Ink for review tests"
     );
 
+    // The one way back through Review (agreed 8 Nov): set aside, then reinstated with a reason,
+    // meeting today's invariants again.
+    let ink_now = registry
+        .get(&human, &format!("{P}review-ink"))
+        .await
+        .unwrap();
+    let aside = registry
+        .propose_batch(
+            &agent,
+            batch(
+                "Set ink aside",
+                vec![Change::Deprecate {
+                    uid: ink_now.identity.uid,
+                    expected_revision: ink_now.revision,
+                }],
+            ),
+        )
+        .await
+        .unwrap();
+    registry.approve(&human, &[aside.uid]).await.unwrap();
+    let aside = registry
+        .get(&human, &format!("{P}review-ink"))
+        .await
+        .unwrap();
+    assert_eq!(aside.lifecycle.state, MeronState::Deprecated);
+    let back = |reason: &str| Change::Reinstate {
+        uid: aside.identity.uid,
+        expected_revision: aside.revision,
+        reason: reason.into(),
+    };
+    assert!(registry
+        .propose_batch(&agent, batch("No reason", vec![back("  ")]))
+        .await
+        .is_err());
+    let again = registry
+        .propose_batch(
+            &agent,
+            batch("Ink again", vec![back("The review tests need it")]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        again.proposals[0].outcome["ok"],
+        json!(true),
+        "{:#?}",
+        again.proposals
+    );
+    registry.approve(&human, &[again.uid]).await.unwrap();
+    let ink_back = registry
+        .get(&human, &format!("{P}review-ink"))
+        .await
+        .unwrap();
+    assert_eq!(ink_back.lifecycle.state, MeronState::Active);
+
     // Nothing is deleted, and decided proposals cannot be edited, even with direct SQL.
     let mut sql = PgConnection::connect(url).await.unwrap();
+    let reason: Option<String> = sqlx::query_scalar(
+        "SELECT payload->>'reason' FROM mer.events WHERE meron_uid=$1 AND action='meron.transition' ORDER BY sequence DESC LIMIT 1",
+    )
+    .bind(ink_back.identity.uid)
+    .fetch_one(&mut sql)
+    .await
+    .unwrap();
+    assert_eq!(reason.as_deref(), Some("The review tests need it"));
     assert!(sql
         .execute("DELETE FROM mer.proposal_events")
         .await
@@ -2134,6 +2522,7 @@ async fn verify_governance(url: &str) {
         title: title.into(),
         note: None,
         changes,
+        touch: None,
     };
     let names = [
         "role-invariant.json",
@@ -2154,8 +2543,14 @@ async fn verify_governance(url: &str) {
     blank.spec["cedar"] = json!("forbid (principal == ?principal, action, resource);");
     changes.push(add(stray));
     changes.push(add(blank));
+    // Some of these rules are written by hand, which an agent may not propose (9 Nov, step 7: it
+    // asks "write Cedar"); a maintainer proposes them here, as the local policy allows.
+    assert!(registry
+        .propose_batch(&agent, batch("Governance roles and rules", changes.clone()))
+        .await
+        .is_err());
     let sent = registry
-        .propose_batch(&agent, batch("Governance roles and rules", changes))
+        .propose_batch(&human, batch("Governance roles and rules", changes))
         .await
         .unwrap();
     let outcome = |path: &str| {
@@ -2229,8 +2624,9 @@ async fn verify_governance(url: &str) {
     unknown.spec["cedar"] = json!(
         r#"permit (principal == ?principal, action == Action::"delete", resource in ?resource);"#
     );
+    // Cedar the form can't read is written by hand: a maintainer's to propose here (step 7).
     let later = registry
-        .propose_batch(&agent, batch("Unknown action", vec![add(unknown)]))
+        .propose_batch(&human, batch("Unknown action", vec![add(unknown)]))
         .await
         .unwrap();
     assert!(

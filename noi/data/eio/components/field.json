@@ -1,0 +1,53 @@
+{
+  "path": "noi.eio.components.field",
+  "name": "Field",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A real text input in a field frame. The frame is its label and shows the focus ring.",
+    "responsibility": "Be the one field every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Take a line of text, such as a search.",
+    "states": {
+      "interaction": {
+        "focus": "focused: the whole frame shows the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.border.input",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.surface.page",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.radius.field",
+      "noi.eio.radius.pill",
+      "noi.eio.size.control.default",
+      "noi.eio.size.icon.small",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.body",
+      "noi.eio.type.style.mono"
+    ],
+    "uses": [
+      "noi.eio.components.icon"
+    ],
+    "files": [
+      {
+        "path": "src/Field/Field.module.css",
+        "sha256": "b63c9c1eb85951ee433b9e4d410e3b946e0a80f8c8a6a6219bd424d87acb3ac4"
+      },
+      {
+        "path": "src/Field/Field.tsx",
+        "sha256": "1cdc3b4de8628171fd03a8fb372d77853001adc2ab27e48fc5c17df8e8dcf5c4"
+      }
+    ]
+  }
+}

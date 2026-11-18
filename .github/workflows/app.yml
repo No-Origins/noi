@@ -36,6 +36,8 @@ jobs:
               - '.node-version'
               - 'tsconfig.base.json'
               - '.github/workflows/app.yml'
+              - 'noi/data/eio/**'
+              - 'noi/scripts/eio-components.mjs'
 
   app:
     name: Typecheck, test and build
@@ -52,6 +54,10 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Components in Mero (agreed 17 Nov): each component meron's files, fingerprints, reads and uses
+      # are what the code has. Comparing with what Mero approved is part B; this compares the data.
+      - name: The component merons match the code
+        run: node noi/scripts/eio-components.mjs --check
       - name: Typecheck
         run: pnpm -r --filter "./ui/**" run typecheck
       - name: Tests (the Eidos rules, the Explorer's styles)

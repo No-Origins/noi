@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.flight.catch-up",
+  "name": "Eye catch-up time",
+  "classification": {
+    "type": "token",
+    "subtype": "time"
+  },
+  "semantics": {
+    "definition": "How long the eye takes to come down to the character when a flight starts while you look from above. A guess, not agreed.",
+    "responsibility": "Let the eye reach the character as quickly as possible (your word, 17 Nov)."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "s": 0.8
+  }
+}

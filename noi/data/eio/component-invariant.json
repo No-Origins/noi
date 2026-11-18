@@ -1,0 +1,144 @@
+{
+  "path": "noi.eio.inv.component",
+  "name": "Component invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos component's meron must meet: what it is for, the states it shows, the Eidos values it reads, the components it uses, and its files with the fingerprints you approved, each in a folder named for it.",
+    "responsibility": "Let a component be used only once it is approved and registered (the user, 17 Nov). Mero keeps the contract and the fingerprints, never the code; git keeps the code. Every file of an Eidos package belongs to exactly one meron."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "agreed": "Components in Mero, decisions 1, 2, 3 and 7, agreed 17 Nov 2026; states by key, Component States, agreed 18 Nov 2026; a folder for each component, 18 Nov 2026 (\"Yes, move them\", then \"Yes, after this one\")"
+  },
+  "spec": {
+    "applies_to": {
+      "type": "component"
+    },
+    "schema": {
+      "title": "Eidos component",
+      "type": "object",
+      "required": [
+        "package",
+        "part",
+        "job",
+        "states",
+        "reads",
+        "uses",
+        "files"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "description": "The Eidos package its files are in. Another package needs a new version of this invariant.",
+          "enum": [
+            "@noi/eio-react",
+            "@noi/eio-3d"
+          ]
+        },
+        "part": {
+          "description": "component: one component. shared-part: a part several components share. package: the package's own files, which belong to no one component (the export list, the settings, the tests).",
+          "enum": [
+            "component",
+            "shared-part",
+            "package"
+          ]
+        },
+        "job": {
+          "description": "What it is for, in plain words.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "states": {
+          "description": "The states it shows, by key (agreed 18 Nov, \"Component States\"): in groups of what varies, each key named as in the code with your words beside it; the group interaction holds what happens to it (hovered, focused, disabled …), every other group an option its code is given. Mero writes the keys as types the code must use. A component names at least one; the package's own files have none.",
+          "$ref": "#/$defs/groups"
+        },
+        "reads": {
+          "description": "The Eidos values its files read, each an admitted value in Mero. Mero links the component to each, so a value in use cannot retire.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/path"
+          }
+        },
+        "uses": {
+          "description": "The components and shared parts its files use, each admitted in Mero under noi.eio.components.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/path"
+          }
+        },
+        "files": {
+          "description": "Its files, as the package's folder has them, each with the fingerprint (SHA-256) of the version you approved. A component's or a shared part's files sit in a folder named for it (src/Button/Button.tsx); the package's own files sit where the package keeps them. The code itself is in git, never in Mero.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "description": "The file's place in the package's folder, such as src/Button/Button.tsx.",
+                "type": "string",
+                "maxLength": 240,
+                "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$"
+              },
+              "sha256": {
+                "description": "The SHA-256 of the file's bytes, in lowercase hex.",
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      },
+      "$defs": {
+        "path": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^noi(\\.[a-z][a-z0-9-]*)+$"
+        },
+        "groups": {
+          "type": "object",
+          "maxProperties": 12,
+          "propertyNames": {
+            "pattern": "^[a-z][a-zA-Z0-9]*$",
+            "maxLength": 40
+          },
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 60,
+            "propertyNames": {
+              "pattern": "^[a-z][a-zA-Z0-9-]*$",
+              "maxLength": 60
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          }
+        }
+      }
+    },
+    "checks": [
+      {
+        "name": "eio.component",
+        "params": {
+          "under": "noi.eio.components",
+          "folders": true
+        }
+      }
+    ]
+  }
+}

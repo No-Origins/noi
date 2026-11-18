@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.movement.walk",
+  "name": "Walk",
+  "classification": {
+    "type": "token",
+    "subtype": "speed"
+  },
+  "semantics": {
+    "definition": "How fast a character walks. The old project's number, brought at your word (17 Nov).",
+    "responsibility": "Move a character."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "old project"
+  },
+  "spec": {
+    "m_per_s": 1.4
+  }
+}

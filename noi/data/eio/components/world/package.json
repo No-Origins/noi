@@ -1,0 +1,59 @@
+{
+  "path": "noi.eio.components.world.package",
+  "name": "@noi/eio-3d: the package’s own files",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The files of @noi/eio-3d that belong to no one element: the export list, the settings, the type for style files, the tests of its rules and states, and the tool that made the characters’ small copies.",
+    "responsibility": "Hold the files of the package that belong to no one component, so that every file of it belongs to exactly one meron. It changes only through a proposal you approve."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "package",
+    "job": "Make the 3D elements one package that apps can use, and test it.",
+    "states": {},
+    "reads": [],
+    "uses": [
+      "noi.eio.components.world.arch",
+      "noi.eio.components.world.character-drawing",
+      "noi.eio.components.world.drawing",
+      "noi.eio.components.world.gateway",
+      "noi.eio.components.world.land",
+      "noi.eio.components.world.pool",
+      "noi.eio.components.world.stage",
+      "noi.eio.components.world.steps"
+    ],
+    "files": [
+      {
+        "path": "package.json",
+        "sha256": "8ca6daaf114001803bc0e5bb5e7f46b2b1d647d1f8f1e8a23deec6cc82274c26"
+      },
+      {
+        "path": "src/css.d.ts",
+        "sha256": "7a2f87015ef7f1aeedbae628457ec9ead7f059addab8cd14865bcbe482edb643"
+      },
+      {
+        "path": "src/index.ts",
+        "sha256": "a5624c3a88d711763aea1dd7db9ba52b20f2dffe916d50d585d723ebffa60633"
+      },
+      {
+        "path": "test/rules.test.mjs",
+        "sha256": "3201714469a5a50b95f952027aea5978ee045e9410c595c54f3e80a05f474196"
+      },
+      {
+        "path": "test/states.test.mjs",
+        "sha256": "59ae3f1d4f5f8d35c589cb3003edbcabf84afeecb3cebd77a9e94f83e151155d"
+      },
+      {
+        "path": "tools/trim-character.mjs",
+        "sha256": "610530ac35d35f05056f249bdd039c0e87fd06c15f28240c657d82181b8c9d5b"
+      },
+      {
+        "path": "tsconfig.json",
+        "sha256": "ce0aab83edf62e4404b70e339703041b5e21e4c78214f017caa4256f7cbc8329"
+      }
+    ]
+  }
+}

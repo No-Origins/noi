@@ -1,0 +1,79 @@
+{
+  "path": "noi.eio.components.package",
+  "name": "@noi/eio-react: the package’s own files",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The files of @noi/eio-react that belong to no one component: the export list, the settings, the type for style files, and the tests of Eidos’s drawing rules, words, links and states.",
+    "responsibility": "Hold the files of the package that belong to no one component, so that every file of it belongs to exactly one meron. It changes only through a proposal you approve."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "package",
+    "job": "Make the components one package that apps can use, and test it.",
+    "states": {},
+    "reads": [],
+    "uses": [
+      "noi.eio.components.badge",
+      "noi.eio.components.button",
+      "noi.eio.components.card",
+      "noi.eio.components.checkbox",
+      "noi.eio.components.chip",
+      "noi.eio.components.choices",
+      "noi.eio.components.disclosure",
+      "noi.eio.components.drawer",
+      "noi.eio.components.field",
+      "noi.eio.components.icon",
+      "noi.eio.components.links",
+      "noi.eio.components.menu-icon",
+      "noi.eio.components.panes",
+      "noi.eio.components.radio",
+      "noi.eio.components.select",
+      "noi.eio.components.sidebar",
+      "noi.eio.components.swatch",
+      "noi.eio.components.tabs",
+      "noi.eio.components.text-area",
+      "noi.eio.components.tree-row"
+    ],
+    "files": [
+      {
+        "path": "package.json",
+        "sha256": "d682f540d56d96aeffb2a600c20c0404cea88953118ea13748fcde208bdf11e0"
+      },
+      {
+        "path": "src/css.d.ts",
+        "sha256": "7a2f87015ef7f1aeedbae628457ec9ead7f059addab8cd14865bcbe482edb643"
+      },
+      {
+        "path": "src/index.ts",
+        "sha256": "e60a93e5025a4f49eefba6d5a210b100f767d43534fb1eb929074319819102e0"
+      },
+      {
+        "path": "test/links.test.mjs",
+        "sha256": "9236f3868e8db3a175fac64469b2983c2ab9e865f41c82029b66c8699896b338"
+      },
+      {
+        "path": "test/rules.test.mjs",
+        "sha256": "f3e544908b26d67e7c7b50f1795f054c1ceba6b93b90aeca6b01a6eb0c81aba7"
+      },
+      {
+        "path": "test/states.test.mjs",
+        "sha256": "546a1958fa91fc8fb08099b9f53496e5e6b76a6be1694e3367b075750abb4e28"
+      },
+      {
+        "path": "test/words.check.tsx",
+        "sha256": "c63d755efb60e2543b412efee73f4880141a0548d519e912b8c977541f34c261"
+      },
+      {
+        "path": "test/words.test.mjs",
+        "sha256": "7a169bbaa1795ec6ed3ab13e68073cfd513032ebbf5aef570d1a5504e6be112f"
+      },
+      {
+        "path": "tsconfig.json",
+        "sha256": "7b3722a01ccb76716900252de18022d7f6fb26bafee9874927850d374922c54e"
+      }
+    ]
+  }
+}

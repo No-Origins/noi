@@ -1,0 +1,41 @@
+{
+  "path": "noi.eio.components.sidebar",
+  "name": "Sidebar",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The list beside a page: what you choose from, such as the tree of merons, the batches in Review or Governance's pages. A real nav with its name; its rows are tree rows, so the keyboard reaches every one. It draws the list only: the app places it, beside the page with Panes where two panes fit, in a Drawer where one fills the window. The usual name for this in design systems.",
+    "responsibility": "Be the one sidebar every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Hold the list you choose from beside a page: what sits on top, then the rows, in one list or in named groups.",
+    "states": {
+      "list": {
+        "one": "the rows in one list",
+        "groups": "the rows in named groups, each under its name"
+      }
+    },
+    "reads": [
+      "noi.eio.color.text.muted",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.gap.stack",
+      "noi.eio.type.style.caption",
+      "noi.eio.type.style.label"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Sidebar/Sidebar.module.css",
+        "sha256": "b4f4502bcd9170468f70d93fc22ff1c9e2ba22672e4682a81452e9fa74a60734"
+      },
+      {
+        "path": "src/Sidebar/Sidebar.tsx",
+        "sha256": "2fc9f000f0597f830580d5de730ce25c005c0806c885273b2ebc227d5585d23b"
+      }
+    ]
+  }
+}

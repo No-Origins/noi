@@ -1,0 +1,40 @@
+{
+  "path": "noi.eio.components.world.steps",
+  "name": "Steps",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "Half rings behind the pool, each higher than the one before, black with one line at the lip of each; the top step carries circles and dissolves with the land.",
+    "responsibility": "Be the one steps every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Rise from the pool to the arches.",
+    "states": {
+      "measure": {
+        "start": "where the steps begin",
+        "depth": "a step’s depth",
+        "height": "a step’s height",
+        "top": "the top step’s height"
+      }
+    },
+    "reads": [
+      "noi.eio.world.steps.depth",
+      "noi.eio.world.steps.height",
+      "noi.eio.world.steps.start",
+      "noi.eio.world.steps.top"
+    ],
+    "uses": [
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/steps/steps.ts",
+        "sha256": "c22bf91a759db38d364956fb9b67efc4f4e880a50d1faa702cf68e1ea900ac51"
+      }
+    ]
+  }
+}

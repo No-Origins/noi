@@ -60,7 +60,9 @@ export const tokens = {
       "red-400": "#FF6467",
       "red-600": "#E7000B",
       "violet": "#9262F3",
-      "white": "#FFFFFF"
+      "white": "#FFFFFF",
+      "world-water": "#1A5F7A",
+      "world-water-deep": "#0A222E"
     },
     "state": {
       "highlight": {
@@ -114,6 +116,48 @@ export const tokens = {
       "warning": {
         "light": "#BB4D00",
         "dark": "#FFB900"
+      }
+    },
+    "world": {
+      "arch": {
+        "light": "#FAFAFA",
+        "dark": "#FAFAFA"
+      },
+      "circle": {
+        "light": "#525252",
+        "dark": "#525252"
+      },
+      "dust": {
+        "light": "#525252",
+        "dark": "#525252"
+      },
+      "highlight": {
+        "light": "#CEEE38",
+        "dark": "#CEEE38"
+      },
+      "land": {
+        "light": "#0A0A0A",
+        "dark": "#0A0A0A"
+      },
+      "sky": {
+        "light": "#0A0A0A",
+        "dark": "#0A0A0A"
+      },
+      "step-edge": {
+        "light": "#737373",
+        "dark": "#737373"
+      },
+      "wall": {
+        "light": "#FAFAFA",
+        "dark": "#FAFAFA"
+      },
+      "water": {
+        "light": "#1A5F7A",
+        "dark": "#1A5F7A"
+      },
+      "water-deep": {
+        "light": "#0A222E",
+        "dark": "#0A222E"
       }
     }
   },
@@ -353,6 +397,78 @@ export const tokens = {
         "case": "none",
         "reading": false
       }
+    }
+  },
+  "world": {
+    "arch": {
+      "distance": 112,
+      "height": 56,
+      "reach": 41.44,
+      "thickness": 4,
+      "width": 40
+    },
+    "character": {
+      "height": 1.8,
+      "step-up": 0.45
+    },
+    "circles": {
+      "dash": 1,
+      "line": 0.14,
+      "place": 10,
+      "radius": 4
+    },
+    "edge": {
+      "band": 48,
+      "grain": 0.35
+    },
+    "eye": {
+      "chase": 3.6,
+      "gateway": 3.4,
+      "jump": 3.8,
+      "on-foot": 6
+    },
+    "flight": {
+      "catch-up": 0.8,
+      "dark": 0.8,
+      "jump-height": 8,
+      "jump-time": 0.6,
+      "least-in": 1.6,
+      "top-speed": 135
+    },
+    "gateway": {
+      "depth": 160
+    },
+    "land": {
+      "radius": 128
+    },
+    "movement": {
+      "ceiling": 100,
+      "fly": 5,
+      "hover": 0.4,
+      "jump": 1.2,
+      "rise": 6,
+      "run": 4,
+      "walk": 1.4
+    },
+    "pool": {
+      "radius": 20
+    },
+    "ripples": {
+      "ahead": 200,
+      "behind": 40,
+      "gap": 1,
+      "speed": 150,
+      "tail": 16
+    },
+    "steps": {
+      "depth": 1.6,
+      "height": 0.3,
+      "start": 32,
+      "top": 9.6
+    },
+    "wall": {
+      "height": 0.6,
+      "width": 1
     }
   }
 } as const

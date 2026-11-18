@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.arch.distance",
+  "name": "Arch distance",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far an arch's upright back stands from the pool's middle, so that the tops of the arches do not touch. A guess, not agreed.",
+    "responsibility": "Place the arches round the half circle."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 112
+  }
+}

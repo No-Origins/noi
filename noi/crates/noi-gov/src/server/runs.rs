@@ -3,7 +3,8 @@
 //! issues a 15-minute run token. The tool runner holds it; the model never does. On this Mac the
 //! platform block is Hyperbase's own Ed25519 key, kept in an owner-only file.
 use super::{
-    accounts::account_by_handle, record, secret, Error, Governance, Result, RUN_TOKEN_MINUTES,
+    accounts::account_by_handle, digest, record, secret, Error, Governance, Result,
+    RUN_TOKEN_MINUTES,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use ed25519_dalek::{pkcs8::EncodePrivateKey, SigningKey};
@@ -150,6 +151,11 @@ impl Governance {
         if claims.exp - claims.iat > MAX_VOUCH_SECONDS {
             return Err(bad("a vouch lasts at most five minutes".into()));
         }
+        // Signed for later, a vouch could last as long as its signer liked (found 9 Nov): it must
+        // start now, give or take the leeway.
+        if claims.iat > chrono::Utc::now().timestamp() + 5 {
+            return Err(bad("a vouch cannot start in the future".into()));
+        }
         let mut tx = self.write().await.map_err(|e| (None, e))?;
         let (agent, kind, state) = account_by_handle(tx.as_mut(), &claims.sub)
             .await
@@ -194,16 +200,24 @@ impl Governance {
             None => None,
         };
         let (token, hash) = secret();
-        sqlx::query("INSERT INTO gov.run_tokens(token_hash,agent,run,started_by,vouched_by,expires_at) VALUES($1,$2,$3,$4,$5, now() + make_interval(mins => $6))")
+        // One run token for each vouch (found 9 Nov): the same vouch again is refused.
+        sqlx::query("INSERT INTO gov.run_tokens(token_hash,agent,run,started_by,vouched_by,expires_at,vouch_hash) VALUES($1,$2,$3,$4,$5, now() + make_interval(mins => $6), $7)")
             .bind(hash)
             .bind(agent)
             .bind(&claims.run)
             .bind(started_by)
             .bind(&name)
             .bind(RUN_TOKEN_MINUTES as i32)
+            .bind(digest(vouch_jwt))
             .execute(tx.as_mut())
             .await
-            .map_err(|e| (who, e.into()))?;
+            .map_err(|e| match e {
+                sqlx::Error::Database(d) if d.is_unique_violation() => (
+                    who,
+                    Error::Refused("this vouch was used already: each buys one run token".into()),
+                ),
+                other => (who, other.into()),
+            })?;
         record(
             tx.as_mut(),
             "run-token",

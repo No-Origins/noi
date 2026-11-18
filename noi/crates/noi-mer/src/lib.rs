@@ -244,7 +244,7 @@ impl Registry {
             }
             resources.push(resource(&scope_meron));
         }
-        let (invariants, checked) = conformance(conn, &proposal).await?;
+        let (invariants, checked) = conformance(conn, uid, &proposal).await?;
         let decision = self
             .authorize(
                 actor,
@@ -291,13 +291,33 @@ impl Registry {
         Ok(meron)
     }
     pub async fn snapshot(&self, actor: &Actor) -> Result<Snapshot> {
+        self.snapshot_under(actor, None).await
+    }
+    /// The registry, or only one place and everything under it (9 Nov, step 6): Governance's
+    /// pages read the roles and rules under noi.gov, not every meron.
+    pub async fn snapshot_under(&self, actor: &Actor, under: Option<&str>) -> Result<Snapshot> {
+        if let Some(place) = under {
+            let ok = place.split('.').all(|p| {
+                p.starts_with(|c: char| c.is_ascii_lowercase())
+                    && p.chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            });
+            if !ok {
+                return Err(Error::Validation(ValidationError(format!(
+                    "{place} is not a place in Mero"
+                ))));
+            }
+        }
         let mut tx = self.pool.begin().await?;
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             .execute(tx.as_mut())
             .await?;
-        let rows = sqlx::query_as::<_, MeronRow>("SELECT * FROM mer.merons ORDER BY path")
-            .fetch_all(tx.as_mut())
-            .await?;
+        let rows = sqlx::query_as::<_, MeronRow>(
+            "SELECT * FROM mer.merons WHERE $1::text IS NULL OR path = $1 OR path LIKE $1 || '.%' ORDER BY path",
+        )
+        .bind(under)
+        .fetch_all(tx.as_mut())
+        .await?;
         let merons: Vec<Meron> = rows
             .into_iter()
             .map(TryInto::try_into)
@@ -306,7 +326,7 @@ impl Registry {
         let resources = if merons.is_empty() {
             vec![Resource {
                 uid: Uuid::nil(),
-                path: "noi".into(),
+                path: under.unwrap_or("noi").into(),
                 revision: 0,
                 authority_scope: Uuid::nil(),
             }]
@@ -320,17 +340,22 @@ impl Registry {
             json!({"operation":"snapshot"}),
         )
         .await?;
+        let uids: Vec<Uuid> = merons.iter().map(|m| m.identity.uid).collect();
         let relationships = sqlx::query_as::<_, RelationshipRow>(
-            "SELECT * FROM mer.relationships ORDER BY source,predicate,target",
+            "SELECT * FROM mer.relationships WHERE $1 OR (source = ANY($2) AND target = ANY($2)) ORDER BY source,predicate,target",
         )
+        .bind(under.is_none())
+        .bind(&uids)
         .fetch_all(tx.as_mut())
         .await?
         .into_iter()
         .map(TryInto::try_into)
         .collect::<Result<_>>()?;
         let releases = sqlx::query_as::<_, ReleaseRow>(
-            "SELECT * FROM mer.releases ORDER BY meron_uid,generation,created_at,uid",
+            "SELECT * FROM mer.releases WHERE $1 OR meron_uid = ANY($2) ORDER BY meron_uid,generation,created_at,uid",
         )
+        .bind(under.is_none())
+        .bind(&uids)
         .fetch_all(tx.as_mut())
         .await?
         .into_iter()
@@ -351,6 +376,18 @@ impl Registry {
     /// The roles and rules under noi.gov, and nothing else: what Governance copies in order to
     /// decide. The one read Mero answers without asking Governance, which needs it to answer at
     /// all; roles and rules hold no secrets (rule 8).
+    /// How current the roles and rules under noi.gov are (9 Nov, step 7), as Governance's copy of
+    /// them is measured: sent with each question, so Governance never decides on a stale copy.
+    pub async fn rules_version(&self) -> Result<String> {
+        let snapshot = self.roles_and_rules().await?;
+        Ok(noi_gov::rules_version(snapshot.merons.iter().map(|m| {
+            (
+                m.identity.path.as_str(),
+                m.revision,
+                m.lifecycle.state.as_str(),
+            )
+        })))
+    }
     pub async fn roles_and_rules(&self) -> Result<Snapshot> {
         let mut conn = self.pool.acquire().await?;
         let rows = sqlx::query_as::<_, MeronRow>(
@@ -559,7 +596,7 @@ impl Registry {
         {
             return Err(ValidationError("update cannot change identity, primary type, release mode or governance binding; use rename for paths".into()).into());
         }
-        let (invariants, checked) = conformance(&mut *conn, &proposal).await?;
+        let (invariants, checked) = conformance(&mut *conn, uid, &proposal).await?;
         // An admitted invariant applies now, so its new version must still pass every meron it covers.
         let mut covered = vec![];
         if before.classification.kind == MeronType::Invariant {
@@ -614,11 +651,12 @@ impl Registry {
     ) -> Result<Meron> {
         let mut tx = self.write().await?;
         let after = self
-            .transition_in(tx.as_mut(), actor, uid, expected_revision, state)
+            .transition_in(tx.as_mut(), actor, uid, expected_revision, state, None)
             .await?;
         tx.commit().await?;
         Ok(after)
     }
+    /// Moves a meron one lifecycle step, with the reason when there is one (a reinstatement has).
     async fn transition_in(
         &self,
         conn: &mut PgConnection,
@@ -626,12 +664,16 @@ impl Registry {
         uid: Uuid,
         expected_revision: i64,
         state: MeronState,
+        reason: Option<&str>,
     ) -> Result<Meron> {
         let before = load(&mut *conn, uid).await?;
         revision(&before, expected_revision)?;
         if !before.lifecycle.state.can_transition(state) {
             return Err(ValidationError("invalid meron lifecycle transition".into()).into());
         }
+        // Coming back from deprecated, a meron must meet today's invariants, as at registration.
+        let reinstating =
+            before.lifecycle.state == MeronState::Deprecated && state == MeronState::Active;
         // Proposed merons are drafts; registration is where invariants are enforced.
         let (mut invariants, mut covered) = (vec![], vec![]);
         let mut checked = checks::Outcome::default();
@@ -639,6 +681,9 @@ impl Registry {
             let invariant = InvariantSpec::parse(&before.spec)?;
             match state {
                 MeronState::Registered => covered = verify_covered(&mut *conn, &before).await?,
+                MeronState::Active if reinstating => {
+                    covered = verify_covered(&mut *conn, &before).await?
+                }
                 MeronState::Retired
                     if !covered_by(&mut *conn, uid, &invariant).await?.is_empty() =>
                 {
@@ -649,10 +694,18 @@ impl Registry {
                 }
                 _ => {}
             }
-        } else if state == MeronState::Registered {
+        } else if state == MeronState::Registered || reinstating {
             let applicable = applicable_invariants(&mut *conn, &before.classification).await?;
             invariants = conform(&before.spec, &applicable)?;
-            checked = checks::run(&mut *conn, &before.spec, &applicable, &HashMap::new()).await?;
+            checked = checks::run(
+                &mut *conn,
+                uid,
+                &before.identity.path,
+                &before.spec,
+                &applicable,
+                &HashMap::new(),
+            )
+            .await?;
         }
         let mut resources = vec![resource(&before)];
         resources.extend(checked.references.values().map(resource));
@@ -675,7 +728,7 @@ impl Registry {
             "meron.transition",
             actor,
             &decision,
-            json!({"before":before,"after":after,"invariants":invariants,"covered":covered,"checks":checked.records,"dependencies":dependencies}),
+            json!({"before":before,"after":after,"invariants":invariants,"covered":covered,"checks":checked.records,"dependencies":dependencies,"reason":reason}),
         )
         .await?;
         Ok(after)
@@ -956,6 +1009,7 @@ async fn known_subtype(conn: &mut PgConnection, kind: MeronType, subtype: &str) 
 /// rules and only checks this registry can run).
 async fn conformance(
     conn: &mut PgConnection,
+    uid: Uuid,
     proposal: &NewMeron,
 ) -> Result<(Vec<RevisionRef>, checks::Outcome)> {
     let classification = &proposal.classification;
@@ -972,7 +1026,15 @@ async fn conformance(
     }
     let applicable = applicable_invariants(conn, classification).await?;
     let invariants = conform(&proposal.spec, &applicable)?;
-    let checked = checks::run(conn, &proposal.spec, &applicable, &HashMap::new()).await?;
+    let checked = checks::run(
+        conn,
+        uid,
+        &proposal.path,
+        &proposal.spec,
+        &applicable,
+        &HashMap::new(),
+    )
+    .await?;
     Ok((invariants, checked))
 }
 async fn applicable_invariants(
@@ -1019,6 +1081,8 @@ async fn verify_covered(conn: &mut PgConnection, invariant: &Meron) -> Result<Ve
         spec.check(&e.spec).map_err(|v| would_fail(v.0))?;
         checks::run(
             conn,
+            e.identity.uid,
+            &e.identity.path,
             &e.spec,
             std::slice::from_ref(invariant),
             &HashMap::new(),

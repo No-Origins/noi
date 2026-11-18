@@ -1,0 +1,68 @@
+{
+  "path": "noi.eio.components.tree-row",
+  "name": "Tree row",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "One row of a tree: a real link or button inside a tree item, so the keyboard reaches every row.",
+    "responsibility": "Be the one tree row every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Show one thing in a tree, such as a meron in Mero’s tree, and lead to its page.",
+    "states": {
+      "holds": {
+        "leaf": "a leaf: holds nothing",
+        "open": "holds others, open: its arrow points down",
+        "closed": "holds others, closed: its arrow points right"
+      },
+      "state": {
+        "other": "not chosen",
+        "selected": "chosen"
+      },
+      "interaction": {
+        "hover": "hovered",
+        "focus": "focused, with the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.focus",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.state.highlight",
+      "noi.eio.color.state.hover",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.motion.duration.ms100",
+      "noi.eio.motion.duration.ms200",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.radius.field",
+      "noi.eio.radius.pill",
+      "noi.eio.size.control.default",
+      "noi.eio.size.control.small",
+      "noi.eio.size.icon.small",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.gap.stack",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.body",
+      "noi.eio.type.style.heading",
+      "noi.eio.type.style.mono"
+    ],
+    "uses": [
+      "noi.eio.components.icon"
+    ],
+    "files": [
+      {
+        "path": "src/TreeRow/TreeRow.module.css",
+        "sha256": "657c04f3c5f4e640c0b0811f9848a7fda9c33bc2624df603cf051be4be4814f7"
+      },
+      {
+        "path": "src/TreeRow/TreeRow.tsx",
+        "sha256": "5b9017a93908772c46d7244d2dc9f02d2eeac9ba0d59cec457bae86550e1adeb"
+      }
+    ]
+  }
+}

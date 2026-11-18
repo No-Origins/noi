@@ -1,17 +1,19 @@
 //! Named invariant checks. Invariants stores each check's name and parameters; the registry runs it.
-//! Today there are five, all pure functions: in `noi-eio`, the Eidos color-role check, the Eidos
-//! text-style check, and the reference check that role tokens such as spacing roles use; in
-//! `noi-gov`, the role and rule checks, which read Cedar against the actions each system declares.
+//! Today there are six, all pure functions: in `noi-eio`, the Eidos color-role check, the Eidos
+//! text-style check, the reference check that role tokens such as spacing roles use, and the
+//! component check (17 Nov); in `noi-gov`, the role and rule checks, which read Cedar against the
+//! actions each system declares.
 use crate::{admitted, applicable_invariants, load, resolve, Error, Result};
 use noi_eio::{
-    FontSpec, Oklch, ReferenceParams, Resolved, RoleParams, RoleSpec, SizeSpec, StyleSpec,
-    TypeParams, TypeResolved, COLOR_ROLE_CHECK, REFERENCE_CHECK, TEXT_STYLE_CHECK,
+    ComponentLookup, ComponentParams, ComponentSpec, FontSpec, Oklch, ReferenceParams, Resolved,
+    RoleParams, RoleSpec, SizeSpec, StyleSpec, TypeParams, TypeResolved, COLOR_ROLE_CHECK,
+    COMPONENT_CHECK, REFERENCE_CHECK, TEXT_STYLE_CHECK,
 };
 use noi_gov::{ROLE_CHECK, RULE_CHECK};
 use noi_inv::{InvariantSpec, Meron, MeronType, RevisionRef, ValidationError};
 use serde_json::{json, Value};
 use sqlx::PgConnection;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use uuid::Uuid;
 
 /// The Governance checks need nothing but the meron's own spec.
@@ -30,6 +32,7 @@ pub(crate) fn validate(invariant: &InvariantSpec) -> Result<()> {
             COLOR_ROLE_CHECK => RoleParams::parse(&check.params).map(|_| ()),
             TEXT_STYLE_CHECK => TypeParams::parse(&check.params).map(|_| ()),
             REFERENCE_CHECK => ReferenceParams::parse(&check.params).map(|_| ()),
+            COMPONENT_CHECK => ComponentParams::parse(&check.params).map(|_| ()),
             ROLE_CHECK | RULE_CHECK => no_params(&check.name, &check.params),
             other => Err(format!("unknown invariant check {other}")),
         }
@@ -61,10 +64,13 @@ fn failed(invariant: &Meron, error: String) -> Error {
     .into()
 }
 
-/// Runs the named checks of `invariants` on `spec`. `overrides` stands a proposed spec in for an
-/// meron's stored one, so a change is checked before it is written.
+/// Runs the named checks of `invariants` on `spec`, the spec of the meron `subject` at `path` (stored
+/// or still to be written). `overrides` stands a proposed spec in for an meron's stored one, so a change is
+/// checked before it is written.
 pub(crate) async fn run(
     conn: &mut PgConnection,
+    subject: Uuid,
+    path: &str,
     spec: &Value,
     invariants: &[Meron],
     overrides: &HashMap<Uuid, Value>,
@@ -98,6 +104,18 @@ pub(crate) async fn run(
                 }
                 REFERENCE_CHECK => {
                     reference(conn, spec, &check.params, &mut read, &mut outcome).await?
+                }
+                COMPONENT_CHECK => {
+                    component(
+                        conn,
+                        (subject, path),
+                        spec,
+                        &check.params,
+                        overrides,
+                        &mut read,
+                        &mut outcome,
+                    )
+                    .await?
                 }
                 ROLE_CHECK => noi_gov::check_role(spec),
                 RULE_CHECK => noi_gov::check_rule(spec),
@@ -211,6 +229,97 @@ async fn reference(
     Ok(noi_eio::check_reference(spec, params, &|_| found))
 }
 
+/// What the component check found in the registry.
+struct ComponentFound {
+    values: BTreeSet<String>,
+    components: BTreeSet<String>,
+    files: HashMap<String, String>,
+    types: HashMap<String, String>,
+    uses: HashMap<String, Vec<String>>,
+}
+impl ComponentLookup for ComponentFound {
+    fn is_value(&self, path: &str) -> bool {
+        self.values.contains(path)
+    }
+    fn is_component(&self, path: &str) -> bool {
+        self.components.contains(path)
+    }
+    fn listed_by(&self, file: &str) -> Option<String> {
+        self.files.get(file).cloned()
+    }
+    fn type_given_by(&self, name: &str) -> Option<String> {
+        self.types.get(name).cloned()
+    }
+    fn uses_of(&self, path: &str) -> Vec<String> {
+        self.uses.get(path).cloned().unwrap_or_default()
+    }
+}
+
+/// The component check: resolves the values a component reads and the components it uses, and
+/// reads every other admitted component meron: those of its package for the files they list, all of
+/// them for the type names their states give and the components they use.
+async fn component(
+    conn: &mut PgConnection,
+    (subject, path): (Uuid, &str),
+    spec: &Value,
+    params: &Value,
+    overrides: &HashMap<Uuid, Value>,
+    read: &mut BTreeMap<Uuid, i64>,
+    outcome: &mut Outcome,
+) -> Result<std::result::Result<(), String>> {
+    let c = match ComponentSpec::parse(spec) {
+        Ok(c) => c,
+        Err(e) => return Ok(Err(e)),
+    };
+    let mut found = ComponentFound {
+        values: BTreeSet::new(),
+        components: BTreeSet::new(),
+        files: HashMap::new(),
+        types: HashMap::new(),
+        uses: HashMap::new(),
+    };
+    for path in &c.reads {
+        if let Some(e) = usable(conn, path).await? {
+            if e.classification.kind == MeronType::Token {
+                found.values.insert(path.clone());
+                read.insert(e.identity.uid, e.revision);
+                outcome.references.insert(e.identity.uid, e);
+            }
+        }
+    }
+    for path in &c.uses {
+        if let Some(e) = usable(conn, path).await? {
+            if e.classification.kind == MeronType::Component {
+                found.components.insert(path.clone());
+                read.insert(e.identity.uid, e.revision);
+                outcome.references.insert(e.identity.uid, e);
+            }
+        }
+    }
+    let others: Vec<Meron> = sqlx::query_as::<_, crate::MeronRow>("SELECT * FROM mer.merons WHERE kind='component' AND state IN ('registered','active','deprecated') AND uid<>$1 ORDER BY path")
+        .bind(subject).fetch_all(&mut *conn).await?
+        .into_iter().map(TryInto::try_into).collect::<Result<_>>()?;
+    for other in &others {
+        // A component's own spec is never read for this, so a malformed one reads as listing nothing.
+        if let Ok(theirs) = ComponentSpec::parse(spec_of(other, overrides)) {
+            for group in theirs.states.keys() {
+                let name = noi_eio::state_type_name(&other.identity.path, group);
+                found.types.insert(name, other.identity.path.clone());
+            }
+            found
+                .uses
+                .insert(other.identity.path.clone(), theirs.uses.clone());
+            if theirs.package == c.package {
+                for f in theirs.files {
+                    found.files.insert(f.path, other.identity.path.clone());
+                }
+            }
+            read.insert(other.identity.uid, other.revision);
+        }
+    }
+    Ok(noi_eio::check_component(path, spec, params, &found))
+}
+
 /// Re-runs the named checks of admitted merons that read a changed meron, with its proposed spec.
 pub(crate) async fn recheck(
     conn: &mut PgConnection,
@@ -224,14 +333,21 @@ pub(crate) async fn recheck(
             continue;
         }
         let invariants = applicable_invariants(conn, &e.classification).await?;
-        let outcome = run(conn, spec_of(&e, overrides), &invariants, overrides)
-            .await
-            .map_err(|error| match error {
-                Error::Validation(v) => {
-                    ValidationError(format!("{} would fail: {}", e.identity.path, v.0)).into()
-                }
-                other => other,
-            })?;
+        let outcome = run(
+            conn,
+            e.identity.uid,
+            &e.identity.path,
+            spec_of(&e, overrides),
+            &invariants,
+            overrides,
+        )
+        .await
+        .map_err(|error| match error {
+            Error::Validation(v) => {
+                ValidationError(format!("{} would fail: {}", e.identity.path, v.0)).into()
+            }
+            other => other,
+        })?;
         if outcome.ran() {
             rechecked.push(RevisionRef {
                 uid: e.identity.uid,

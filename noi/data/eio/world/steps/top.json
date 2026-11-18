@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.steps.top",
+  "name": "Top step height",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How high the top step is above the land: the level the arches stand on. The number of steps is this height over one step's height, 32 today. Your word (17 Nov): more steps, so the arches stand higher. 9.6 metres is a guess, not agreed.",
+    "responsibility": "Lift the arches above the land."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 9.6
+  }
+}

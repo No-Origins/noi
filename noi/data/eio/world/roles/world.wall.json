@@ -1,0 +1,24 @@
+{
+  "path": "noi.eio.color.world.wall",
+  "name": "Pool wall colour",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The wall round the pool. Your word (17 Nov): “The wall around the pool should also be white.”",
+    "responsibility": "Give the 3D world this colour by its meaning, so its drawing code reads a role, never a palette colour."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "world": true
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.neutral-50"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.neutral-50"
+    }
+  }
+}

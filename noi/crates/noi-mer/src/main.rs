@@ -65,7 +65,7 @@ enum Command {
         output: Option<PathBuf>,
     },
     /// An agent sends changes for review as one batch. Each file is a new meron, a change
-    /// (`{"operation": "update" | "rename" | "deprecate", ...}`), or a whole batch.
+    /// (`{"operation": "update" | "rename" | "deprecate" | "reinstate", ...}`), or a whole batch.
     Propose {
         #[arg(required = true)]
         files: Vec<PathBuf>,
@@ -129,7 +129,9 @@ const OPERATOR: &str = "operator";
 impl Authorizer for Operator {
     fn authorize<'a>(&'a self, request: &'a AuthorizationRequest) -> Answer<'a> {
         answer(
-            if request.action == Action::Read && request.actor.subject == OPERATOR {
+            if matches!(request.action, Action::Read | Action::ReadReview)
+                && request.actor.subject == OPERATOR
+            {
                 Decision::Allow {
                     reference: "operator:database-password".into(),
                     policies: vec![],
@@ -237,11 +239,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Err(e) = governance.who(&Credential::Visitor).await {
                 tracing::warn!("{e}. Until Governance answers, Mero refuses everything");
             }
+            // How current the roles and rules are, sent with every question (9 Nov, step 7).
+            match registry.rules_version().await {
+                Ok(v) => governance.rules_now(v),
+                Err(e) => tracing::warn!("the roles and rules could not be read: {e}"),
+            }
             let app = Router::new()
                 .route("/health/alive", get(|| async { noi_log::health::alive() }))
                 .route("/health/ready", get(ready_handler))
                 .route("/api/registry", get(snapshot_handler))
                 .route("/api/review", get(review_handler))
+                .route("/api/review/waiting", get(waiting_handler))
                 .route("/api/review/places", post(places_handler))
                 .route("/api/review/batches", post(propose_handler))
                 .route("/api/review/approve", post(approve_handler))
@@ -428,8 +436,14 @@ fn failure(e: MeroError) -> Response {
         MeroError::Denied(_) | MeroError::ApprovalRequired(_) => StatusCode::FORBIDDEN,
         _ => StatusCode::SERVICE_UNAVAILABLE,
     };
-    let mut response = refused(status, &e.to_string());
-    // A failure inside Mero reaches the Problems page with its reason.
+    // A failure inside Mero says only that; its reason, which can be the database's own words,
+    // reaches the log and the Problems page, never the asker (architecture review, 9 Nov).
+    let said = if status.is_server_error() {
+        "Mero could not answer: try again".to_string()
+    } else {
+        e.to_string()
+    };
+    let mut response = refused(status, &said);
     if status.is_server_error() {
         response
             .extensions_mut()
@@ -495,10 +509,27 @@ async fn ready_handler(State(served): State<Served>) -> Response {
     noi_log::health::ready(&[("database", database), ("governance", governance)])
 }
 
-async fn snapshot_handler(State(served): State<Served>, headers: HeaderMap) -> Response {
+#[derive(Deserialize)]
+struct Under {
+    /// One place and everything under it, such as noi.gov; the whole registry without it.
+    under: Option<String>,
+}
+async fn snapshot_handler(
+    State(served): State<Served>,
+    headers: HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<Under>,
+) -> Response {
     let (actor, registry) = caller!(served, headers, None, false);
-    match registry.snapshot(&actor).await {
+    match registry.snapshot_under(&actor, q.under.as_deref()).await {
         Ok(snapshot) => Json(json!(snapshot)).into_response(),
+        Err(e) => failure(e),
+    }
+}
+/// How many proposals wait: Review's badge (9 Nov, step 6).
+async fn waiting_handler(State(served): State<Served>, headers: HeaderMap) -> Response {
+    let (actor, registry) = caller!(served, headers, None, false);
+    match registry.waiting(&actor).await {
+        Ok(waiting) => Json(json!({ "waiting": waiting })).into_response(),
         Err(e) => failure(e),
     }
 }
@@ -506,14 +537,49 @@ async fn review_handler(State(served): State<Served>, headers: HeaderMap) -> Res
     let (actor, registry) = caller!(served, headers, None, false);
     let signed_in = actor.subject != "visitors";
     match registry.review(&actor).await {
-        Ok(batches) => Json(json!({
-            // Proposing needs only a sign-in; approving, sending back and rejecting need a touch.
-            "writable": signed_in,
-            "reviewer": signed_in.then_some(&actor.subject),
-            "touch_to_decide": true,
-            "batches": batches,
-        }))
-        .into_response(),
+        Ok(batches) => {
+            // Which waiting batches they may decide (agreed 9 Nov, step 6): one question to
+            // Governance for all of them, as if confirmed with a touch, and not recorded. The page
+            // offers Approve, Send back and Reject only there; the real question, with the touch,
+            // is asked when they act.
+            let open: Vec<usize> = (0..batches.len())
+                .filter(|&i| !batches[i].places.is_empty())
+                .collect();
+            let questions: Vec<(Action, Vec<String>)> = open
+                .iter()
+                .map(|&i| (Action::Review, batches[i].places.clone()))
+                .collect();
+            let answers = match credential(&headers) {
+                Ok(c) if signed_in => {
+                    served
+                        .governance
+                        .for_request(
+                            headers
+                                .get(noi_log::REQUEST_ID)
+                                .and_then(|v| v.to_str().ok()),
+                        )
+                        .may_preview(&c, &questions)
+                        .await
+                }
+                _ => vec![false; questions.len()],
+            };
+            let mut may_decide = vec![false; batches.len()];
+            for (k, &i) in open.iter().enumerate() {
+                may_decide[i] = answers.get(k).copied().unwrap_or(false);
+            }
+            Json(json!({
+                // Whether they may decide any waiting batch.
+                "writable": may_decide.iter().any(|d| *d),
+                "reviewer": signed_in.then_some(&actor.subject),
+                "touch_to_decide": true,
+                "batches": batches.iter().zip(may_decide).map(|(b, d)| {
+                    let mut batch = json!(b);
+                    batch["may_decide"] = json!(d);
+                    batch
+                }).collect::<Vec<_>>(),
+            }))
+            .into_response()
+        }
         Err(e) => failure(e),
     }
 }
@@ -525,6 +591,9 @@ struct PlacesBody {
     proposals: Vec<Uuid>,
     #[serde(default)]
     whole_batches: bool,
+    /// approve, send-back or reject: what the touch is for (9 Nov, step 7).
+    #[serde(default)]
+    decision: Option<String>,
 }
 async fn places_handler(
     State(served): State<Served>,
@@ -532,13 +601,27 @@ async fn places_handler(
     Json(body): Json<PlacesBody>,
 ) -> Response {
     let (actor, registry) = caller!(served, headers, None, false);
+    if let Some(d) = &body.decision {
+        if !["approve", "send-back", "reject"].contains(&d.as_str()) {
+            return refused(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "a decision is approve, send-back or reject",
+            );
+        }
+    }
     match registry
-        .review_places(&actor, &body.proposals, body.whole_batches)
+        .review_places_for(
+            &actor,
+            &body.proposals,
+            body.whole_batches,
+            body.decision.as_deref(),
+        )
         .await
     {
-        Ok(places) => Json(json!({
+        Ok((places, about)) => Json(json!({
             "action": Action::Review.as_str(),
             "targets": places.into_iter().map(|p| json!({"path": p})).collect::<Vec<_>>(),
+            "about": about,
         }))
         .into_response(),
         Err(e) => failure(e),
@@ -549,7 +632,8 @@ async fn propose_handler(
     headers: HeaderMap,
     Json(batch): Json<NewBatch>,
 ) -> Response {
-    let (actor, registry) = caller!(served, headers, None, true);
+    // A touch goes with a batch that writes Cedar by hand (9 Nov, step 7).
+    let (actor, registry) = caller!(served, headers, batch.touch, true);
     match registry.propose_batch(&actor, batch).await {
         Ok(batch) => Json(json!(batch)).into_response(),
         Err(e) => failure(e),
@@ -582,8 +666,12 @@ async fn approve_handler(
         },
         _ => Value::Null,
     };
-    // An approved role or rule reaches Governance at once: it copies them again from Mero.
+    // An approved role or rule reaches Governance at once: it copies them again from Mero. Should
+    // that fail, the next question says how current the rules are, and Governance copies then.
     let copied = if touches(&approved, "noi.gov.") {
+        if let Ok(v) = served.registry.rules_version().await {
+            served.governance.rules_now(v);
+        }
         match served.governance.copy().await {
             Ok(c) => c,
             Err(e) => {
@@ -726,20 +814,46 @@ fn cedar_written(body: &CedarForm) -> Result<String, String> {
 
 /// Writes the Eidos token files from the active Eidos merons. Returns how many merons it used.
 fn export_eio(snapshot: &Snapshot, dir: &Path) -> Result<usize, Box<dyn std::error::Error>> {
-    // Only active merons reach apps; proposals never do.
+    // Active merons reach apps, and deprecated ones, marked, until they retire (18 Nov): what reads
+    // them keeps working while it moves off. Proposals never do.
     let sources: Vec<noi_eio::TokenSource> = snapshot
         .merons
         .iter()
         .filter(|m| {
-            m.lifecycle.state == MeronState::Active && m.identity.path.starts_with("noi.eio.")
+            matches!(
+                m.lifecycle.state,
+                MeronState::Active | MeronState::Deprecated
+            ) && m.identity.path.starts_with("noi.eio.")
         })
         .map(|m| noi_eio::TokenSource {
             path: &m.identity.path,
             subtype: m.classification.subtype.as_deref().unwrap_or(""),
             spec: &m.spec,
+            deprecated: m.lifecycle.state == MeronState::Deprecated,
         })
         .collect();
     let files = noi_eio::export_tokens(&sources)?;
+    // Components' states, by key, as types the code must use (agreed 18 Nov, "Component States").
+    let components: Vec<noi_eio::ComponentSource> = snapshot
+        .merons
+        .iter()
+        // A deprecated component keeps its types, marked, until it retires (18 Nov): the code that
+        // uses it moves off it in its own time, and still builds meanwhile.
+        .filter(|m| {
+            matches!(
+                m.lifecycle.state,
+                MeronState::Active | MeronState::Deprecated
+            ) && m.classification.kind == noi_inv::MeronType::Component
+                && m.identity.path.starts_with("noi.eio.")
+        })
+        .map(|m| noi_eio::ComponentSource {
+            path: &m.identity.path,
+            spec: &m.spec,
+            deprecated: m.lifecycle.state == MeronState::Deprecated,
+        })
+        .collect();
+    let types = noi_eio::export_component_types(&components);
+    // The values reach the apps even when the types cannot be written; the error still says why.
     for (name, body) in [
         ("tokens.css", &files.css),
         ("tokens.ts", &files.ts),
@@ -747,6 +861,10 @@ fn export_eio(snapshot: &Snapshot, dir: &Path) -> Result<usize, Box<dyn std::err
     ] {
         std::fs::write(dir.join(name), body)?;
     }
+    std::fs::write(
+        dir.join("components.ts"),
+        types.map_err(|e| format!("the token files are written, but not components.ts: {e}"))?,
+    )?;
     Ok(sources.len())
 }
 
@@ -789,6 +907,7 @@ fn read_batch(
         title,
         note,
         changes,
+        touch: None,
     })
 }
 

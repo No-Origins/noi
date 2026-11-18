@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.steps.depth",
+  "name": "Step depth",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How deep one step is to walk on. Your word (17 Nov): a fifth narrower than before. 1.6 metres is a guess, not agreed.",
+    "responsibility": "Shape the steps."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 1.6
+  }
+}

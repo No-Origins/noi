@@ -1,0 +1,71 @@
+{
+  "path": "noi.eio.components.world.stage",
+  "name": "Stage",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A small black stage for one element of the 3D world, drawn with the world’s own painters, so the element looks as it does in the world: drag to turn it, scroll or pinch to come closer.",
+    "responsibility": "Be the one stage every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Show one element of the 3D world on its own page.",
+    "states": {
+      "interaction": {
+        "drag": "turned: dragged, scrolled or pinched closer",
+        "focus": "focused, with the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.border.default",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.world.arch",
+      "noi.eio.color.world.highlight",
+      "noi.eio.color.world.land",
+      "noi.eio.color.world.sky",
+      "noi.eio.color.world.step-edge",
+      "noi.eio.color.world.wall",
+      "noi.eio.radius.card",
+      "noi.eio.radius.pill",
+      "noi.eio.size.control.large",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.card",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.body",
+      "noi.eio.type.style.caption",
+      "noi.eio.type.style.label",
+      "noi.eio.world.edge.band",
+      "noi.eio.world.edge.grain",
+      "noi.eio.world.land.radius"
+    ],
+    "uses": [
+      "noi.eio.components.world.arch",
+      "noi.eio.components.world.character-drawing",
+      "noi.eio.components.world.drawing",
+      "noi.eio.components.world.gateway",
+      "noi.eio.components.world.land",
+      "noi.eio.components.world.pool",
+      "noi.eio.components.world.steps"
+    ],
+    "files": [
+      {
+        "path": "src/stage/stage.ts",
+        "sha256": "257cc6043d72e4156f70940b8f21de6c359dcd0712fe0ed5c90bb1bb0d253f78"
+      },
+      {
+        "path": "src/stage/Stage3D.module.css",
+        "sha256": "d4194a0b9873ff72a2f3f0ca5ea0fc7da0f79a6888ab89f895c8ee02e4ef7bb5"
+      },
+      {
+        "path": "src/stage/Stage3D.tsx",
+        "sha256": "7516b10a88969e7ba92d8fa10300c834b5470b1e818b3a37d24b8779dd500dee"
+      }
+    ]
+  }
+}

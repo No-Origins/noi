@@ -1,14 +1,16 @@
 //! Eidos design rules as pure functions. No dependency on Invariants, Governance or storage:
 //! the registry runs these when an invariant names one of their checks.
 //! Color lives here; typography in `typography.rs`; the reference check in `reference.rs`;
-//! the token export for apps in `export.rs`.
+//! the component check in `component.rs`; the token export for apps in `export.rs`.
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
 
+mod component;
 mod export;
 mod reference;
 mod typography;
+pub use component::*;
 pub use export::*;
 pub use reference::*;
 pub use typography::*;

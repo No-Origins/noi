@@ -62,21 +62,9 @@
 .error {
   color: var(--eio-color-text-danger);
 }
+/* Eidos's Button, placed at the start of the row. */
 .switch {
   align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--eio-size-target-minimum);
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--eio-color-text-faint);
-  cursor: pointer;
-}
-.switch:hover {
-  text-decoration-color: currentColor;
 }
 /* Before and after, in words, in Review. */
 .words {

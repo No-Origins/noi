@@ -1,0 +1,69 @@
+{
+  "path": "noi.eio.components.icon",
+  "name": "Icons",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The icon set: 27 stroke icons drawn on a 20-unit grid, in the colour of the text around them.",
+    "responsibility": "Be the one icons every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Show a small picture of an action or a thing. A new icon is a new version of this meron.",
+    "states": {
+      "name": {
+        "search": "a magnifying glass: search",
+        "right": "pointing right: on, or open a row",
+        "down": "pointing down: an open row, a list that opens",
+        "left": "pointing left: back",
+        "up-right": "up and to the right, at 45 degrees: a link to a place",
+        "check": "a tick in a circle: success",
+        "tick": "a tick: a checkbox that is on",
+        "x": "a cross in a circle: danger, or no",
+        "warn": "a triangle with a mark: warning",
+        "dash": "a line in a circle: not yet, or does not apply",
+        "plus": "a plus: add",
+        "minus": "a minus: take away",
+        "close": "a cross: close",
+        "arrow": "an arrow to the right: go on",
+        "fit": "four corners: fit to the window",
+        "layers": "stacked layers: a system or a group",
+        "doc": "a page: a document or an invariant",
+        "pen": "a pen: change",
+        "drop": "a drop: a colour",
+        "user": "a person",
+        "agent": "an agent",
+        "key": "a key: a passkey",
+        "fingerprint": "a fingerprint: your touch",
+        "eye": "an eye: look, or show",
+        "theme": "a half-filled circle: light or dark",
+        "comp": "a pill: a component",
+        "menu": "three lines: the menu"
+      },
+      "size": {
+        "small": "16 px",
+        "default": "20 px",
+        "large": "24 px"
+      }
+    },
+    "reads": [
+      "noi.eio.size.icon.default",
+      "noi.eio.size.icon.large",
+      "noi.eio.size.icon.small"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Icon/Icon.module.css",
+        "sha256": "576a2313ce48b09ff2107a8d2d65f17cb800610f11596a886b86d896632aabf2"
+      },
+      {
+        "path": "src/Icon/Icon.tsx",
+        "sha256": "2c71a689d0d890566cc10ce6923ec552a2471e3b845905f9ee6132b6b2908fc9"
+      }
+    ]
+  }
+}

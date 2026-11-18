@@ -22,4 +22,3 @@ services:
     environment:
       MERO_URL: http://127.0.0.1:8787
       GOVERNANCE_API: http://127.0.0.1:8788
-      GOVERNANCE_URL: http://localhost:8788

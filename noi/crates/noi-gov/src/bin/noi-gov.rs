@@ -1,7 +1,7 @@
 //! Governance's command: run its server, set up the first owner, and the operator's few tools.
 //! Also reached as `noi gov …`.
 use clap::{Parser, Subcommand};
-use noi_gov::server::{http, new_voucher_key, vouch, Config, Governance};
+use noi_gov::server::{http, new_voucher_key, vouch, Config, Governance, Mailer};
 use std::{net::SocketAddr, path::PathBuf};
 use url::Url;
 
@@ -15,12 +15,33 @@ struct Cli {
     /// Only Governance uses schema gov. Not needed to sign a vouch.
     #[arg(long, env = "NOI_GOV_DATABASE_URL", hide_env_values = true)]
     database_url: Option<String>,
-    /// Governance's own address. Passkeys need a name, so use localhost, not 127.0.0.1.
+    /// Governance's own address, for its API.
     #[arg(long, env = "NOI_GOV_ORIGIN", default_value = "http://localhost:8788")]
     origin: Url,
+    /// The base name every system's pages are under (agreed 8 Nov): no-origins.localhost on this
+    /// Mac, no-origins.com hosted, and no other (the user, 18 Nov). Passkeys belong to it, on every
+    /// subdomain.
+    #[arg(
+        long,
+        env = "NOI_DOMAIN",
+        default_value = "no-origins.localhost",
+        value_parser = ["no-origins.com", "no-origins.localhost"]
+    )]
+    domain: String,
+    /// Where Governance's pages are, in the one app on gov's own name. One-time links open here.
+    /// Default: http://gov.<domain>:3000/.
+    #[arg(long, env = "NOI_GOV_PAGES")]
+    pages: Option<Url>,
     /// Mero's read API, for copying the approved roles and rules.
     #[arg(long, env = "NOI_MERO_URL", default_value = "http://127.0.0.1:8787")]
     mero: Url,
+    /// Where email goes, such as smtp://127.0.0.1:55325, the mail catcher on this Mac (agreed
+    /// 8 Nov). Without it, signing up and lost-passkey links are refused.
+    #[arg(long, env = "NOI_GOV_MAIL")]
+    mail: Option<Url>,
+    /// Who email comes from. Default: No Origins <no-reply@<domain>>.
+    #[arg(long, env = "NOI_GOV_MAIL_FROM")]
+    mail_from: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -42,6 +63,13 @@ enum Command {
         handle: String,
         #[arg(long)]
         name: String,
+        #[arg(long)]
+        email: String,
+    },
+    /// Accounts.
+    Account {
+        #[command(subcommand)]
+        command: AccountCommand,
     },
     /// Passkeys.
     Passkey {
@@ -69,9 +97,22 @@ enum Command {
 }
 
 #[derive(Subcommand)]
+enum AccountCommand {
+    /// Sets a person's email (agreed 8 Nov): how the first owner gets theirs. Recorded, without the
+    /// address.
+    Email { handle: String, email: String },
+}
+
+#[derive(Subcommand)]
 enum PasskeyCommand {
-    /// Prints a one-time, 10-minute link for an account's first passkey. Refused once it has one.
-    Add { handle: String },
+    /// Prints a one-time, 10-minute link for an account's first passkey. Refused once it has one,
+    /// unless --another: then a link for another passkey, such as one for a new name (agreed 8 Nov).
+    Add {
+        handle: String,
+        /// For an account that has a passkey already; the record keeps that it came from here.
+        #[arg(long)]
+        another: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -118,7 +159,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         &url,
         Config {
             origin: cli.origin.clone(),
+            pages: match &cli.pages {
+                Some(pages) => pages.clone(),
+                None => Url::parse(&format!("http://gov.{}:3000/", cli.domain))?,
+            },
+            domain: cli.domain.clone(),
             mero: Some(cli.mero.clone()),
+            mail: Mailer::from_setting(
+                cli.mail.as_ref(),
+                &cli.mail_from
+                    .clone()
+                    .unwrap_or_else(|| format!("No Origins <no-reply@{}>", cli.domain)),
+            )?,
         },
     )
     .await?;
@@ -131,15 +183,29 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             "{}",
             serde_json::to_string_pretty(&gov.copy_from_mero().await?)?
         ),
-        Command::Setup { handle, name } => {
-            let setup = gov.setup(&handle, &name).await?;
-            println!("{} is the first owner. Open this link in your browser within 10 minutes, then touch to add your passkey:\n{}", handle, setup.link);
+        Command::Setup {
+            handle,
+            name,
+            email,
+        } => {
+            let setup = gov.setup(&handle, &name, &email).await?;
+            println!("{} is the first owner. With the app running, open this link in your browser within 10 minutes, then touch to add your passkey:\n{}", handle, setup.link);
+        }
+        Command::Account {
+            command: AccountCommand::Email { handle, email },
+        } => {
+            gov.set_email(&handle, &email).await?;
+            println!("{handle}'s email is set. Sign in with it or with the handle.");
         }
         Command::Passkey {
-            command: PasskeyCommand::Add { handle },
+            command: PasskeyCommand::Add { handle, another },
         } => {
-            let link = gov.first_passkey_link(&handle).await?;
-            println!("Open this link within 10 minutes, then touch:\n{link}");
+            let link = if another {
+                gov.another_passkey_link(&handle).await?
+            } else {
+                gov.first_passkey_link(&handle).await?
+            };
+            println!("With the app running, open this link within 10 minutes, then touch:\n{link}");
         }
         Command::Voucher {
             command: VoucherCommand::AddThisMac { key_file, name },
@@ -167,7 +233,24 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => tracing::warn!("{e}"),
             }
             let listener = tokio::net::TcpListener::bind(bind).await?;
-            tracing::info!("Governance listening on {} (open {})", bind, cli.origin);
+            tracing::info!(
+                "Governance listening on {} (its pages are in the app, at {})",
+                bind,
+                gov.config().pages
+            );
+            // What has expired is cleared every hour (agreed 9 Nov, step 7), from the start.
+            let tidy = gov.clone();
+            tokio::spawn(async move {
+                let mut every = tokio::time::interval(std::time::Duration::from_secs(3600));
+                loop {
+                    every.tick().await;
+                    match tidy.tidy().await {
+                        Ok(0) => {}
+                        Ok(n) => tracing::info!("cleared {n} expired rows"),
+                        Err(e) => tracing::warn!("clearing expired rows failed: {e}"),
+                    }
+                }
+            });
             // One line per request on standard error, with nothing secret in it.
             // At most 1 MB a request and 30 seconds an answer (agreed 8 Nov); the caller's address
             // is kept for the limit on sign-in starts.
@@ -216,4 +299,37 @@ fn write_owner_only(path: &std::path::Path, contents: &str) -> std::io::Result<(
         .mode(0o600)
         .open(path)?;
     f.write_all(contents.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// NOI_DOMAIN is one of the two names No Origins answers on (the user, 18 Nov), or Governance
+    /// does not start.
+    #[test]
+    fn the_domain_is_one_of_the_two_names() {
+        let domain = |args: &[&str]| {
+            Cli::try_parse_from([&["noi gov"], args, &["copy"]].concat()).map(|c| c.domain)
+        };
+        if std::env::var_os("NOI_DOMAIN").is_none() {
+            assert_eq!(
+                domain(&[]).unwrap(),
+                "no-origins.localhost",
+                "not set: this Mac"
+            );
+        }
+        assert_eq!(
+            domain(&["--domain", "no-origins.com"]).unwrap(),
+            "no-origins.com"
+        );
+        for other in [
+            "no-origins.test",
+            "localhost",
+            "gov.no-origins.com",
+            "example.com",
+        ] {
+            assert!(domain(&["--domain", other]).is_err(), "{other}");
+        }
+    }
 }

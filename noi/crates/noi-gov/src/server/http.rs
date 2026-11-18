@@ -1,15 +1,17 @@
-//! Governance over HTTP, on loopback only. Its own small pages run the passkey ceremonies, so a
-//! passkey is only ever used on Governance's origin or the Explorer's. The session travels as an
-//! HttpOnly, SameSite=Strict cookie that no page script can read. Requests from other hosts or
-//! sites are refused.
+//! Governance over HTTP, on loopback only: its API and its health, and no pages. Its pages (sign
+//! in, add your passkey) are in the one app (agreed 8 Nov), whose server asks this API, so a
+//! passkey is only ever used on the app's pages. The session travels as an HttpOnly,
+//! SameSite=Strict cookie that no page script can read. Requests from other hosts or sites are
+//! refused.
 use super::{
-    accounts::GrantSpec, Credential, Error, Governance, Target, SESSION_COOKIE, SESSION_HOURS,
+    accounts::GrantSpec, Change, Credential, Error, Governance, Target, FAILED_SIGN_INS,
+    SESSION_COOKIE, SESSION_DAYS, WAIT_MINUTES,
 };
 use axum::{
     extract::{ConnectInfo, Path, Query, Request, State},
     http::{header, HeaderMap, HeaderValue, Method, StatusCode},
     middleware::{self, Next},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -28,6 +30,7 @@ impl IntoResponse for Error {
             Error::NotFound(_) => StatusCode::NOT_FOUND,
             Error::Mero(_) => StatusCode::BAD_GATEWAY,
             Error::TooMany(_) => StatusCode::TOO_MANY_REQUESTS,
+            Error::Mail(_) => StatusCode::BAD_GATEWAY,
             Error::Database(_) | Error::Migration(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         // Internal failures stay in Governance's log; the asker learns only that it said no.
@@ -35,6 +38,7 @@ impl IntoResponse for Error {
             Error::Database(_) | Error::Migration(_) => {
                 "Governance could not answer, so no".to_string()
             }
+            Error::Mail(_) => "the email could not be sent: try again later".to_string(),
             other => other.to_string(),
         };
         let mut response = (status, Json(json!({"error": message}))).into_response();
@@ -52,12 +56,6 @@ type Result<T> = std::result::Result<T, Error>;
 
 pub fn router(gov: Governance) -> Router {
     Router::new()
-        .route("/", get(|| async { page("Governance", INDEX) }))
-        .route("/sign-in", get(|| async { page("Sign in", SIGN_IN) }))
-        .route(
-            "/link/{token}",
-            get(|| async { page("Add your passkey", LINK) }),
-        )
         .route("/health/alive", get(|| async { noi_log::health::alive() }))
         .route("/health/ready", get(ready))
         .route("/api/me", get(me))
@@ -66,11 +64,20 @@ pub fn router(gov: Governance) -> Router {
         .route("/api/sign-in/start", post(sign_in_start))
         .route("/api/sign-in/finish", post(sign_in_finish))
         .route("/api/sign-out", post(sign_out))
+        .route("/api/sign-up/start", post(sign_up_start))
+        .route("/api/lost/start", post(lost_start))
         .route("/api/touch/start", post(touch_start))
         .route("/api/touch/finish", post(touch_finish))
         .route("/api/may", post(may))
+        .route("/api/may/preview", post(may_preview))
         .route("/api/profile", get(profile))
-        .route("/api/profile/sign-out", post(profile_sign_out))
+        .route("/api/account/touch/start", post(own_touch_start))
+        .route("/api/account/passkeys/start", post(passkey_add_start))
+        .route("/api/account/passkeys/finish", post(passkey_add_finish))
+        .route("/api/account/passkeys/remove", post(remove_passkey))
+        .route("/api/account/sign-ins/end", post(end_sign_ins))
+        .route("/api/account/email/start", post(email_change_start))
+        .route("/api/account/email/finish", post(email_change_finish))
         .route(
             "/api/profile/sign-out-everywhere",
             post(sign_out_everywhere),
@@ -78,6 +85,8 @@ pub fn router(gov: Governance) -> Router {
         .route("/api/accounts", get(accounts))
         .route("/api/accounts/{handle}", get(account))
         .route("/api/roles", get(roles))
+        .route("/api/dashboard", get(dashboard))
+        .route("/api/people/{handle}", get(person))
         .route("/api/record", get(record_page))
         .route("/api/problems", get(problems))
         .route("/api/who", post(who))
@@ -92,6 +101,10 @@ pub fn router(gov: Governance) -> Router {
             (gov.clone(), Tries::new()),
             limit_starts,
         ))
+        .layer(middleware::from_fn_with_state(
+            (gov.clone(), Tries::new()),
+            limit_failed_sign_ins,
+        ))
         .layer(middleware::from_fn_with_state(gov.clone(), same_machine))
         .with_state(gov)
 }
@@ -105,34 +118,72 @@ pub const STARTS_PER_MINUTE: usize = 10;
 #[derive(Clone)]
 struct Tries {
     starts: Window,
+    failed: Window,
     noted: Window,
 }
 impl Tries {
     fn new() -> Self {
         Self {
             starts: Window::new(STARTS_PER_MINUTE, Duration::from_secs(60)),
+            failed: Window::new(
+                FAILED_SIGN_INS,
+                Duration::from_secs(WAIT_MINUTES as u64 * 60),
+            ),
             noted: Window::new(1, Duration::from_secs(60)),
         }
     }
 }
 
+/// Failed sign-ins slow down whoever is trying, not the person they aim at (agreed 9 Nov, finding
+/// 1): after FAILED_SIGN_INS failed answers from one address in WAIT_MINUTES, that address waits
+/// before signing in again. A passkey can't be guessed, so this only keeps a flood off; it never
+/// stops the person themselves. Until the hosting service names visitors (NOI_VISITOR_HEADER),
+/// every visitor is the app's own server here, and they wait together.
+async fn limit_failed_sign_ins(
+    State((gov, tries)): State<(Governance, Tries)>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let path = req.uri().path();
+    if path != "/api/sign-in/start" && path != "/api/sign-in/finish" {
+        return next.run(req).await;
+    }
+    let finish = path == "/api/sign-in/finish";
+    let key = format!("failed-sign-in:{}", visitor(&req));
+    if let Some(wait) = tries.failed.waits(&key) {
+        let minutes = wait.as_secs().div_ceil(60).max(1);
+        let why = format!(
+            "{FAILED_SIGN_INS} sign-ins failed from here in {WAIT_MINUTES} minutes: wait {minutes} minute{}, then try again",
+            if minutes == 1 { "" } else { "s" }
+        );
+        if tries.noted.allow(&key).is_ok() {
+            gov.note_limit(None, &why, json!({})).await;
+        }
+        return Error::TooMany(why).into_response();
+    }
+    let response = next.run(req).await;
+    if finish && !response.status().is_success() {
+        let _ = tries.failed.allow(&key);
+    }
+    response
+}
+
 /// Which count a start belongs to, if it is one: its key, and what the key stands for.
 fn start_key(req: &Request) -> Option<(String, &'static str)> {
     match req.uri().path() {
-        "/api/sign-in/start" | "/api/link/start" => {
-            let address = req
-                .extensions()
-                .get::<ConnectInfo<SocketAddr>>()
-                .map(|c| c.0.ip().to_string())
-                .unwrap_or_else(|| "unknown".into());
-            Some((format!("address:{address}"), "address"))
+        "/api/sign-in/start"
+        | "/api/link/start"
+        | "/api/sign-up/start"
+        | "/api/lost/start"
+        | "/api/account/email/finish" => Some((format!("address:{}", visitor(req)), "address")),
+        "/api/touch/start" | "/api/account/touch/start" | "/api/account/passkeys/start" => {
+            cookie_session(req.headers()).map(|token| {
+                (
+                    format!("sign-in:{}", hex(&super::digest(&token)[..8])),
+                    "sign-in",
+                )
+            })
         }
-        "/api/touch/start" => cookie_session(req.headers()).map(|token| {
-            (
-                format!("sign-in:{}", hex(&super::digest(&token)[..8])),
-                "sign-in",
-            )
-        }),
         _ => None,
     }
 }
@@ -162,6 +213,25 @@ async fn limit_starts(
         wait.as_secs().max(1)
     ))
     .into_response()
+}
+
+/// Who is visiting: the address the one app's server names for its visitor (it asks for them, so
+/// its own address says nothing about who asks), else the connection's. Governance answers only on
+/// this machine, so only this machine's processes can name one.
+fn visitor(req: &Request) -> String {
+    visitor_of(req.headers()).unwrap_or_else(|| {
+        req.extensions()
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|c| c.0.ip().to_string())
+            .unwrap_or_else(|| "unknown".into())
+    })
+}
+fn visitor_of(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-noi-visitor")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.trim().chars().take(64).collect::<String>())
+        .filter(|v| !v.is_empty())
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -218,10 +288,12 @@ fn cookie_session(headers: &HeaderMap) -> Option<String> {
 fn session(headers: &HeaderMap) -> Result<String> {
     cookie_session(headers).ok_or_else(|| Error::Refused("signed out: sign in first".into()))
 }
+/// The cookie lasts as long as a session can (agreed 9 Nov: a session runs on while it is used);
+/// Governance ends the session itself after SESSION_HOURS unused.
 fn set_session(token: &str) -> HeaderValue {
     HeaderValue::from_str(&format!(
         "{SESSION_COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
-        SESSION_HOURS * 3600
+        SESSION_DAYS * 24 * 3600
     ))
     .expect("a cookie")
 }
@@ -300,14 +372,52 @@ async fn link_finish(
 }
 
 #[derive(Deserialize)]
-struct SignInStart {
+struct SignUpStart {
+    email: String,
     handle: String,
+    display_name: String,
+}
+/// A sign-up (agreed 8 Nov): the same answer whether or not the email has an account.
+async fn sign_up_start(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<SignUpStart>,
+) -> Result<Json<Value>> {
+    // The visitor the app names, for the hourly limit on sign-ups from one address.
+    let address = visitor_of(&headers);
+    let said = gov
+        .sign_up_start(&b.email, &b.handle, &b.display_name, address.as_deref())
+        .await?;
+    Ok(Json(json!({ "ok": true, "said": said })))
+}
+#[derive(Deserialize)]
+struct LostStart {
+    email: String,
+}
+/// A lost passkey: the same answer whether or not the email has an account.
+async fn lost_start(
+    State(gov): State<Governance>,
+    Json(b): Json<LostStart>,
+) -> Result<Json<Value>> {
+    let said = gov.lost_passkey_start(&b.email).await?;
+    Ok(Json(json!({ "ok": true, "said": said })))
+}
+
+/// Signing in (agreed 9 Nov): with no handle, the browser offers this site's passkeys; with one,
+/// only that person's.
+#[derive(Deserialize)]
+struct SignInStart {
+    #[serde(default)]
+    handle: Option<String>,
 }
 async fn sign_in_start(
     State(gov): State<Governance>,
     Json(b): Json<SignInStart>,
 ) -> Result<impl IntoResponse> {
-    Ok(Json(gov.sign_in_start(b.handle.trim()).await?))
+    Ok(Json(match b.handle.as_deref().map(str::trim) {
+        Some(handle) if !handle.is_empty() => gov.sign_in_start(handle).await?,
+        _ => gov.sign_in_any_start().await?,
+    }))
 }
 #[derive(Deserialize)]
 struct Finish {
@@ -329,17 +439,100 @@ async fn sign_in_finish(
 async fn profile(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Value>> {
     Ok(Json(gov.profile(&session(&headers)?).await?))
 }
-#[derive(Deserialize)]
-struct SignOutOne {
-    session: Uuid,
-}
-async fn profile_sign_out(
+
+/// Your account (agreed 9 Nov): a touch for one change to it, then the change with that touch.
+async fn own_touch_start(
     State(gov): State<Governance>,
     headers: HeaderMap,
-    Json(b): Json<SignOutOne>,
+    Json(change): Json<Change>,
+) -> Result<impl IntoResponse> {
+    Ok(Json(
+        gov.own_touch_start(&session(&headers)?, change).await?,
+    ))
+}
+#[derive(Deserialize)]
+struct Touched {
+    touch: Uuid,
+}
+async fn passkey_add_start(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<Touched>,
+) -> Result<impl IntoResponse> {
+    Ok(Json(
+        gov.passkey_add_start(&session(&headers)?, b.touch).await?,
+    ))
+}
+async fn passkey_add_finish(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<LinkFinish>,
 ) -> Result<Json<Value>> {
-    gov.sign_out_session(&session(&headers)?, b.session).await?;
-    Ok(Json(json!({"ok": true})))
+    let passkey = gov
+        .passkey_add_finish(
+            &session(&headers)?,
+            b.ceremony,
+            &b.credential,
+            &b.name,
+            device(&headers).as_deref(),
+        )
+        .await?;
+    Ok(Json(json!({ "passkey": passkey })))
+}
+#[derive(Deserialize)]
+struct RemovePasskey {
+    touch: Uuid,
+    passkey: Uuid,
+}
+async fn remove_passkey(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<RemovePasskey>,
+) -> Result<Json<Value>> {
+    let ended = gov
+        .remove_passkey(&session(&headers)?, b.touch, b.passkey)
+        .await?;
+    Ok(Json(json!({ "sign_ins_ended": ended })))
+}
+#[derive(Deserialize)]
+struct EndSignIns {
+    touch: Uuid,
+    /// One sign-in; without it, every one but this.
+    #[serde(default)]
+    session: Option<Uuid>,
+}
+async fn end_sign_ins(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<EndSignIns>,
+) -> Result<Json<Value>> {
+    let ended = gov
+        .end_sign_ins(&session(&headers)?, b.touch, b.session)
+        .await?;
+    Ok(Json(json!({ "ended": ended })))
+}
+#[derive(Deserialize)]
+struct EmailStart {
+    touch: Uuid,
+    email: String,
+}
+async fn email_change_start(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<EmailStart>,
+) -> Result<Json<Value>> {
+    let said = gov
+        .email_change_start(&session(&headers)?, b.touch, &b.email)
+        .await?;
+    Ok(Json(json!({ "ok": true, "said": said })))
+}
+/// The link sent to a new email: no sign-in needed, as the link proves the address.
+async fn email_change_finish(
+    State(gov): State<Governance>,
+    Json(b): Json<LinkStart>,
+) -> Result<Json<Value>> {
+    gov.email_change_finish(&b.token).await?;
+    Ok(Json(json!({ "ok": true })))
 }
 async fn sign_out_everywhere(
     State(gov): State<Governance>,
@@ -369,6 +562,14 @@ async fn account(
 }
 async fn roles(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Value>> {
     Ok(Json(gov.roles(&viewer(&headers)).await?))
+}
+/// Governance's home, for whoever is looking: signed out gets nothing asked of it.
+async fn dashboard(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Value>> {
+    Ok(Json(gov.dashboard(&viewer(&headers)).await?))
+}
+/// Someone's public profile, by handle: open to everyone, signed in or not.
+async fn person(State(gov): State<Governance>, Path(handle): Path<String>) -> Result<Json<Value>> {
+    Ok(Json(gov.public_profile(&handle).await?))
 }
 async fn record_page(
     State(gov): State<Governance>,
@@ -405,6 +606,9 @@ async fn sign_out(State(gov): State<Governance>, headers: HeaderMap) -> Result<R
 struct TouchStart {
     action: String,
     targets: Vec<Target>,
+    /// What else the touch is for (step 7), as the system that will ask says it.
+    #[serde(default)]
+    about: Option<Value>,
 }
 /// Governance can decide when its database answers and it holds a copy of the roles and rules.
 async fn ready(State(gov): State<Governance>) -> Response {
@@ -418,7 +622,7 @@ async fn touch_start(
     Json(b): Json<TouchStart>,
 ) -> Result<impl IntoResponse> {
     Ok(Json(
-        gov.touch_start(&session(&headers)?, &b.action, &b.targets)
+        gov.touch_start_about(&session(&headers)?, &b.action, &b.targets, b.about.as_ref())
             .await?,
     ))
 }
@@ -433,6 +637,39 @@ async fn touch_finish(
     Ok(Json(json!({"touch": touch})))
 }
 
+/// "What may they do here?" (step 6): a system names the credential it was given, else the
+/// browser's cookie, else signed out. Answers only yes or no for each; nothing is recorded.
+#[derive(Deserialize)]
+struct Preview {
+    #[serde(default)]
+    credential: Option<Credential>,
+    questions: Vec<Question>,
+    #[serde(default)]
+    rules_at: Option<String>,
+}
+#[derive(Deserialize)]
+struct Question {
+    action: String,
+    targets: Vec<Target>,
+}
+async fn may_preview(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<Preview>,
+) -> Result<Json<Value>> {
+    let credential = b.credential.unwrap_or_else(|| viewer(&headers));
+    if let Some(at) = &b.rules_at {
+        gov.keep_up(at).await?;
+    }
+    let questions: Vec<(String, Vec<Target>)> = b
+        .questions
+        .into_iter()
+        .map(|q| (q.action, q.targets))
+        .collect();
+    let answers = gov.may_preview(&credential, &questions).await?;
+    Ok(Json(json!({ "answers": answers })))
+}
+
 /// "May they?" A system names the credential it was given; a browser's cookie is used otherwise;
 /// with neither, the asker is signed out.
 #[derive(Deserialize)]
@@ -443,6 +680,12 @@ struct May {
     targets: Vec<Target>,
     #[serde(default)]
     touch: Option<Uuid>,
+    /// What else the touch named (step 7): it must be the same.
+    #[serde(default)]
+    about: Option<Value>,
+    /// How current Mero's roles and rules are (step 7): if the copy differs, copy first.
+    #[serde(default)]
+    rules_at: Option<String>,
 }
 async fn may(
     State(gov): State<Governance>,
@@ -453,15 +696,26 @@ async fn may(
         .credential
         .or_else(|| cookie_session(&headers).map(Credential::Session))
         .unwrap_or(Credential::Visitor);
-    let answer = gov.may(&credential, &b.action, &b.targets, b.touch).await?;
+    if let Some(at) = &b.rules_at {
+        gov.keep_up(at).await?;
+    }
+    let answer = gov
+        .may_about(
+            &credential,
+            &b.action,
+            &b.targets,
+            b.touch,
+            b.about.as_ref(),
+        )
+        .await?;
     if let Some(handle) = &answer.handle {
         noi_log::who(handle);
     }
     // Only what is safe to show: what, how many places, the answer and why; never the credential.
     if answer.allowed {
-        tracing::info!(action = %b.action, places = b.targets.len(), touch = b.touch.is_some(), record = answer.record, "may: allowed");
+        tracing::info!(action = %b.action, places = b.targets.len(), touch = b.touch.is_some(), record = ?answer.record, "may: allowed");
     } else {
-        tracing::info!(action = %b.action, places = b.targets.len(), touch = b.touch.is_some(), record = answer.record, why = %answer.reason, "may: refused");
+        tracing::info!(action = %b.action, places = b.targets.len(), touch = b.touch.is_some(), record = ?answer.record, why = %answer.reason, "may: refused");
     }
     Ok(Json(answer))
 }
@@ -522,8 +776,7 @@ struct Invite {
     touch: Option<Uuid>,
     handle: String,
     display_name: String,
-    #[serde(default)]
-    email: Option<String>,
+    email: String,
     #[serde(default)]
     grants: Vec<GrantSpec>,
 }
@@ -538,7 +791,7 @@ async fn invite(
             b.touch,
             &b.handle,
             &b.display_name,
-            b.email.as_deref(),
+            &b.email,
             &b.grants,
         )
         .await?;
@@ -590,113 +843,3 @@ async fn end_sessions(
 async fn copy(State(gov): State<Governance>) -> Result<impl IntoResponse> {
     Ok(Json(gov.copy_from_mero().await?))
 }
-
-fn page(title: &str, body: &str) -> Html<String> {
-    let title = if title == "Governance" {
-        "Governance".to_string()
-    } else {
-        format!("{title} · Governance")
-    };
-    Html(format!(
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title}</title><style>{STYLE}</style><script>{SCRIPT}</script></head><body><main><p class="label">No Origins · Governance</p>{body}</main></body></html>"#
-    ))
-}
-
-const STYLE: &str = r#"
-:root { color-scheme: light dark; --ink: #0a0a0a; --muted: #636363; --line: #d4d4d4; --page: #fafafa; --card: #fff; --accent: #ceee38; }
-@media (prefers-color-scheme: dark) { :root { --ink: #fafafa; --muted: #a3a3a3; --line: #404040; --page: #0a0a0a; --card: #171717; } }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--page); color: var(--ink); font: 16px/24px system-ui, sans-serif; }
-main { max-width: 440px; margin: 64px auto; padding: 24px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
-h1 { font-size: 24px; line-height: 32px; margin: 0 0 8px; }
-p { margin: 0 0 16px; }
-.label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-label { display: block; margin: 0 0 16px; color: var(--muted); font-size: 14px; }
-input { display: block; width: 100%; margin-top: 8px; min-height: 44px; padding: 0 12px; font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--line); border-radius: 12px; }
-button { min-height: 44px; padding: 0 20px; font: inherit; font-weight: 600; color: #0a0a0a; background: var(--accent); border: 0; border-radius: 999px; cursor: pointer; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-#out { margin-top: 16px; min-height: 24px; color: var(--muted); }
-"#;
-
-const SCRIPT: &str = r#"
-const dec = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=')), c => c.charCodeAt(0));
-const enc = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const out = t => { document.getElementById('out').textContent = t; };
-async function post(path, body) {
-  const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error || 'Governance said no');
-  return j;
-}
-function creation(o) {
-  const p = structuredClone(o.publicKey);
-  p.challenge = dec(p.challenge); p.user.id = dec(p.user.id);
-  (p.excludeCredentials || []).forEach(c => { c.id = dec(c.id); });
-  return { publicKey: p };
-}
-function request(o) {
-  const p = structuredClone(o.publicKey);
-  p.challenge = dec(p.challenge);
-  (p.allowCredentials || []).forEach(c => { c.id = dec(c.id); });
-  return { publicKey: p };
-}
-const registered = c => ({ id: c.id, rawId: enc(c.rawId), type: c.type, extensions: c.getClientExtensionResults(),
-  response: { attestationObject: enc(c.response.attestationObject), clientDataJSON: enc(c.response.clientDataJSON),
-    transports: c.response.getTransports ? c.response.getTransports() : undefined } });
-const asserted = c => ({ id: c.id, rawId: enc(c.rawId), type: c.type, extensions: c.getClientExtensionResults(),
-  response: { authenticatorData: enc(c.response.authenticatorData), clientDataJSON: enc(c.response.clientDataJSON),
-    signature: enc(c.response.signature), userHandle: c.response.userHandle ? enc(c.response.userHandle) : null } });
-async function whoami() {
-  const r = await fetch('/api/me');
-  return r.ok ? r.json() : null;
-}
-async function showMe() {
-  const me = await whoami();
-  const el = document.getElementById('me');
-  if (!el) return;
-  el.textContent = me ? `Signed in as ${me.display_name} (${me.handle}).` : 'Signed out.';
-  document.getElementById('signout').hidden = !me;
-}
-async function signOut() { await post('/api/sign-out'); showMe(); out(''); }
-"#;
-
-const INDEX: &str = r#"<h1>Governance</h1><p id="me">…</p>
-<p><a href="/sign-in">Sign in</a></p><button id="signout" hidden onclick="signOut()">Sign out</button><p id="out"></p>
-<script>addEventListener('DOMContentLoaded', showMe)</script>"#;
-
-const SIGN_IN: &str = r#"<h1>Sign in</h1><p id="me">…</p>
-<p>No passkey yet? Open the one-time link you were given first: it adds your passkey and signs you in.</p>
-<label>Handle<input id="handle" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
-<button onclick="signIn()">Sign in with your passkey</button> <button id="signout" hidden onclick="signOut()">Sign out</button>
-<p id="out" role="status"></p>
-<script>
-addEventListener('DOMContentLoaded', showMe);
-async function signIn() {
-  try {
-    out('Touch your passkey…');
-    const s = await post('/api/sign-in/start', { handle: document.getElementById('handle').value });
-    const c = await navigator.credentials.get(request(s.options));
-    await post('/api/sign-in/finish', { ceremony: s.ceremony, credential: asserted(c) });
-    out(''); showMe();
-  } catch (e) { out(e.message); }
-}
-</script>"#;
-
-const LINK: &str = r#"<h1>Add your passkey</h1>
-<p>This link works once. Your passkey stays on your device; Governance keeps only its public half.</p>
-<label>Name this passkey<input id="name" value="Touch ID on this Mac" autocomplete="off"></label>
-<button onclick="addPasskey()">Add a passkey</button>
-<p id="out" role="status"></p><p id="me"></p><button id="signout" hidden onclick="signOut()">Sign out</button>
-<script>
-async function addPasskey() {
-  try {
-    out('Touch to make your passkey…');
-    const token = location.pathname.split('/').pop();
-    const s = await post('/api/link/start', { token });
-    const c = await navigator.credentials.create(creation(s.options));
-    await post('/api/link/finish', { ceremony: s.ceremony, credential: registered(c), name: document.getElementById('name').value });
-    out('Your passkey is added.'); showMe();
-  } catch (e) { out(e.message); }
-}
-</script>"#;

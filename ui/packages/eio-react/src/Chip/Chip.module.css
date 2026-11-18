@@ -1,0 +1,30 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+  min-height: var(--eio-size-target-minimum);
+  padding: 0 var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-surface-card);
+  color: var(--eio-color-text-primary);
+  text-decoration: none;
+  /* Hover fades its color: Eidos motion, 100 ms. */
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--eio-motion-duration-ms100);
+  transition-timing-function: var(--eio-motion-easing-standard);
+}
+.chip:hover {
+  background: var(--eio-color-state-hover);
+}
+.chip:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: var(--eio-border-width-focus);
+}
+.mark {
+  display: inline-flex;
+  flex: none;
+}
+.note {
+  color: var(--eio-color-text-muted);
+}

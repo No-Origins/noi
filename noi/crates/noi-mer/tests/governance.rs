@@ -2,7 +2,7 @@
 //! with a software passkey standing in for Touch ID. Creates a disposable database and drops it;
 //! never touches the shared one.
 //! Explicit opt-in: NOI_TEST_ADMIN_URL=... cargo test -p noi-mer --test governance -- --ignored
-use noi_gov::server::{http, new_voucher_key, vouch, Config, Governance, GrantSpec};
+use noi_gov::server::{grant_about, http, new_voucher_key, vouch, Config, Governance, GrantSpec};
 use noi_gov::*;
 use noi_inv::*;
 use noi_mer::{Change, Error, NewBatch, ProposalState, Registry};
@@ -45,7 +45,7 @@ struct Person {
 impl Person {
     async fn add_passkey(&mut self, gov: &Governance, link: &str) {
         let s = gov
-            .link_start(link.rsplit('/').next().unwrap())
+            .link_start(link.rsplit('#').next().unwrap())
             .await
             .unwrap();
         let c = self
@@ -71,7 +71,21 @@ impl Person {
         action: &str,
         targets: &[Target],
     ) -> Uuid {
-        let s = gov.touch_start(session, action, targets).await.unwrap();
+        self.touch_for(gov, session, action, targets, None).await
+    }
+    /// A touch naming what else it is for (9 Nov, step 7).
+    async fn touch_for(
+        &mut self,
+        gov: &Governance,
+        session: &str,
+        action: &str,
+        targets: &[Target],
+        about: Option<Value>,
+    ) -> Uuid {
+        let s = gov
+            .touch_start_about(session, action, targets, about.as_ref())
+            .await
+            .unwrap();
         let c = self
             .key
             .do_authentication(self.origin.clone(), s.options)
@@ -104,6 +118,7 @@ fn batch(title: &str, changes: Vec<Change>) -> NewBatch {
         title: title.into(),
         note: None,
         changes,
+        touch: None,
     }
 }
 fn add(m: NewMeron) -> Change {
@@ -182,6 +197,9 @@ async fn verify(url: &str) {
         url,
         Config {
             origin: origin.clone(),
+            pages: Url::parse("https://gov.no-origins.localhost:3000/").unwrap(),
+            domain: "no-origins.localhost".into(),
+            mail: noi_gov::server::Mailer::None,
             mero: None,
         },
     )
@@ -202,10 +220,15 @@ async fn verify(url: &str) {
     };
 
     // You: the first owner, a passkey, a session.
-    let setup = gov.setup("hiddenstack", "Ada").await.unwrap();
+    let setup = gov
+        .setup("hiddenstack", "Ada", "ada@example.com")
+        .await
+        .unwrap();
+    // Where the passkey is used: the app's pages on the subdomains (agreed 8 Nov); https, as the
+    // software passkey takes http only for plain localhost.
     let mut person = Person {
         key: SoftPasskey::new(true),
-        origin: origin.clone(),
+        origin: Url::parse("https://mero.no-origins.localhost:3000").unwrap(),
     };
     person.add_passkey(&gov, &setup.link).await;
     let session = person.sign_in(&gov, "hiddenstack").await;
@@ -250,7 +273,13 @@ async fn verify(url: &str) {
         .await
         .unwrap();
     let t = person
-        .touch(&gov, &session, "add-agent", &[Target::Path("noi".into())])
+        .touch_for(
+            &gov,
+            &session,
+            "add-agent",
+            &[Target::Path("noi".into())],
+            Some(json!({"handle": "design-agent"})),
+        )
         .await;
     let agent_id = gov
         .add_agent(
@@ -264,20 +293,22 @@ async fn verify(url: &str) {
         )
         .await
         .unwrap();
+    let proposing = GrantSpec {
+        role: "noi.gov.roles.proposer".into(),
+        scope: "noi.inv".into(),
+    };
     let t = person
-        .touch(&gov, &session, "grant", &[Target::Account(agent_id)])
+        .touch_for(
+            &gov,
+            &session,
+            "grant",
+            &[Target::Account(agent_id)],
+            Some(grant_about(&proposing)),
+        )
         .await;
-    gov.grant(
-        &you,
-        Some(t),
-        "design-agent",
-        &GrantSpec {
-            role: "noi.gov.roles.proposer".into(),
-            scope: "noi.inv".into(),
-        },
-    )
-    .await
-    .unwrap();
+    gov.grant(&you, Some(t), "design-agent", &proposing)
+        .await
+        .unwrap();
     let v = vouch(
         &pem,
         "hyperbase:this-mac",
@@ -319,6 +350,31 @@ async fn verify(url: &str) {
     );
     // Agents never approve.
     denied(as_agent.approve(&agent, &[sent.uid]).await, "");
+    // Reading Review is its own action (9 Nov, step 6): this agent may propose, and gets its batch
+    // back, but may not read Review; a maintainer may, and sees the batch's places and the count.
+    denied(as_agent.review(&agent).await, "read-review");
+    let seen = with(you.clone(), None).review(&me).await.unwrap();
+    let mine = seen.iter().find(|b| b.uid == sent.uid).unwrap();
+    assert_eq!(
+        mine.places,
+        vec!["noi.inv".to_string(), "noi.inv.step-three".to_string()]
+    );
+    assert!(with(you.clone(), None).waiting(&me).await.unwrap() >= 1);
+    denied(as_agent.waiting(&agent).await, "read-review");
+    // Only one place and what is under it, for Governance's pages.
+    let gov_only = with(you.clone(), None)
+        .snapshot_under(&me, Some("noi.gov"))
+        .await
+        .unwrap();
+    assert!(!gov_only.merons.is_empty());
+    assert!(gov_only
+        .merons
+        .iter()
+        .all(|m| m.identity.path == "noi.gov" || m.identity.path.starts_with("noi.gov.")));
+    assert!(with(you.clone(), None)
+        .snapshot_under(&me, Some("noi.gov%"))
+        .await
+        .is_err());
 
     // Approving: without a touch the fresh-touch rule says no.
     denied(
@@ -345,8 +401,30 @@ async fn verify(url: &str) {
             .await,
         "touch",
     );
+    // A touch names the decision and each proposal at its revision (9 Nov, step 7): one made to
+    // send it back, on the same places, does not approve it.
+    let (_, back) = with(you.clone(), None)
+        .review_places_for(&me, &[sent.uid], true, Some("send-back"))
+        .await
+        .unwrap();
+    let to_send_back = person
+        .touch_for(&gov, &session, "review", &targets, back)
+        .await;
+    denied(
+        with(you.clone(), Some(to_send_back))
+            .approve(&me, &[sent.uid])
+            .await,
+        "touch",
+    );
     // The right touch approves the whole batch.
-    let touch = person.touch(&gov, &session, "review", &targets).await;
+    let (_, about) = with(you.clone(), None)
+        .review_places_for(&me, &[sent.uid], true, Some("approve"))
+        .await
+        .unwrap();
+    assert_eq!(about.as_ref().unwrap()["decision"], "approve");
+    let touch = person
+        .touch_for(&gov, &session, "review", &targets, about)
+        .await;
     let approved = with(you.clone(), Some(touch))
         .approve(&me, &[sent.uid])
         .await
@@ -452,24 +530,91 @@ async fn verify(url: &str) {
         "touch",
     );
 
-    // Governance's record holds every answer Mero asked for, refusals too.
+    // Cedar the form didn't write asks "write Cedar", with a touch (9 Nov, step 7): refused
+    // without one, proposed with one made for it.
+    let mut by_hand = meron(gov_scope, "noi.gov.rules.by-hand");
+    by_hand.classification = Classification {
+        kind: MeronType::Rule,
+        subtype: Some("policy".into()),
+        roles: vec![],
+    };
+    by_hand.spec = json!({"cedar": "forbid (principal, action, resource) when { context.fresh_signature && !context.fresh_signature };"});
+    let by_hand_batch = || batch("By hand", vec![add(by_hand.clone())]);
+    denied(
+        with(you.clone(), None)
+            .propose_batch(&me, by_hand_batch())
+            .await,
+        "fresh-touch",
+    );
+    let written = vec![Target::Path("noi.gov.rules.by-hand".into())];
+    let t = person
+        .touch_for(&gov, &session, "write-cedar", &written, None)
+        .await;
+    let mut with_touch = by_hand_batch();
+    with_touch.touch = Some(t);
+    assert!(with(you.clone(), Some(t))
+        .propose_batch(&me, with_touch)
+        .await
+        .is_ok());
+    // Revising asks it too (10 Nov): a rule the form wrote can't be revised into Cedar written by
+    // hand without that touch.
+    let mut formed = by_hand.clone();
+    formed.path = "noi.gov.rules.formed".into();
+    formed.spec = json!({"cedar": noi_gov::form::write_rule(&noi_gov::form::RuleForm {
+        effect: noi_gov::form::Effect::Forbid,
+        who: noi_gov::form::Who::Anyone,
+        doing: vec![noi_gov::form::Doing {
+            system: "mero".into(),
+            pick: noi_gov::form::Pick::These { verbs: vec!["transition".into()] },
+        }],
+        place: noi_gov::form::Where::Everywhere,
+        unless: vec![],
+    })
+    .unwrap()});
+    let waiting = with(you.clone(), None)
+        .propose_batch(&me, batch("Formed", vec![add(formed.clone())]))
+        .await
+        .unwrap();
+    let mut rewritten = formed.clone();
+    rewritten.spec = by_hand.spec.clone();
+    denied(
+        with(you.clone(), None)
+            .revise(&me, waiting.proposals[0].uid, add(rewritten), None)
+            .await,
+        "fresh-touch",
+    );
+    // Governance's record holds every answer Mero asked for, refusals too, but not an allowed read
+    // (agreed 9 Nov, finding I).
     let mut sql = PgConnection::connect(url).await.unwrap();
     let asked: Vec<(Option<String>, bool)> =
         sqlx::query_as("SELECT action, allowed FROM gov.record WHERE kind = 'decision'")
             .fetch_all(&mut sql)
             .await
             .unwrap();
-    for action in ["read", "propose", "review"] {
+    // Approving asked what each change does too (9 Nov, step 7): a new meron is linked into its
+    // container and moved to active.
+    for action in ["relate", "transition"] {
         assert!(
             asked
                 .iter()
                 .any(|(a, ok)| a.as_deref() == Some(action) && *ok),
+            "{action} asked on approval"
+        );
+    }
+    for action in ["read", "propose", "review"] {
+        assert_eq!(
+            asked
+                .iter()
+                .any(|(a, ok)| a.as_deref() == Some(action) && *ok),
+            action != "read",
             "{action} allowed"
         );
-        assert!(
+        // The one refused read here was a visitor's, which is no longer recorded (10 Nov).
+        assert_eq!(
             asked
                 .iter()
                 .any(|(a, ok)| a.as_deref() == Some(action) && !*ok),
+            action != "read",
             "{action} refused"
         );
     }

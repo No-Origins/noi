@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.ripples.ahead",
+  "name": "Lime ripples ahead",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far ahead of the character the lime ripples in a gateway fade out. A guess, not agreed.",
+    "responsibility": "Show the path into a system."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 200
+  }
+}

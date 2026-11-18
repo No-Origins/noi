@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.character.height",
+  "name": "Character height",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How tall a character is: 6 feet. Your word (17 Nov): characters of about 6 feet.",
+    "responsibility": "Give everything in the world its size beside a person."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "m": 1.8
+  }
+}

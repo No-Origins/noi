@@ -4,27 +4,46 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import { cache } from 'react'
+import { errorOf, notAnswering, READ_MS, WRITE_MS } from './backend'
 
 const MERO_URL = process.env.MERO_URL ?? 'http://127.0.0.1:8787'
-/** Where you sign in. Open the Explorer at localhost too, so the browser sends the same cookie. */
-export const GOVERNANCE_URL = process.env.GOVERNANCE_URL ?? 'http://localhost:8788'
 
 /** Your sign-in, as Mero takes it. Signed out, there is none, and Mero asks as a visitor. */
 async function credential(): Promise<Record<string, string>> {
   const token = (await cookies()).get('noi_session')?.value
-  return token ? { authorization: `Session ${token}` } : {}
+  return token && !ended().yes ? { authorization: `Session ${token}` } : {}
+}
+
+/** Whether this request's sign-in turned out to have ended, remembered for the one render. */
+const ended = cache(() => ({ yes: false }))
+
+/** Whether this browser carries a sign-in at all. Without one there is nothing to ask as. */
+async function carriesSignIn(): Promise<boolean> {
+  return Boolean((await cookies()).get('noi_session')?.value)
 }
 
 /** Mero said no to whoever is asking: signed out, a sign-in that ended, or no grant. */
 export class Refused extends Error {}
 
 async function read<T>(path: string): Promise<T> {
-  const res = await fetch(`${MERO_URL}${path}`, { cache: 'no-store', headers: await credential() })
+  const headers = await credential()
+  let res: Response
+  try {
+    res = await fetch(`${MERO_URL}${path}`, { cache: 'no-store', headers, signal: AbortSignal.timeout(READ_MS) })
+  } catch {
+    throw new Error(notAnswering('Mero'))
+  }
+  // A sign-in that ended (12 hours unused) must not close what a visitor may read (10 Nov): the
+  // cookie outlives the session, so ask again as a visitor, for the rest of this render too.
+  if (res.status === 401 && 'authorization' in headers) {
+    ended().yes = true
+    return read<T>(path)
+  }
   if (res.status === 401 || res.status === 403) {
     const body = await res.json().catch(() => ({}))
     throw new Refused(body.error ?? `Mero answered ${res.status}`)
   }
-  if (!res.ok) throw new Error(`Mero answered ${res.status}. Is \`noi serve\` running?`)
+  if (!res.ok) throw new Error(errorOf('Mero', res.status))
   return res.json()
 }
 
@@ -77,6 +96,9 @@ export const hrefOf = (path: string) => `/merons/${path.split('.').join('/')}`
 /** A label for the meron's kind, such as "Token · color role". */
 export function kindLabel(m: Meron) {
   const type = m.classification.type[0].toUpperCase() + m.classification.type.slice(1)
+  // A component's meron says which part of a package it is (Components in Mero, 17 Nov).
+  if (m.classification.type === 'component' && m.spec?.part === 'shared-part') return 'Component · shared part'
+  if (m.classification.type === 'component' && m.spec?.part === 'package') return 'Component · the package’s own files'
   return m.classification.subtype ? `${type} · ${m.classification.subtype.replace(/-/g, ' ')}` : type
 }
 
@@ -104,6 +126,7 @@ export type Change =
   | { operation: 'update'; uid: string; expected_revision: number; meron: NewMeron; compatibility: Compatibility }
   | { operation: 'rename'; uid: string; expected_revision: number; path: string }
   | { operation: 'deprecate'; uid: string; expected_revision: number }
+  | { operation: 'reinstate'; uid: string; expected_revision: number; reason: string }
 
 export interface NewMeron {
   path: string
@@ -137,9 +160,14 @@ export interface Proposal {
   stale: boolean
 }
 export interface ProposalEvent { sequence: number; proposal: string | null; action: string; actor: string; note: string | null; occurred_at: string }
-export interface Batch { uid: string; title: string; proposer: string; created_at: string; proposals: Proposal[]; events: ProposalEvent[] }
-/** `writable`: signed in, so you can propose. `touch_to_decide`: approving, sending back and
- * rejecting need your touch, which comes to the Explorer in step 4. */
+/** A batch, with the places deciding its waiting proposals asks about, and whether you may decide
+ * it (asked of Governance as if you touched, unrecorded: 9 Nov, step 6). */
+export interface Batch {
+  uid: string; title: string; proposer: string; created_at: string; proposals: Proposal[]; events: ProposalEvent[]
+  places: string[]; may_decide?: boolean
+}
+/** `writable`: you may decide at least one waiting batch. `reviewer`: who is signed in.
+ * `touch_to_decide`: approving, sending back and rejecting need your touch. */
 export interface ReviewState { writable: boolean; reviewer: string | null; touch_to_decide?: boolean; batches: Batch[] }
 
 /** Every batch, and what you may do with them. */
@@ -149,10 +177,17 @@ export const review = cache(async (): Promise<ReviewState> => read<ReviewState>(
 export const nextBatch = (batches: Batch[]): Batch | undefined =>
   batches.filter(b => b.proposals.some(p => p.state === 'waiting')).at(-1) ?? batches[0]
 
-/** How many proposals wait for a decision; undefined when Mero cannot say. */
+/** Only the roles and rules, under noi.gov (9 Nov, step 6): what Governance's pages need, without
+ * the whole registry. Read once per request. */
+export const govSnapshot = cache(async (): Promise<Snapshot> => read<Snapshot>('/api/registry?under=noi.gov'))
+
+/** How many proposals wait for a decision: Review's badge, as Mero counts it, without every batch
+ * (9 Nov, step 6). Undefined when Mero won't or can't say: signed out, Review is closed. */
 export async function waitingCount(): Promise<number | undefined> {
+  // Signed out, Review is closed: don't ask, so a visitor's page view leaves nothing behind (10 Nov).
+  if (!(await carriesSignIn())) return undefined
   try {
-    return (await review()).batches.flatMap(b => b.proposals).filter(p => p.state === 'waiting').length
+    return (await read<{ waiting: number }>('/api/review/waiting')).waiting
   } catch {
     return undefined
   }
@@ -167,19 +202,22 @@ export async function send(path: string, body: unknown): Promise<{ ok: true; dat
       headers: { 'content-type': 'application/json', ...(await credential()) },
       body: JSON.stringify(body),
       cache: 'no-store',
+      signal: AbortSignal.timeout(WRITE_MS),
     })
     const data = await res.json().catch(() => ({}))
-    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Mero answered ${res.status}` }
+    return res.ok ? { ok: true, data } : { ok: false, error: errorOf('Mero', res.status, data.error) }
   } catch {
-    return { ok: false, error: 'Mero isn’t answering. Is `noi serve` running?' }
+    return { ok: false, error: notAnswering('Mero') }
   }
 }
 
-/** What deciding on these proposals asks Governance about: the action, and exactly which places. A
- * touch is for these and nothing else. `wholeBatches` is approving every waiting proposal given. */
-export async function places(proposals: string[], wholeBatches: boolean) {
-  return send('places', { proposals, whole_batches: wholeBatches }) as Promise<
-    { ok: true; data: { action: string; targets: { path: string }[] } } | { ok: false; error: string }
+/** What deciding on these proposals asks Governance about: the action, exactly which places, and,
+ * with the decision, what else the touch names: the decision and each proposal at its revision (9
+ * Nov, step 7). A touch is for these and nothing else. `wholeBatches` is approving every waiting
+ * proposal given. */
+export async function places(proposals: string[], wholeBatches: boolean, decision?: string) {
+  return send('places', { proposals, whole_batches: wholeBatches, ...(decision ? { decision } : {}) }) as Promise<
+    { ok: true; data: { action: string; targets: { path: string }[]; about?: unknown } } | { ok: false; error: string }
   >
 }
 

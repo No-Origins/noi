@@ -24,11 +24,12 @@
       "additionalProperties": false,
       "properties": {
         "family": {
-          "description": "brand, neutral or status. A new family needs a maintainer.",
+          "description": "brand, neutral, status, or world: colours only the 3D world uses. A new family needs a maintainer.",
           "enum": [
             "brand",
             "neutral",
-            "status"
+            "status",
+            "world"
           ]
         },
         "value": {
@@ -44,7 +45,7 @@
               "const": "oklch"
             },
             "components": {
-              "description": "Lightness 0\u20131, chroma 0 or more, hue in degrees 0 up to 360.",
+              "description": "Lightness 0–1, chroma 0 or more, hue in degrees 0 up to 360.",
               "type": "array",
               "prefixItems": [
                 {

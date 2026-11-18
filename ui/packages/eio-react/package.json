@@ -8,7 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "node --test test/rules.test.mjs test/words.test.mjs",
+    "test": "node --test test/rules.test.mjs test/words.test.mjs test/links.test.mjs test/states.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -1,0 +1,43 @@
+{
+  "path": "noi.eio.components.swatch",
+  "name": "Swatch",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A colour shown as content: the one component whose colour comes from data, not from a role.",
+    "responsibility": "Be the one swatch every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Show a colour, or a role’s two colours.",
+    "states": {
+      "size": {
+        "small": "16 px",
+        "default": "24 px",
+        "large": "40 px"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.color.border.default",
+      "noi.eio.radius.pill",
+      "noi.eio.size.control.default",
+      "noi.eio.size.control.small",
+      "noi.eio.size.icon.small"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Swatch/Swatch.module.css",
+        "sha256": "604863d3d78853a64b61933d5ff878bda62d7dac55214c5a23a851bb25737f71"
+      },
+      {
+        "path": "src/Swatch/Swatch.tsx",
+        "sha256": "83920c1ec8cc85160ce75c41aa7fcec4c74617ef14e1f93222401784e813e071"
+      }
+    ]
+  }
+}

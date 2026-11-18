@@ -27,6 +27,47 @@ struct Held {
 
 /// The roles and rules in a Mero snapshot: rule merons under noi.gov that are active or deprecated.
 /// Retired ones are left out. Each is checked again, as Invariants checked it before approval.
+/// How current a snapshot of Mero's roles and rules is, as Mero says it of its own.
+fn version_of(snapshot: &Value) -> String {
+    let merons = snapshot["merons"].as_array().cloned().unwrap_or_default();
+    crate::rules_version(merons.iter().map(|m| {
+        (
+            m["identity"]["path"].as_str().unwrap_or_default(),
+            m["revision"].as_i64().unwrap_or_default(),
+            m["lifecycle"]["state"].as_str().unwrap_or_default(),
+        )
+    }))
+}
+
+impl Governance {
+    /// Never decides on a stale copy (agreed 9 Nov, step 7): when Mero's roles and rules differ
+    /// from the last copy, copies them now, one copy at a time, and says no if it can't.
+    pub async fn keep_up(&self, mero_has: &str) -> Result<()> {
+        let latest = || async {
+            sqlx::query_scalar::<_, Option<String>>(
+                "SELECT version FROM gov.copies ORDER BY id DESC LIMIT 1",
+            )
+            .fetch_optional(&self.pool)
+            .await
+            .map(Option::flatten)
+        };
+        if latest().await?.as_deref() == Some(mero_has) {
+            return Ok(());
+        }
+        let _one = self.copying.lock().await;
+        if latest().await?.as_deref() == Some(mero_has) {
+            return Ok(());
+        }
+        match self.copy_from_mero().await {
+            // Copied what Mero holds now: as current as Mero, even if it moved on meanwhile.
+            Ok(_) => Ok(()),
+            Err(_) => Err(Error::Refused(
+                "Governance's roles and rules are behind Mero's, and could not be brought up to date: try again".into(),
+            )),
+        }
+    }
+}
+
 fn held(snapshot: &Value) -> std::result::Result<Vec<Held>, String> {
     let merons = snapshot["merons"]
         .as_array()
@@ -92,7 +133,9 @@ impl Governance {
             Ok(snapshot) => self.copy_from_snapshot(&snapshot, url.as_str()).await,
             Err(e) => {
                 let mut conn = self.pool.acquire().await?;
-                let reason = format!("Mero did not answer, so the last copy stays: {e}");
+                // The network's own words stay in the log, not the record or the page (10 Nov).
+                tracing::error!(error = %e, "Mero did not answer the copy");
+                let reason = "Mero did not answer, so the last copy stays".to_string();
                 record(
                     &mut conn,
                     "copy",
@@ -140,13 +183,15 @@ impl Governance {
         };
         let roles = held.iter().filter(|h| h.kind == "role").count();
         let rules = held.len() - roles;
+        let version = version_of(snapshot);
         let mut tx = self.write().await?;
         let copy: i64 = sqlx::query_scalar(
-            "INSERT INTO gov.copies(source, roles, rules) VALUES($1,$2,$3) RETURNING id",
+            "INSERT INTO gov.copies(source, roles, rules, version) VALUES($1,$2,$3,$4) RETURNING id",
         )
         .bind(source)
         .bind(roles as i32)
         .bind(rules as i32)
+        .bind(&version)
         .fetch_one(tx.as_mut())
         .await?;
         sqlx::query("DELETE FROM gov.policies")

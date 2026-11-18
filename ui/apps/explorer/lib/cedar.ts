@@ -2,6 +2,7 @@
 // Nov). Server-side only, with your sign-in, like every other call to Mero.
 import 'server-only'
 import { cookies } from 'next/headers'
+import { errorOf, notAnswering, READ_MS } from './backend'
 import type { Meron, Snapshot } from './mero'
 import type { Reading, RoleForm, RuleForm } from './sentence'
 
@@ -15,11 +16,12 @@ async function post<T>(path: string, body: unknown): Promise<{ ok: true; data: T
       headers: { 'content-type': 'application/json', ...(token ? { authorization: `Session ${token}` } : {}) },
       body: JSON.stringify(body),
       cache: 'no-store',
+      signal: AbortSignal.timeout(READ_MS),
     })
     const data = await res.json().catch(() => ({}))
-    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Mero answered ${res.status}` }
+    return res.ok ? { ok: true, data } : { ok: false, error: errorOf('Mero', res.status, data.error) }
   } catch {
-    return { ok: false, error: 'Mero isn’t answering. Is `noi serve` running?' }
+    return { ok: false, error: notAnswering('Mero') }
   }
 }
 

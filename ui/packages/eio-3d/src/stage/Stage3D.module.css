@@ -1,0 +1,72 @@
+/* One element of the 3D world on a small black stage. Colours are Eidos's roles, sizes its tokens. */
+.stage {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-world-sky);
+  aspect-ratio: 16 / 10;
+  min-height: calc(var(--eio-size-control-large) * 5);
+}
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+.canvas:active {
+  cursor: grabbing;
+}
+.canvas:focus-visible {
+  outline: var(--eio-border-width-focus) solid var(--eio-color-focus-ring);
+  outline-offset: calc(var(--eio-border-width-focus) * -1);
+}
+/* A measure, laid over the picture: a clear line in the world's highlight colour. */
+.marks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.marks line {
+  stroke: var(--eio-color-world-highlight);
+  stroke-width: var(--eio-border-width-focus);
+  stroke-linecap: round;
+}
+.label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  padding: calc(var(--eio-space-gap-inline) / 2) var(--eio-space-gap-inline);
+  border: var(--eio-border-width-default) solid var(--eio-color-world-highlight);
+  border-radius: var(--eio-radius-pill);
+  background: var(--eio-color-world-sky);
+  color: var(--eio-color-world-highlight);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hint {
+  position: absolute;
+  left: var(--eio-space-inset-control);
+  bottom: var(--eio-space-gap-inline);
+  margin: 0;
+  color: var(--eio-color-text-muted);
+  pointer-events: none;
+}
+.cannot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--eio-space-inset-card);
+  text-align: center;
+  color: var(--eio-color-text-muted);
+}

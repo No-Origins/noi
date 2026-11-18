@@ -206,7 +206,7 @@
 }
 .record {
   display: grid;
-  grid-template-columns: 5ch minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto;
+  grid-template-columns: var(--eio-size-control-default) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto;
   align-items: center;
   gap: var(--eio-space-gap-stack);
   padding: var(--eio-space-gap-stack) 0;

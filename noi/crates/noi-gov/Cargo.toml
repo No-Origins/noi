@@ -6,7 +6,7 @@ license.workspace = true
 
 [features]
 # What Mero uses to ask Governance's server "may they?", over loopback.
-client = ["dep:reqwest"]
+client = ["dep:reqwest", "dep:sha2"]
 # Governance's own server: schema gov, passkeys, sessions, run tokens, grants, "may they?" and the
 # record. Mero uses only the boundary types, the Cedar checks and the client, so it builds without this.
 server = [
@@ -22,9 +22,9 @@ cedar-policy = "4.14.1"
 axum = { version = "0.8", optional = true }
 noi-log = { path = "../noi-log", optional = true }
 tracing = { version = "0.1", optional = true }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"], optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "io-util", "time"], optional = true }
 sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json", "migrate", "macros"], optional = true }
-webauthn-rs = { version = "0.6.2", features = ["danger-allow-state-serialisation"], optional = true }
+webauthn-rs = { version = "0.6.2", features = ["danger-allow-state-serialisation", "conditional-ui"], optional = true }
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto", "use_pem"], optional = true }
 ed25519-dalek = { version = "2", features = ["pkcs8", "pem"], optional = true }
 rand = { version = "0.9", optional = true }

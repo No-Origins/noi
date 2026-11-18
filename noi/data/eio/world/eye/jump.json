@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.eye.jump",
+  "name": "Eye in the jump",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far behind the character the eye is while he leaps. A guess, not agreed.",
+    "responsibility": "Follow the character into a system."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 3.8
+  }
+}

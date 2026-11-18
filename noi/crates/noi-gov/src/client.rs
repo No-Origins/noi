@@ -5,8 +5,20 @@ use crate::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::time::Duration;
+use sha2::{Digest, Sha256};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
+
+/// How long Mero remembers who holds a credential (agreed 9 Nov, step 6): one call to Governance
+/// per request, not two. Safe because "who" only names the account: "may they?" still checks the
+/// credential on every request, so an ended sign-in or role stops at once.
+const WHO_SECONDS: u64 = 30;
+/// Who holds each credential, by the credential's SHA-256, so no token is kept here.
+type Known = Arc<Mutex<HashMap<[u8; 32], (Who, Instant)>>>;
 
 /// Governance's address, and one HTTP client for every question.
 #[derive(Clone)]
@@ -15,6 +27,9 @@ pub struct GovernanceClient {
     http: reqwest::Client,
     /// The request this client asks for, so Governance's log line carries the same ID as Mero's.
     request_id: Option<String>,
+    known: Known,
+    /// How current Mero's roles and rules are (9 Nov, step 7), sent with each question.
+    rules_at: Arc<Mutex<Option<String>>>,
 }
 
 /// Who holds a credential, as Governance says.
@@ -31,7 +46,9 @@ struct MayAnswer {
     allowed: bool,
     reason: String,
     handle: Option<String>,
-    record: i64,
+    /// None for an allowed read, which Governance doesn't record (9 Nov).
+    #[serde(default)]
+    record: Option<i64>,
 }
 
 impl GovernanceClient {
@@ -44,7 +61,18 @@ impl GovernanceClient {
             base: base.trim_end_matches('/').to_string(),
             http,
             request_id: None,
+            known: Arc::default(),
+            rules_at: Arc::default(),
         }
+    }
+
+    /// Mero's roles and rules as they are now (see `crate::rules_version`): sent with each
+    /// question, so Governance never decides on a stale copy.
+    pub fn rules_now(&self, version: String) {
+        *self.rules_at.lock().expect("rules version") = Some(version);
+    }
+    fn rules_at(&self) -> Option<String> {
+        self.rules_at.lock().expect("rules version").clone()
     }
 
     /// The same client, asking on behalf of this request.
@@ -101,11 +129,53 @@ impl GovernanceClient {
     }
 
     pub async fn who(&self, credential: &Credential) -> Result<Who, String> {
+        let key: [u8; 32] =
+            Sha256::digest(serde_json::to_vec(credential).unwrap_or_default()).into();
+        let fresh = Duration::from_secs(WHO_SECONDS);
+        if let Some((who, at)) = self.known.lock().expect("who cache").get(&key) {
+            if at.elapsed() < fresh {
+                return Ok(who.clone());
+            }
+        }
         let value = self
             .post("/api/who", json!({ "credential": credential }))
             .await?;
-        serde_json::from_value(value)
-            .map_err(|e| format!("Governance's answer could not be read: {e}"))
+        let who: Who = serde_json::from_value(value)
+            .map_err(|e| format!("Governance's answer could not be read: {e}"))?;
+        let mut known = self.known.lock().expect("who cache");
+        if known.len() >= 1000 {
+            known.retain(|_, (_, at)| at.elapsed() < fresh);
+        }
+        known.insert(key, (who.clone(), Instant::now()));
+        Ok(who)
+    }
+
+    /// "What may they do here?" (agreed 9 Nov, step 6): yes or no for each action on its places,
+    /// as if confirmed with a touch, and not recorded. Anything but an answer reads as no.
+    pub async fn may_preview(
+        &self,
+        credential: &Credential,
+        questions: &[(Action, Vec<String>)],
+    ) -> Vec<bool> {
+        let none = || vec![false; questions.len()];
+        if questions.is_empty() {
+            return vec![];
+        }
+        let body = json!({
+            "credential": credential,
+            "rules_at": self.rules_at(),
+            "questions": questions.iter().map(|(action, paths)| json!({
+                "action": action.as_str(),
+                "targets": paths.iter().map(|p| json!({"path": p})).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+        });
+        match self.post("/api/may/preview", body).await {
+            Ok(v) => serde_json::from_value::<Vec<bool>>(v["answers"].clone())
+                .ok()
+                .filter(|a| a.len() == questions.len())
+                .unwrap_or_else(none),
+            Err(_) => none(),
+        }
     }
 
     /// Trades a platform's vouch for an agent's 15-minute run token.
@@ -148,7 +218,7 @@ impl GovernanceClient {
         if targets.is_empty() {
             return deny("an action needs at least one resource".into());
         }
-        let touch = if request.action == Action::Review {
+        let touch = if matches!(request.action, Action::Review | Action::WriteCedar) {
             touch
         } else {
             None
@@ -158,6 +228,9 @@ impl GovernanceClient {
             "action": request.action.as_str(),
             "targets": targets,
             "touch": touch,
+            // What else the touch named (9 Nov, step 7): the decision and each proposal.
+            "about": request.intent.get("touch_for"),
+            "rules_at": self.rules_at(),
         });
         let answer: MayAnswer = match self.post("/api/may", body).await {
             Ok(v) => match serde_json::from_value(v) {
@@ -167,17 +240,21 @@ impl GovernanceClient {
             Err(e) => return deny(e),
         };
         if !answer.allowed {
-            return deny(format!(
-                "{} (Governance record {})",
-                answer.reason, answer.record
-            ));
+            return deny(match answer.record {
+                Some(n) => format!("{} (Governance record {n})", answer.reason),
+                None => answer.reason,
+            });
         }
         // Governance answered for the credential; Mero records the actor. They must be the same.
         if answer.handle.as_deref() != Some(request.actor.subject.as_str()) {
             return deny("Governance answered for someone else".into());
         }
         Decision::Allow {
-            reference: format!("governance:record:{}", answer.record),
+            // An allowed read has no place in the record (9 Nov); everything else cites its entry.
+            reference: match answer.record {
+                Some(n) => format!("governance:record:{n}"),
+                None => "governance:read".into(),
+            },
             policies: vec![answer.reason],
         }
     }

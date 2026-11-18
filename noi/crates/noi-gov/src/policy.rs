@@ -123,7 +123,7 @@ impl ScopedAuthorizer {
             return deny("no assignment for every resource governance scope");
         };
         let allowed = roles.iter().all(|role| match request.action {
-            Action::Read => true,
+            Action::Read | Action::ReadReview => true,
             Action::Propose => *role != Role::Observer,
             _ => *role == Role::Maintainer,
         });

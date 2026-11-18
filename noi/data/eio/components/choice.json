@@ -1,0 +1,55 @@
+{
+  "path": "noi.eio.components.choice",
+  "name": "Choice box",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The box Checkbox and Radio share: square with a tick for a checkbox, round with a dot for a radio, and the frame of a checkbox’s tile.",
+    "responsibility": "Hold what several Eidos components share, once. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "shared-part",
+    "job": "Draw the box of a checkbox and of a radio once, so the two always match.",
+    "states": {
+      "interaction": {
+        "checked": "on: lime, with its tick or dot",
+        "disabled": "locked",
+        "focus": "focused, with the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.action.on-primary",
+      "noi.eio.color.action.primary",
+      "noi.eio.color.border.default",
+      "noi.eio.color.border.input",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.state.highlight",
+      "noi.eio.color.surface.page",
+      "noi.eio.color.text.faint",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.motion.duration.ms100",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.radius.check",
+      "noi.eio.radius.field",
+      "noi.eio.radius.pill",
+      "noi.eio.size.dot",
+      "noi.eio.size.icon.default",
+      "noi.eio.size.target.minimum",
+      "noi.eio.space.gap.inline",
+      "noi.eio.space.inset.control"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Choice/Choice.module.css",
+        "sha256": "539336d60a08dd9be1bda74a89054131b39beb3a0bae845abd31610fd8284307"
+      }
+    ]
+  }
+}

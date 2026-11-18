@@ -1,13 +1,12 @@
 'use client'
-// The list of merons: search, then the tree. The tree opens the way to the meron on screen, and each
+// The list of merons, on Eidos's Sidebar: search, then the tree. The tree opens the way to the meron on screen, and each
 // arrow opens or closes its row; a row's name opens its page. With a search, it lists every meron or
 // group whose name, path or color matches. Beside the page where two panes fit, in the menu otherwise.
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Field, TreeRow } from '@noi/eio-react'
+import { Field, Sidebar, TreeRow } from '@noi/eio-react'
 import type { TreeNode } from '../../lib/tree'
 import { PreviewMark } from './PreviewMark'
-import styles from './merons.module.css'
 
 const hrefOf = (path: string) => `/merons/${path.split('.').join('/')}`
 const prefixes = (path: string) => path.split('.').map((_, i, a) => a.slice(0, i + 1).join('.'))
@@ -19,7 +18,7 @@ export function Navigator({ nodes }: { nodes: TreeNode[] }) {
   const current = decodeURIComponent(pathname.replace(/^\/merons\/?/, '')).split('/').filter(Boolean).join('.')
     || (nodes.find(n => n.parent === null)?.path ?? '')
   const [query, setQuery] = useState('')
-  const pane = useRef<HTMLDivElement>(null)
+  const pane = useRef<HTMLElement>(null)
 
   // Rows open by their arrows; the way to the meron on screen is always opened.
   const [expanded, setExpanded] = useState(() => new Set(prefixes(current)))
@@ -72,25 +71,27 @@ export function Navigator({ nodes }: { nodes: TreeNode[] }) {
   }
 
   return (
-    <div className={styles.navigator} ref={pane}>
-      <Field label="Search merons" icon="search" placeholder="Search names, paths, colors" hint="/" value={query} onChange={e => setQuery(e.target.value)} onClear={() => setQuery('')} />
-      <div role="tree" aria-label="Merons" className={styles.tree} onClick={follow}>
-        {visible.map(n => (
-          <TreeRow
-            key={n.path}
-            name={n.name}
-            depth={query ? 0 : n.depth}
-            open={n.count > 0 && !query ? expanded.has(n.path) : undefined}
-            onToggle={() => toggle(n.path)}
-            appear={revealed !== null && n.path.startsWith(`${revealed}.`)}
-            preview={<PreviewMark preview={n.preview} />}
-            count={n.count > 0 ? n.count : undefined}
-            selected={n.path === current}
-            href={hrefOf(n.path)}
-          />
-        ))}
-        {query && visible.length === 0 && <p className={[styles.muted, 'eio-type-style-caption'].join(' ')}>Nothing matches “{query}”.</p>}
-      </div>
-    </div>
+    <Sidebar
+      ref={pane}
+      label="Merons"
+      onClick={follow}
+      top={<Field label="Search merons" icon="search" placeholder="Search names, paths, colors" hint="/" value={query} onChange={e => setQuery(e.target.value)} onClear={() => setQuery('')} />}
+      empty={query && visible.length === 0 ? <>Nothing matches “{query}”.</> : undefined}
+    >
+      {visible.map(n => (
+        <TreeRow
+          key={n.path}
+          name={n.name}
+          depth={query ? 0 : n.depth}
+          open={n.count > 0 && !query ? expanded.has(n.path) : undefined}
+          onToggle={() => toggle(n.path)}
+          appear={revealed !== null && n.path.startsWith(`${revealed}.`)}
+          preview={<PreviewMark preview={n.preview} />}
+          count={n.count > 0 ? n.count : undefined}
+          selected={n.path === current}
+          href={hrefOf(n.path)}
+        />
+      ))}
+    </Sidebar>
   )
 }

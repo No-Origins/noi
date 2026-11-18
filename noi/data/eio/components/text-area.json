@@ -1,0 +1,54 @@
+{
+  "path": "noi.eio.components.text-area",
+  "name": "Text area",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "Text over several lines, in the frame of a Field; drag its corner to grow it.",
+    "responsibility": "Be the one text area every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Take text of several lines, such as a note, or Cedar and JSON in mono.",
+    "states": {
+      "words": {
+        "body": "body words",
+        "mono": "mono words, for Cedar and JSON"
+      },
+      "interaction": {
+        "focus": "focused, with the focus ring",
+        "disabled": "disabled"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.border.default",
+      "noi.eio.color.border.input",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.surface.page",
+      "noi.eio.color.text.faint",
+      "noi.eio.color.text.muted",
+      "noi.eio.color.text.primary",
+      "noi.eio.radius.field",
+      "noi.eio.size.control.default",
+      "noi.eio.space.inset.control",
+      "noi.eio.type.style.body",
+      "noi.eio.type.style.mono"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/TextArea/TextArea.module.css",
+        "sha256": "cfd0fb000eeb5804bd75238efa3ee32fd8d8b669c290c78a28cc4fbaf847d41e"
+      },
+      {
+        "path": "src/TextArea/TextArea.tsx",
+        "sha256": "ab7774acdbe95cb16e7174f85dc258fb0c1633105295898cb15f8487956dd62b"
+      }
+    ]
+  }
+}
