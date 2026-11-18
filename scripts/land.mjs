@@ -10,15 +10,14 @@
 //      component rule in the branch are exactly what Mero holds, and Mero holds no component the
 //      branch lacks. On a pushed branch Mero posts the answer on GitHub as "Mero approved".
 //   4. Its pull request to main: open, and GitHub's checks green.
-//   5. With --merge: merges it, with a merge commit, so every commit stays as it was.
+//   5. With --merge: merges it, with a merge commit, so every commit stays as it was, and tells Mero,
+//      so what you approved for this code takes effect (noi landed).
 //
 // Usage, from anywhere in the repository:
 //   pnpm land               says whether the current branch may land
 //   pnpm land --merge       and lands it
 //   pnpm land --skip-local  leaves step 2 to GitHub (when the same commit was just checked here)
 //
-// Part B of "Components in Mero" adds one more step later: telling Mero that what you approved has
-// landed, so an approval takes effect only then (decision 4).
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -133,4 +132,13 @@ if (!merge) {
 }
 say('Landing')
 run(ROOT, 'gh', ['pr', 'merge', String(p.number), '--merge', '--match-head-commit', here])
+// What you approved for this code takes effect now, in Mero too (part B, decision 4).
+if (existsSync(join(NOI, 'mero.local.env')) && existsSync(join(NOI, 'target/debug/noi'))) {
+  const env = Object.fromEntries(readFileSync(join(NOI, 'mero.local.env'), 'utf8').split('\n')
+    .filter(l => /^[A-Z_]+=/.test(l)).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
+  const landed = read(NOI, join(NOI, 'target/debug/noi'), ['landed'], env)
+  if (!landed.ok) stop(`merged, but Mero has not taken it yet: ${(landed.err || landed.out).split('\n')[0]}. Run noi landed`)
+  const n = JSON.parse(landed.out).landed.length
+  console.log(`  Mero took ${n} approved batch${n === 1 ? '' : 'es'} that waited for this code`)
+}
 console.log(`\n✓ ${branch} landed on main`)

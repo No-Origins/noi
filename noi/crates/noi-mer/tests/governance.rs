@@ -119,6 +119,8 @@ fn batch(title: &str, changes: Vec<Change>) -> NewBatch {
         note: None,
         changes,
         touch: None,
+        branch: None,
+        commit: None,
     }
 }
 fn add(m: NewMeron) -> Change {

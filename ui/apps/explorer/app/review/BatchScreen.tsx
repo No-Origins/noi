@@ -2,7 +2,7 @@
 // /review/<batch> shows it; /review shows the next one beside the list of batches.
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Badge, Card, Disclosure } from '@noi/eio-react'
+import { Badge, Button, Card, Disclosure } from '@noi/eio-react'
 import type { Check } from '../../lib/checks'
 import {
   changeName, changePath, hrefOf, index, kindLabel, review, snapshot,
@@ -20,13 +20,14 @@ import { asList, listChange, listChanged, type ListChange } from '../../lib/list
 import styles from './review.module.css'
 
 const OPERATION = { add: 'New', update: 'Change', rename: 'Rename', deprecate: 'Deprecate', reinstate: 'Reinstate' } as const
-const STATE = { waiting: 'Waiting', 'sent-back': 'Sent back', approved: 'Approved', rejected: 'Rejected' } as const
+const STATE = { waiting: 'Waiting', 'sent-back': 'Sent back', landing: 'Approved, waiting to land', approved: 'Approved', rejected: 'Rejected' } as const
 const ACTION: Record<string, string> = {
   'proposal.submit': 'proposed this batch',
   'proposal.revise': 'revised',
   'proposal.send-back': 'sent back',
   'proposal.approve': 'approved',
   'proposal.reject': 'rejected',
+  'proposal.land': 'landed',
 }
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -63,8 +64,21 @@ export async function BatchScreen({ batch }: { batch: string }) {
           <p className={cx(styles.muted, 'eio-type-style-label')}>Batch · from {b.proposer} · {when(b.created_at)}</p>
           <h1 className="eio-type-style-title">{b.title}</h1>
           <p className={cx(styles.muted, 'eio-type-style-body')}>
-            {b.proposals.length} change{b.proposals.length === 1 ? '' : 's'}. Approving runs them again for real, all together: if one fails, none apply.
+            {b.proposals.length} change{b.proposals.length === 1 ? '' : 's'}. {b.commit
+              ? 'Approving tries them again, all together, and they wait for their code: they take effect when its commit lands on main.'
+              : 'Approving runs them again for real, all together: if one fails, none apply.'}
           </p>
+          {b.branch && b.commit && (
+            <p className={cx(styles.muted, 'eio-type-style-body')}>
+              Its code: branch <code className="eio-type-style-mono">{b.branch}</code> at <code className="eio-type-style-mono">{b.commit.slice(0, 7)}</code>.{' '}
+              <Button href={`https://github.com/No-Origins/noi/commit/${b.commit}`}>Its files on GitHub</Button>
+            </p>
+          )}
+          {b.proposals.some(p => p.state === 'landing') && (
+            <p className={cx(styles.muted, 'eio-type-style-body')}>
+              Approved, waiting to land: nothing in Mero changes until this commit is on main (pnpm land --merge).
+            </p>
+          )}
         </div>
         {decides && waiting.length > 0 && (
           <ApproveAll proposals={waiting.map(p => p.uid)} blocked={blocked ? `Not yet: ${blocked}` : undefined} />

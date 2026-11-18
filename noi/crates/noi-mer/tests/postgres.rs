@@ -158,8 +158,8 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    // Every registry migration plus the other application's row.
-    assert_eq!(unmoved, 14);
+    // Every registry migration (14, the last part B's landing, 18 Nov) plus the other application's row.
+    assert_eq!(unmoved, 15);
     metadata
         .execute("DELETE FROM public._sqlx_migrations WHERE version=42")
         .await
@@ -169,7 +169,7 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    assert_eq!(own_count, 13);
+    assert_eq!(own_count, 14);
     assert_eq!(registry.snapshot(&actor).await.unwrap().merons.len(), 3);
     let root = registry.get(&actor, "noi").await.unwrap();
     let root_uid = root.identity.uid;
@@ -1975,11 +1975,15 @@ async fn verify_components(url: &str) {
         expected_revision: revision,
         path: format!("{C}tree-row"),
     };
+    // A component's change names its branch and commit (part B, agreed 18 Nov).
+    let commit = "a".repeat(40);
     let batch = |changes: Vec<Change>| NewBatch {
         title: "Tree becomes Tree row".into(),
         note: None,
         changes,
         touch: None,
+        branch: Some("claude/tree-row".into()),
+        commit: Some(commit.clone()),
     };
     let alone = registry
         .propose_batch(&actor, batch(vec![rename.clone()]))
@@ -2011,6 +2015,94 @@ async fn verify_components(url: &str) {
     for p in &both.proposals {
         assert_eq!(p.outcome["ok"], json!(true), "{}", p.outcome);
     }
+
+    // What you approve is what lands (part B, decision 4, agreed 18 Nov). A component's change with no
+    // branch is refused; with one, approving it waits for its commit, and landing applies it.
+    let mut quieter = component("tree", R, &[], &[], &["src/Tree/Tree.tsx"]);
+    quieter.spec["job"] = json!("Show a tree, more quietly.");
+    let change = |rev: i64| Change::Update {
+        uid: tree,
+        expected_revision: rev,
+        meron: quieter.clone(),
+        compatibility: CompatibilityEvidence {
+            impact: Impact::NonBreaking,
+            rationale: "Its words".into(),
+            invariant_checks: vec!["Its rule".into()],
+            migration_plan: None,
+        },
+    };
+    let error = registry
+        .propose_batch(
+            &actor,
+            NewBatch {
+                branch: None,
+                commit: None,
+                ..batch(vec![change(revision)])
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(&format!(
+            "{C}tree: a change to a component names its branch and commit"
+        )),
+        "{error}"
+    );
+    let waits = registry
+        .propose_batch(&actor, batch(vec![change(revision)]))
+        .await
+        .unwrap();
+    assert_eq!(waits.commit.as_deref(), Some(commit.as_str()));
+    let approved = registry.approve(&actor, &[waits.uid]).await.unwrap();
+    assert_eq!(
+        approved[0].state,
+        ProposalState::Landing,
+        "approved, waiting to land"
+    );
+    let held = registry.get(&actor, &format!("{C}tree")).await.unwrap();
+    assert_eq!(held.revision, revision, "nothing in Mero changed yet");
+    assert_eq!(held.spec["job"], json!("A test component."));
+    let landing = registry.landing_for(&commit).await.unwrap();
+    assert_eq!(landing.len(), 1);
+    assert_eq!(
+        landing[0].spec["job"],
+        json!("Show a tree, more quietly."),
+        "Mero's check counts it for that commit"
+    );
+    assert!(
+        registry
+            .landing_for(&"b".repeat(40))
+            .await
+            .unwrap()
+            .is_empty(),
+        "and for no other"
+    );
+    assert!(registry
+        .waiting_to_land()
+        .await
+        .unwrap()
+        .contains(&(waits.uid, commit.clone())));
+    // Approved once; not again.
+    assert!(registry.approve(&actor, &[waits.uid]).await.is_err());
+    let landed = registry.land(&actor, waits.uid).await.unwrap();
+    assert_eq!(landed[0].state, ProposalState::Approved);
+    let held = registry.get(&actor, &format!("{C}tree")).await.unwrap();
+    assert_eq!(
+        held.spec["job"],
+        json!("Show a tree, more quietly."),
+        "landed: now it is in Mero"
+    );
+    assert!(registry
+        .waiting_to_land()
+        .await
+        .unwrap()
+        .iter()
+        .all(|(b, _)| *b != waits.uid));
+    assert!(
+        matches!(registry.land(&actor, waits.uid).await, Err(Error::NotFound)),
+        "it lands once"
+    );
 }
 
 /// Review: proposals wait in batches; Mero holds only what a maintainer approved.
@@ -2086,6 +2178,8 @@ async fn verify_review(url: &str) {
         note: Some("From the review test".into()),
         changes,
         touch: None,
+        branch: None,
+        commit: None,
     };
 
     // Order inside a batch does not matter: the role comes before the color it reads.
@@ -2523,6 +2617,8 @@ async fn verify_governance(url: &str) {
         note: None,
         changes,
         touch: None,
+        branch: None,
+        commit: None,
     };
     let names = [
         "role-invariant.json",
