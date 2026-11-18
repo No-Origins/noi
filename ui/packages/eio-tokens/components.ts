@@ -1,6 +1,7 @@
 // Eidos's components and their states, by key, as you approved them in Mero (agreed 18 Nov,
-// "Component States"). Mero writes this file after each approval that changes Eidos; nobody
-// edits it. To change a state, change the component's meron and approve it in Review.
+// "Component States"). Mero's writer makes this file (pnpm eio:write) from the merons, and Mero
+// checks it is exactly what it writes; nobody edits it. To change a state, change the component's
+// meron and approve it in Review.
 // A component's code reads each option through a table that names every key, so a key missing
 // from the code, or one Mero never approved, fails the type check.
 

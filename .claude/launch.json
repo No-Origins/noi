@@ -17,7 +17,7 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd noi && set -a && . ./mero.local.env && set +a && exec ./target/debug/noi serve --eio-tokens ../ui/packages/eio-tokens"
+        "cd noi && set -a && . ./mero.local.env && set +a && exec ./target/debug/noi serve"
       ],
       "port": 8787
     },

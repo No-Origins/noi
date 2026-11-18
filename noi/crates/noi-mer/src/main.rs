@@ -90,9 +90,6 @@ enum Command {
     Serve {
         #[arg(long, default_value = "127.0.0.1:8787")]
         bind: SocketAddr,
-        /// Writes the Eidos token files here after an approval that changes Eidos.
-        #[arg(long, env = "NOI_EIO_TOKENS")]
-        eio_tokens: Option<PathBuf>,
     },
 }
 
@@ -229,7 +226,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await?,
             )?
         }
-        Command::Serve { bind, eio_tokens } => {
+        Command::Serve { bind } => {
             // On this Mac, loopback only. Inside a container (its image sets NOI_IN_CONTAINER=1) the
             // container's own network is private, and only the ports its host publishes reach it.
             if !bind.ip().is_loopback() && !noi_log::in_container() {
@@ -266,7 +263,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_state(Served {
                     registry: registry.clone(),
                     governance,
-                    eio_tokens,
                 });
             // At most 5 MB a request (a batch of changes) and 30 seconds an answer (agreed 8 Nov).
             let app = noi_log::limits::around(app, 5 << 20, std::time::Duration::from_secs(30));
@@ -363,7 +359,6 @@ async fn as_agent(
 struct Served {
     registry: Registry,
     governance: GovernanceClient,
-    eio_tokens: Option<PathBuf>,
 }
 
 /// The credential a request carries: `Authorization: Session <token>` from the Explorer's server,
@@ -655,17 +650,8 @@ async fn approve_handler(
         Ok(p) => p,
         Err(e) => return failure(e),
     };
-    // An approved Eidos change reaches the apps through the token files.
-    let exported = match (&served.eio_tokens, touches(&approved, "noi.eio.")) {
-        (Some(dir), true) => match registry.snapshot(&actor).await {
-            Ok(snapshot) => match export_eio(&snapshot, dir) {
-                Ok(n) => json!({"tokens": n}),
-                Err(e) => json!({"error": format!("approved, but the token export failed: {e}")}),
-            },
-            Err(e) => json!({"error": format!("approved, but the token export failed: {e}")}),
-        },
-        _ => Value::Null,
-    };
+    // Eidos's files are not written here: the branch carries them, made by Mero's writer (part B,
+    // decision 5, agreed 18 Nov), and Mero only checks them.
     // An approved role or rule reaches Governance at once: it copies them again from Mero. Should
     // that fail, the next question says how current the rules are, and Governance copies then.
     let copied = if touches(&approved, "noi.gov.") {
@@ -681,7 +667,7 @@ async fn approve_handler(
     } else {
         Value::Null
     };
-    Json(json!({"approved": approved, "exported": exported, "copied": copied})).into_response()
+    Json(json!({"approved": approved, "copied": copied})).into_response()
 }
 /// Whether an approval changed anything under this place, where it was or where it went.
 fn touches(approved: &[Proposal], prefix: &str) -> bool {

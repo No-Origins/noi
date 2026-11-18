@@ -8,6 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "land": "node scripts/land.mjs"
+    "land": "node scripts/land.mjs",
+    "eio:write": "cargo run -q --manifest-path noi/Cargo.toml -p noi-eio --bin eio-write --"
   }
 }

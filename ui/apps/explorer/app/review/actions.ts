@@ -44,13 +44,12 @@ export async function approve(_: ActionState, form: FormData): Promise<ActionSta
   revalidatePath('/', 'layout')
   if (!result.ok) return { error: result.error }
   const n = result.data.approved.length
-  const tokens = result.data.exported?.tokens
-  const exportError = result.data.exported?.error
+  // Eidos's files come with the branch (part B, decision 5): Mero writes nothing after an approval.
   const copied = result.data.copied
-  const notes = [tokens ? 'Eidos tokens were written again.' : '', copied && !copied.error ? 'Governance copied the roles and rules again.' : '']
+  const notes = [copied && !copied.error ? 'Governance copied the roles and rules again.' : '']
   return {
     done: `Approved ${n} change${n === 1 ? '' : 's'}. ${notes.filter(Boolean).join(' ')}`.trim(),
-    error: exportError ?? copied?.error,
+    error: copied?.error,
   }
 }
 

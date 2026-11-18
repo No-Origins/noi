@@ -10,10 +10,12 @@ mod component;
 mod export;
 mod reference;
 mod typography;
+mod write;
 pub use component::*;
 pub use export::*;
 pub use reference::*;
 pub use typography::*;
+pub use write::*;
 
 /// The check Eidos color-role invariants ask the registry to run.
 pub const COLOR_ROLE_CHECK: &str = "eio.color-role";
