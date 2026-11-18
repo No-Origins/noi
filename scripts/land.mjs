@@ -13,7 +13,9 @@
 //      "Mero approved".
 //   4. Its pull request to main: open, and GitHub's checks green: every check main requires has
 //      started and passed (a check GitHub has not started yet is not green). --merge waits for them.
-//   5. With --merge: merges it, with a merge commit, so every commit stays as it was, and tells Mero,
+//   5. With --merge: merges it, with a merge commit, so every commit stays as it was, and only at the
+//      commit checked here, through GitHub's asynchronous merge (a pull request opened on top of another
+//      can be merged no other way); then tells Mero,
 //      so what you approved for this code takes effect (noi landed). Mero reads main's files, not the
 //      commits' ids, so a merge made on GitHub (a squash too) lands as well: the next pnpm land, or
 //      noi landed, takes it in.
@@ -27,6 +29,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { mergeAsync } from './merge-async.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const NOI = join(ROOT, 'noi')
@@ -179,7 +182,11 @@ if (!merge) {
   process.exit(0)
 }
 say('Landing')
-run(ROOT, 'gh', ['pr', 'merge', String(p.number), '--merge', '--match-head-commit', here])
+console.log(`  merging it at ${here.slice(0, 7)}, with a merge commit`)
+const done = mergeAsync({ api: args => read(ROOT, 'gh', ['api', ...args]), sleep, number: p.number, sha: here })
+if (done.error) stop(`GitHub did not merge it: ${done.error}`)
+const mergedAs = done.merged || read(ROOT, 'gh', ['pr', 'view', String(p.number), '--json', 'mergeCommit', '--jq', '.mergeCommit.oid']).out
+console.log(`  merged: main is at ${mergedAs.slice(0, 7)}`)
 // What you approved for this code takes effect now, in Mero too (part B, decision 4).
 if (existsSync(join(NOI, 'mero.local.env')) && existsSync(join(NOI, 'target/debug/noi'))) {
   const env = Object.fromEntries(readFileSync(join(NOI, 'mero.local.env'), 'utf8').split('\n')
