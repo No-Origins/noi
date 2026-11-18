@@ -85,12 +85,75 @@ enum Command {
         #[command(flatten)]
         run: RunArgs,
     },
+    /// Mero's check on a commit (part B, agreed 18 Nov): are its Eidos meron files exactly what you
+    /// approved? With --post, Mero posts the answer on GitHub as the commit status "Mero approved".
+    /// Fails (exit 1) when they are not.
+    CheckApproved {
+        /// The commit: a hash, or anything git reads as one (HEAD, a branch).
+        #[arg(long)]
+        commit: String,
+        /// Post the answer on GitHub, as the App "No Origins Mero".
+        #[arg(long)]
+        post: bool,
+        #[command(flatten)]
+        github: GitHubArgs,
+    },
     /// Mero's API for the Explorer and Governance. Loopback only. Each request carries its own
     /// credential, and Mero asks Governance about it.
     Serve {
         #[arg(long, default_value = "127.0.0.1:8787")]
         bind: SocketAddr,
     },
+}
+
+/// Mero's own name on GitHub (part B, decision 1): the App "No Origins Mero" and its private key,
+/// an owner-only file beside Mero's other secrets.
+#[derive(Args)]
+struct GitHubArgs {
+    #[arg(long, env = "NOI_GITHUB_APP", default_value = "5818697")]
+    github_app: String,
+    #[arg(long, env = "NOI_GITHUB_KEY", default_value = "mero-github.local.pem")]
+    github_key: PathBuf,
+    #[arg(long, env = "NOI_GITHUB_REPO", default_value = "No-Origins/noi")]
+    github_repo: String,
+    #[arg(long, env = "NOI_GITHUB_API", default_value = "https://api.github.com")]
+    github_api: String,
+}
+
+/// git, run at the top of the repository this Mero works in.
+fn git(args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+    let out = std::process::Command::new("git").args(args).output()?;
+    if !out.status.success() {
+        return Err(format!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )
+        .into());
+    }
+    Ok(String::from_utf8(out.stdout)?.trim().to_string())
+}
+
+/// The Eidos meron files this check covers, as a commit has them.
+fn merons_at(commit: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    let top = git(&["rev-parse", "--show-toplevel"])?;
+    let files = git(&[
+        "-C",
+        &top,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        commit,
+        "--",
+        noi_mer::approved::COMPONENTS,
+        noi_mer::approved::RULE,
+    ])?;
+    let mut merons = vec![];
+    for file in files.lines().filter(|f| f.ends_with(".json")) {
+        let text = git(&["-C", &top, "show", &format!("{commit}:{file}")])?;
+        merons.push(serde_json::from_str(&text).map_err(|e| format!("{file}: {e}"))?);
+    }
+    Ok(merons)
 }
 
 /// What an agent's run carries. Until Hyperbase exists, `noi propose` plays its tool runner: it
@@ -200,6 +263,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::fs::write(file, serde_json::to_vec_pretty(&snapshot)?)?;
             } else {
                 print(snapshot)?;
+            }
+        }
+        Command::CheckApproved {
+            commit,
+            post,
+            github,
+        } => {
+            let sha = git(&["rev-parse", "--verify", &format!("{commit}^{{commit}}")])?;
+            let branch = merons_at(&sha)?;
+            let held = reader().snapshot(&operator).await?;
+            let problems = noi_mer::approved::problems(&held.merons, &branch);
+            let words = noi_mer::approved::words(&problems, branch.len());
+            if post {
+                let key = std::fs::read(&github.github_key)
+                    .map_err(|e| format!("the App's key, {}: {e}", github.github_key.display()))?;
+                let verdict = if problems.is_empty() {
+                    noi_mer::github::Verdict::Green
+                } else {
+                    noi_mer::github::Verdict::Red
+                };
+                noi_mer::github::GitHub::new(
+                    &github.github_app,
+                    &key,
+                    &github.github_repo,
+                    &github.github_api,
+                )?
+                .post(&sha, verdict, &words)
+                .await?;
+            }
+            print(
+                json!({"commit": sha, "approved": problems.is_empty(), "merons": branch.len(), "problems": problems, "words": words, "posted": post}),
+            )?;
+            if !problems.is_empty() {
+                std::process::exit(1);
             }
         }
         Command::Propose {

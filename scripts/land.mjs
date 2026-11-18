@@ -6,9 +6,9 @@
 //   1. The branch: not main, nothing uncommitted; to merge, the same as on GitHub.
 //   2. The checks GitHub runs, here first: Rust (format, clippy, tests; the database tests too when
 //      NOI_TEST_ADMIN_URL is set), the component merons match the code, the type checks, the tests.
-//   3. What you approved: when Mero's login is on this Mac (noi/mero.local.env), every component's
-//      meron and the component rule in the branch are exactly what Mero holds, and Mero holds no
-//      component the branch lacks. Code nobody approved does not land.
+//   3. What you approved: Mero's own check (noi check-approved): every component's meron and the
+//      component rule in the branch are exactly what Mero holds, and Mero holds no component the
+//      branch lacks. On a pushed branch Mero posts the answer on GitHub as "Mero approved".
 //   4. Its pull request to main: open, and GitHub's checks green.
 //   5. With --merge: merges it, with a merge commit, so every commit stays as it was.
 //
@@ -17,10 +17,10 @@
 //   pnpm land --merge       and lands it
 //   pnpm land --skip-local  leaves step 2 to GitHub (when the same commit was just checked here)
 //
-// Part B of "Components in Mero" will add the last step: telling Mero that what you approved has
-// landed, so an approval takes effect only then.
+// Part B of "Components in Mero" adds one more step later: telling Mero that what you approved has
+// landed, so an approval takes effect only then (decision 4).
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -77,40 +77,21 @@ if (skipLocal) {
   run(ROOT, 'pnpm', ['-r', '--filter', './ui/**', 'test'])
 }
 
-// 3 · What you approved.
+// 3 · What you approved: Mero's own check (part B, decision 2), and on a pushed branch it posts the
+//     answer on GitHub as "Mero approved", the check main requires (decision 3: Mero looks when asked).
 say('What you approved in Mero')
 const login = join(NOI, 'mero.local.env')
 const noi = join(NOI, 'target/debug/noi')
 if (!existsSync(login) || !existsSync(noi)) {
-  console.log('  (Mero is not reachable from here: GitHub cannot check this until part B)')
+  console.log('  (Mero is not on this Mac: it cannot be asked here)')
 } else {
   const env = Object.fromEntries(readFileSync(login, 'utf8').split('\n')
     .filter(l => /^[A-Z_]+=/.test(l)).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
-  const exported = read(NOI, noi, ['export'], env)
-  if (!exported.ok) stop(`Mero could not be read: ${exported.err.split('\n')[0]}`)
-  const held = new Map(JSON.parse(exported.out).merons.map(m => [m.identity.path, m]))
-  const walk = dir => readdirSync(dir).flatMap(f => statSync(join(dir, f)).isDirectory() ? walk(join(dir, f)) : [join(dir, f)])
-  const files = [join(NOI, 'data/eio/component-invariant.json'), ...walk(join(NOI, 'data/eio/components')).filter(f => f.endsWith('.json'))]
-  const same = (a, b) => JSON.stringify(sorted(a)) === JSON.stringify(sorted(b))
-  const problems = []
-  const inBranch = new Set()
-  for (const file of files) {
-    const m = JSON.parse(readFileSync(file, 'utf8'))
-    inBranch.add(m.path)
-    const h = held.get(m.path)
-    if (!h) problems.push(`${m.path}: not in Mero. Propose it, and approve it in Review`)
-    else if (h.lifecycle.state !== 'active' && h.lifecycle.state !== 'deprecated') problems.push(`${m.path}: ${h.lifecycle.state} in Mero, not active`)
-    else if (!same(h.spec, m.spec) || !same(h.semantics, m.semantics) || h.identity.name !== m.name) {
-      problems.push(`${m.path}: not what you approved in Mero. Propose the change, and approve it in Review`)
-    }
-  }
-  for (const [path, h] of held) {
-    if (path.startsWith('noi.eio.components.') && ['active', 'deprecated'].includes(h.lifecycle.state) && !inBranch.has(path)) {
-      problems.push(`${path}: ${h.lifecycle.state} in Mero, but the branch has no meron for it`)
-    }
-  }
-  if (problems.length) stop(`what lands must be what you approved:\n  ${problems.join('\n  ')}`)
-  console.log(`  ${files.length} merons, each exactly what Mero holds`)
+  const asked = read(NOI, noi, ['check-approved', '--commit', here, ...(pushed ? ['--post'] : [])], env)
+  let answer
+  try { answer = JSON.parse(asked.out) } catch { stop(`Mero could not be asked: ${(asked.err || asked.out).split('\n')[0]}`) }
+  if (!answer.approved) stop(`what lands must be what you approved:\n  ${answer.problems.join('\n  ')}`)
+  console.log(`  ${answer.words}${answer.posted ? ', posted on GitHub as “Mero approved”' : ''}`)
 }
 
 // 4 · The pull request.
@@ -153,10 +134,3 @@ if (!merge) {
 say('Landing')
 run(ROOT, 'gh', ['pr', 'merge', String(p.number), '--merge', '--match-head-commit', here])
 console.log(`\n✓ ${branch} landed on main`)
-
-/** The same object with its keys in one order, so two are compared by what they hold. */
-function sorted(v) {
-  if (Array.isArray(v)) return v.map(sorted)
-  if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, sorted(v[k])]))
-  return v
-}
