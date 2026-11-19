@@ -4,6 +4,7 @@
 // hold each role, the latest changes and what needs attention. No forms: a role is given on the
 // person's profile, an agent added on Accounts.
 import { Button, Card, Panes } from '@noi/eio-react'
+import { notHostedWords, notHostedYet } from '../../lib/backend'
 import { readCedar } from '../../lib/cedar'
 import { changeWords, when } from '../../lib/changes'
 import { dashboard, type Dashboard, type Held } from '../../lib/governance'
@@ -50,15 +51,21 @@ function Section({ title, children, note }: { title: string; children: React.Rea
   )
 }
 
-/** Signed out: what Governance is, and the two ways in. */
-function SignedOutHome({ problem }: { problem?: string }) {
+/** Signed out: what Governance is, and the two ways in. Hosted before Governance is (20 Nov): that
+    signing in comes later, instead of buttons to pages that cannot sign anyone in. */
+function SignedOutHome({ problem, later }: { problem?: string; later?: boolean }) {
+  const words = later ? notHostedWords('Governance', 'Signing in') : undefined
   return (
     <main className={cx(styles.page, styles.reading)}>
       <Head />
-      <div className={styles.actions}>
-        <Button variant="primary" size="large" icon="key" href="/account/sign-in?back=/">Sign in with a passkey</Button>
-        <Button size="large" href="/account/sign-up">Sign up</Button>
-      </div>
+      {words ? (
+        <p className="eio-type-style-body"><strong>{words.title}.</strong> {words.line}</p>
+      ) : (
+        <div className={styles.actions}>
+          <Button variant="primary" size="large" icon="key" href="/account/sign-in?back=/">Sign in with a passkey</Button>
+          <Button size="large" href="/account/sign-up">Sign up</Button>
+        </div>
+      )}
       <p className={cx(styles.muted, 'eio-type-style-caption')}>
         Roles and rules are merons in Mero, changed through Review like anything else; Governance enforces its own copy of them.
       </p>
@@ -80,6 +87,14 @@ function yourRoles(roles: Held[], names: Record<string, string>) {
 }
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ passkey?: string }> }) {
+  if (notHostedYet('Governance')) {
+    return (
+      <>
+        <TopBar view="gov" />
+        <SignedOutHome later />
+      </>
+    )
+  }
   const [at, d, { passkey }] = await Promise.all([origins(), dashboard(), searchParams])
   if (!d.ok || !d.data.you) {
     return (

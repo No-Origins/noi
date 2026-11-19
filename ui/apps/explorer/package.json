@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname localhost --port 3000",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/styles.test.mjs test/passkey.test.mjs test/session.test.mjs test/hosts.test.mjs test/sentence.test.mjs test/changes.test.mjs test/lists.test.mjs",
+    "test": "node --test test/backend.test.mjs test/styles.test.mjs test/passkey.test.mjs test/session.test.mjs test/hosts.test.mjs test/sentence.test.mjs test/changes.test.mjs test/lists.test.mjs",
     "test:fit": "node --test test/fit.test.mjs"
   },
   "dependencies": {

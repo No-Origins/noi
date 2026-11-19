@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Panes } from '@noi/eio-react'
+import { notHostedYet } from '../../lib/backend'
 import { nextBatch, Refused, review, snapshot, type ReviewState, type Snapshot } from '../../lib/mero'
+import { NotHostedYet } from '../NotHostedYet'
 import { SignedOut } from '../SignedOut'
 import { TopBar } from '../TopBar'
 import { BatchList } from './BatchList'
@@ -9,6 +11,8 @@ import styles from '../merons/merons.module.css'
 export const dynamic = 'force-dynamic'
 
 export default async function ReviewLayout({ children }: { children: ReactNode }) {
+  // Hosted before Mero is (20 Nov): say so plainly, with the top bar for the pages that work.
+  if (notHostedYet('Mero')) return <><TopBar view="review" /><NotHostedYet server="Mero" /></>
   // Review is for people signed in (9 Nov, step 6): reading it is its own action, which signed out
   // you can never hold, though you may read Merons.
   let s: Snapshot, r: ReviewState
