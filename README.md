@@ -23,7 +23,6 @@ It is in development on one Mac. Nothing is hosted yet.
 | `ui/packages/eio-react` | Eidos components, built only from the tokens |
 | `infrastructure/containers` | Container images for the servers and the app |
 | `infrastructure/supabase` | The local Postgres (Supabase) every system shares, each in its own schema |
-| `Planning/board-scripts` | Scripts that draw the planning boards in tldraw, where every decision is agreed before it is built |
 
 One pnpm workspace covers the TypeScript side, with one lockfile at the top.
 

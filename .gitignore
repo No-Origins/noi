@@ -1,4 +1,4 @@
-# No Origins: one repository for noi, ui, infrastructure and Planning (8 Nov).
+# No Origins: one repository for the code: noi, ui and infrastructure (8 Nov).
 # Each folder's own .gitignore still applies: noi keeps its secrets, target and vendor out,
 # infrastructure/supabase its backups.
 
@@ -21,8 +21,6 @@ noi/target/
 noi/vendor/
 *.tsbuildinfo
 
-# Planning: the board files and their images change on every redraw. The scripts that draw
-# them, and the HTML and Swift that make the images, are kept.
-Planning/**/*.tldraw
-Planning/board-scripts/renders/*.png
-Planning/board-scripts/renders/*.jpg
+# Planning (notes, decisions, design pages) is a separate, private repository.
+# On the maintainer's machine it sits in this folder; it is never tracked here.
+/Planning/
