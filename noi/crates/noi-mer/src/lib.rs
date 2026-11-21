@@ -816,8 +816,19 @@ impl Registry {
                 .await?
                 .ok_or(Error::NotFound)?
                 .try_into()?;
-        let s = load(tx.as_mut(), r.source).await?;
-        let t = load(tx.as_mut(), r.target).await?;
+        self.unrelate_in(tx.as_mut(), actor, r).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+    /// Removes one link, inside the caller's transaction, asking about both of its ends.
+    pub(crate) async fn unrelate_in(
+        &self,
+        conn: &mut PgConnection,
+        actor: &Actor,
+        r: Relationship,
+    ) -> Result<()> {
+        let s = load(&mut *conn, r.source).await?;
+        let t = load(&mut *conn, r.target).await?;
         let decision = self
             .authorize(
                 actor,
@@ -827,11 +838,11 @@ impl Registry {
             )
             .await?;
         sqlx::query("DELETE FROM mer.relationships WHERE uid=$1")
-            .bind(uid)
-            .execute(tx.as_mut())
+            .bind(r.uid)
+            .execute(&mut *conn)
             .await?;
         event(
-            tx.as_mut(),
+            conn,
             r.source,
             "relationship.remove",
             actor,
@@ -839,7 +850,6 @@ impl Registry {
             json!({"relationship":r}),
         )
         .await?;
-        tx.commit().await?;
         Ok(())
     }
     pub async fn plan_release(

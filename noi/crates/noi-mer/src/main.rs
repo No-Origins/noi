@@ -407,7 +407,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     serde_json::to_value(reader().roles_and_rules_to_move(&operator).await?)?
                 } else {
                     let on = chrono::Utc::now().format("%-d %b %Y").to_string();
-                    let held = reader().snapshot_under(&operator, Some("noi.gov")).await?;
+                    // The whole registry, so an invariant that still covers a rule elsewhere stays.
+                    let held = reader().snapshot(&operator).await?;
                     serde_json::to_value(noi_mer::retire_moved(&held.merons, &on))?
                 };
                 match output {
@@ -1211,6 +1212,15 @@ mod tests {
         assert!(noi_mer::retire_moved(&held[3..4], "21 Nov 2026")
             .changes
             .is_empty());
+        // A rule meron outside noi.gov keeps the rule invariant, which still covers it.
+        let mut more = held.to_vec();
+        more.push(meron("noi.eio.rules.x", "rule", Some("policy"), "active"));
+        let kept = noi_mer::retire_moved(&more, "21 Nov 2026");
+        assert_eq!(kept.changes.len(), 4);
+        assert!(!kept
+            .changes
+            .iter()
+            .any(|c| c.target() == Some(held[6].identity.uid)));
     }
 
     #[tokio::test]

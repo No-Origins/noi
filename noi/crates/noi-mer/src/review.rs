@@ -39,8 +39,9 @@ pub enum Change {
         reason: String,
     },
     /// Retires a meron for good, with a note saying why or where it went (step 3: the roles and
-    /// rules that moved to Governance). An active one is deprecated first, in the same step, so
-    /// the lifecycle still moves one step at a time; both steps carry the note.
+    /// rules that moved to Governance). It leaves the system it was filed under, and links from
+    /// retired merons go; an active one is deprecated first, in the same step, so the lifecycle
+    /// still moves one step at a time; both steps carry the note.
     Retire {
         uid: Uuid,
         expected_revision: i64,
@@ -1332,6 +1333,32 @@ impl Registry {
                 expected_revision,
                 reason,
             } => {
+                // Nothing may link to a retired meron. It leaves the system it was filed under, and
+                // links from merons already retired go; a live meron that still reads it must change
+                // first.
+                let links: Vec<Relationship> = sqlx::query_as::<_, RelationshipRow>(
+                    "SELECT * FROM mer.relationships WHERE target=$1 ORDER BY uid",
+                )
+                .bind(uid)
+                .fetch_all(&mut *conn)
+                .await?
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_>>()?;
+                for r in links {
+                    let source = load(&mut *conn, r.source).await?;
+                    if r.predicate != Predicate::Contains
+                        && source.lifecycle.state != MeronState::Retired
+                    {
+                        return Err(ValidationError(format!(
+                            "{} still links to it ({}): change or retire that first",
+                            source.identity.path,
+                            r.predicate.as_str()
+                        ))
+                        .into());
+                    }
+                    self.unrelate_in(conn, approver, r).await?;
+                }
                 let mut revision = *expected_revision;
                 if load(&mut *conn, *uid).await?.lifecycle.state == MeronState::Active {
                     revision = self
@@ -1600,14 +1627,18 @@ async fn change_actions(
                 moved.path = path.clone();
                 add(&mut by, Action::Rename, vec![resource(&meron), moved]);
             }
-            Change::Deprecate { uid, .. }
-            | Change::Reinstate { uid, .. }
-            | Change::Retire { uid, .. } => {
+            Change::Deprecate { uid, .. } | Change::Reinstate { uid, .. } => {
                 add(
                     &mut by,
                     Action::Transition,
                     vec![resource(&load(conn, *uid).await?)],
                 );
+            }
+            // Retiring also takes it out of the links to it (step 3).
+            Change::Retire { uid, .. } => {
+                let meron = resource(&load(conn, *uid).await?);
+                add(&mut by, Action::Transition, vec![meron.clone()]);
+                add(&mut by, Action::Unrelate, vec![meron]);
             }
         }
     }
@@ -1672,26 +1703,34 @@ pub fn retire_moved(held: &[Meron], on: &str) -> NewBatch {
         expected_revision: m.revision,
         reason,
     };
+    // A role or rule meron, of this subtype.
+    let of = |m: &Meron, subtype: &str| {
+        m.classification.kind == MeronType::Rule
+            && m.classification.subtype.as_deref() == Some(subtype)
+    };
     let mut changes: Vec<Change> = held
         .iter()
         .filter(in_force)
-        .filter(|m| {
-            m.classification.kind == MeronType::Rule
-                && matches!(m.classification.subtype.as_deref(), Some("role" | "policy"))
-        })
+        .filter(|m| m.identity.path.starts_with("noi.gov.") && (of(m, "role") || of(m, "policy")))
         .map(|m| retire(m, retired_note(on)))
         .collect();
-    changes.extend(
-        held.iter()
+    // Each invariant retires only when everything it covers does: a rule meron anywhere else in
+    // Mero keeps it.
+    for (path, subtype) in [("noi.gov.inv.role", "role"), ("noi.gov.inv.rule", "policy")] {
+        let elsewhere = held
+            .iter()
             .filter(in_force)
-            .filter(|m| {
-                matches!(
-                    m.identity.path.as_str(),
-                    "noi.gov.inv.role" | "noi.gov.inv.rule"
-                )
-            })
-            .map(|m| retire(m, retired_invariant_note(on))),
-    );
+            .any(|m| of(m, subtype) && !m.identity.path.starts_with("noi.gov."));
+        if let Some(m) = held
+            .iter()
+            .filter(in_force)
+            .find(|m| m.identity.path == path)
+        {
+            if !elsewhere {
+                changes.push(retire(m, retired_invariant_note(on)));
+            }
+        }
+    }
     NewBatch {
         title: "Retire the roles and rules: they moved to Governance".into(),
         note: Some(format!(
