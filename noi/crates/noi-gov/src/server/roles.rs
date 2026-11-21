@@ -711,7 +711,7 @@ impl Governance {
             &[path.to_string()],
             true,
             "proposed",
-            json!({"proposal": id, "operation": draft.operation.as_str(), "revision": base, "by_hand": by_hand}),
+            json!({"proposal": id, "path": path, "operation": draft.operation.as_str(), "revision": base, "by_hand": by_hand}),
         )
         .await?;
         let proposal = load(tx.as_mut(), id).await?;
@@ -764,7 +764,7 @@ impl Governance {
                 )],
             )
             .await?;
-        let mut done = json!({"proposal": id, "decision": decide.as_str()});
+        let mut done = json!({"proposal": id, "decision": decide.as_str(), "path": p.path});
         if decide == Decide::Approve {
             let now = newest(tx.as_mut(), &p.path).await?;
             if now.as_ref().map(|v| v.revision) != p.base_revision {
