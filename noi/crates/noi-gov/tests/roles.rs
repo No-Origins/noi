@@ -5,11 +5,13 @@
 //! and drops it; never touches the shared one.
 //! Explicit opt-in: NOI_TEST_ADMIN_URL=... cargo test -p noi-gov --features server --test roles -- --ignored
 #![cfg(feature = "server")]
-use noi_gov::form::{write_role, write_rule, Doing, Effect, Pick, RoleForm, RuleForm, Where, Who};
+use noi_gov::form::{
+    write_role, write_rule, Condition, Doing, Effect, Pick, RoleForm, RuleForm, Where, Who,
+};
 use noi_gov::moving::MoveFile;
 use noi_gov::server::{
-    decide_about, grant_about, http, new_voucher_key, vouch, Config, Credential, Decide, Draft,
-    Governance, GrantSpec, Mailer, Target,
+    decide_about, grant_about, http, invite_about, new_voucher_key, vouch, Config, Credential,
+    Decide, Draft, Governance, GrantSpec, Mailer, Target,
 };
 use serde_json::{json, Value};
 use sqlx::{Connection, Executor, PgConnection};
@@ -599,6 +601,112 @@ async fn verify(url: &str, login: &str) {
         .to_string();
     assert!(refused.contains("nobody is locked out"), "{refused}");
 
+    // Second review, A: a rule on proposing that asks a touch, which proposing never carries. It
+    // reads as "proposing needs a touch"; approved, no proposal could ever be made again.
+    let cedar_of = |verb: &str, place: &str, unless: Vec<Condition>| {
+        write_rule(&RuleForm {
+            effect: Effect::Forbid,
+            who: Who::Anyone,
+            doing: vec![Doing {
+                system: "mero".into(),
+                pick: Pick::These {
+                    verbs: vec![verb.into()],
+                },
+            }],
+            place: Where::Place(place.into()),
+            unless,
+        })
+        .unwrap()
+    };
+    let approve_refused =
+        |cedar: String, name: &'static str, touch_for_cedar: Option<Uuid>| {
+            let gov = gov.clone();
+            let you_c = you_c.clone();
+            async move {
+                let p = gov
+                .propose(&you_c, touch_for_cedar, &draft(json!({
+                    "operation": "add", "path": format!("noi.gov.rules.{name}"), "name": name,
+                    "definition": "A test rule.", "responsibility": "Test.", "cedar": cedar,
+                    "why": "To test the lockout check through the server.",
+                })))
+                .await
+                .unwrap();
+                p
+            }
+        };
+    let propose_touch = approve_refused(
+        cedar_of("propose", "noi.gov", vec![Condition::FreshTouch]),
+        "propose-touch",
+        None,
+    )
+    .await;
+    let t = you
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.rules.propose-touch",
+            Decide::Approve,
+            propose_touch.id,
+        )
+        .await;
+    let refused = gov
+        .decide_proposal(&you_c, Some(t), propose_touch.id, Decide::Approve, "")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(refused.contains("nobody is locked out"), "{refused}");
+    // Review 1, through the server: a rule that stops approving its own place can never be retired.
+    let self_lock = approve_refused(
+        cedar_of("review", "noi.gov.rules.self-lock", vec![]),
+        "self-lock",
+        None,
+    )
+    .await;
+    let t = you
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.rules.self-lock",
+            Decide::Approve,
+            self_lock.id,
+        )
+        .await;
+    let refused = gov
+        .decide_proposal(&you_c, Some(t), self_lock.id, Decide::Approve, "")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(refused.contains("nobody is locked out"), "{refused}");
+    // Review 1, through the server: approving allowed only on the two places above, nowhere real
+    // (written by hand, so its touch for writing Cedar first).
+    let only_above = r#"forbid (principal, action == Action::"review", resource in Scope::"noi.gov") unless { resource == Scope::"noi.gov.roles" || resource == Scope::"noi.gov.rules" };"#.to_string();
+    let t = you
+        .touch(
+            &gov,
+            &session,
+            "write-cedar",
+            &[path("noi.gov.rules.only-above")],
+            None,
+        )
+        .await;
+    let above = approve_refused(only_above, "only-above", Some(t)).await;
+    assert!(above.by_hand);
+    let t = you
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.rules.only-above",
+            Decide::Approve,
+            above.id,
+        )
+        .await;
+    let refused = gov
+        .decide_proposal(&you_c, Some(t), above.id, Decide::Approve, "")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(refused.contains("nobody is locked out"), "{refused}");
+
     // Review 6: giving a role can lock everyone out too. A role no one holds, a rule that stops its
     // holders approving roles and rules, and that role given to the only owner: refused, and recorded.
     let marked = write_role(&RoleForm {
@@ -679,6 +787,99 @@ async fn verify(url: &str, login: &str) {
             .await
             .unwrap();
     assert_eq!(kept, 1);
+
+    // Review 5, through the server: a second owner who may review but not update can't approve a
+    // change, as in Mero.
+    let reviewing = write_role(&RoleForm {
+        system: "mero".into(),
+        pick: Pick::These {
+            verbs: vec![
+                "read".into(),
+                "read-review".into(),
+                "propose".into(),
+                "review".into(),
+            ],
+        },
+    })
+    .unwrap();
+    let r = gov
+        .propose(&you_c, None, &draft(json!({
+            "operation": "add", "path": "noi.gov.roles.reviewer", "name": "Reviewer", "definition": "A test role.",
+            "responsibility": "Test.", "system": "mero", "cedar": reviewing, "why": "To test approving without update.",
+        })))
+        .await
+        .unwrap();
+    let t = you
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.roles.reviewer",
+            Decide::Approve,
+            r.id,
+        )
+        .await;
+    gov.decide_proposal(&you_c, Some(t), r.id, Decide::Approve, "")
+        .await
+        .unwrap();
+    let gives = [
+        GrantSpec {
+            role: "noi.gov.roles.reviewer".into(),
+            scope: "noi".into(),
+        },
+        GrantSpec {
+            role: "noi.gov.roles.owner".into(),
+            scope: "noi".into(),
+        },
+    ];
+    let t = you
+        .touch(
+            &gov,
+            &session,
+            "invite",
+            &[path("noi")],
+            Some(invite_about("steward", &gives)),
+        )
+        .await;
+    let link = gov
+        .invite(
+            &you_c,
+            Some(t),
+            "steward",
+            "Steward",
+            "steward@example.com",
+            &gives,
+        )
+        .await
+        .unwrap();
+    let mut steward = Person {
+        key: SoftPasskey::new(true),
+    };
+    steward.add_passkey(&gov, &link).await;
+    let theirs = steward.sign_in(&gov, "steward").await;
+    let steward_c = Credential::Session(theirs.clone());
+    let rename = gov
+        .propose(&you_c, None, &draft(json!({
+            "operation": "change", "path": "noi.gov.roles.marked", "base_revision": 1, "name": "Marked, renamed",
+            "definition": "A test role.", "responsibility": "Test.", "system": "mero", "cedar": marked,
+            "why": "A change for the steward to try.",
+        })))
+        .await
+        .unwrap();
+    let t = steward
+        .touch_to_decide(
+            &gov,
+            &theirs,
+            "noi.gov.roles.marked",
+            Decide::Approve,
+            rename.id,
+        )
+        .await;
+    let refused = gov
+        .decide_proposal(&steward_c, Some(t), rename.id, Decide::Approve, "")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(refused.contains("no grant allows update"), "{refused}");
 
     // Review 10: a proposal can't be changed in the database once made, and a decided one stays
     // decided, even by Governance's own login.
@@ -780,6 +981,14 @@ async fn verify(url: &str, login: &str) {
         gov.recover("design-agent").await.is_err(),
         "for a person only"
     );
+    // Review 4: a refused recovery is in the record too.
+    let kept: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM gov.record WHERE kind = 'recover' AND NOT allowed",
+    )
+    .fetch_one(&mut sql)
+    .await
+    .unwrap();
+    assert_eq!(kept, 1);
 
     // 9 · The move runs once, into a Governance that holds none: this one holds its own.
     let file: MoveFile = serde_json::from_value(json!({
@@ -830,8 +1039,8 @@ async fn verify(url: &str, login: &str) {
         .unwrap();
     assert_eq!(
         read["roles"].as_array().unwrap().len(),
-        3,
-        "maintainer, owner and marked"
+        4,
+        "maintainer, owner, marked and reviewer"
     );
     let listed: Value = get("/api/proposals?all=true", true)
         .send()
@@ -1125,6 +1334,29 @@ async fn verify_move(url: &str, login: &str) {
             .contains("noi.gov.rules.broken"),
         "{recovered}"
     );
+    // Second review, B: a starting rule that stops loading is written back as first agreed, never
+    // retired, or approving would quietly stop needing a touch.
+    sql.execute(
+        "INSERT INTO gov.versions(path, revision, kind, name, definition, responsibility, cedar, state, came, why)
+         VALUES('noi.gov.rules.fresh-touch', 4, 'rule', 'A fresh touch', 'd', 'r', 'forbid (', 'active', 'recovery', 'a bad edit')",
+    )
+    .await
+    .unwrap();
+    let recovered = gov.recover("hiddenstack").await.unwrap();
+    assert!(
+        recovered["done"]
+            .to_string()
+            .contains("noi.gov.rules.fresh-touch did not load: as first agreed, at revision 5"),
+        "{recovered}"
+    );
+    let touch: (String, String) = sqlx::query_as(
+        "SELECT state, cedar FROM gov.policies WHERE path = 'noi.gov.rules.fresh-touch'",
+    )
+    .fetch_one(&mut sql)
+    .await
+    .unwrap();
+    assert_eq!(touch.0, "active");
+    assert!(touch.1.contains("fresh_signature"));
     // A rule that loads but can't be evaluated is the same.
     sql.execute(
         "INSERT INTO gov.versions(path, revision, kind, name, definition, responsibility, cedar, state, came, why)
@@ -1149,7 +1381,7 @@ async fn verify_move(url: &str, login: &str) {
             .fetch_one(&mut sql)
             .await
             .unwrap();
-    assert_eq!(recorded, 2);
+    assert_eq!(recorded, 3);
     // The old copy is kept, read only, for a later migration to remove.
     let mut as_runtime = PgConnection::connect(&runtime).await.unwrap();
     assert!(as_runtime

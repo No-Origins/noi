@@ -319,44 +319,67 @@ fn form_reads(kind: &str, system: Option<&str>, cedar: &str) -> bool {
     }
 }
 
-/// What approving asks besides `review` (review, 21 Nov, finding 5): each change's own action, as
-/// Mero asked its approver. A new one is linked into noi.gov and made active; a change updates it;
-/// setting aside, bringing back and retiring move it through its lifecycle. Asked without a touch.
-fn change_questions(operation: Operation, path: &str) -> Vec<(&'static str, Vec<String>)> {
-    match operation {
-        Operation::Add => vec![
-            ("relate", vec!["noi.gov".into(), path.into()]),
-            ("transition", vec![path.into()]),
-        ],
-        Operation::Change => vec![("update", vec![path.into()])],
-        _ => vec![("transition", vec![path.into()])],
+/// One question as Governance really asks it: an action, on these places, with a touch or without.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Question {
+    pub action: &'static str,
+    pub places: Vec<String>,
+    pub touched: bool,
+}
+impl Question {
+    fn new(action: &'static str, places: &[&str], touched: bool) -> Self {
+        Question {
+            action,
+            places: places.iter().map(|p| p.to_string()).collect(),
+            touched,
+        }
     }
 }
 
-/// One thing changing roles and rules takes, which one person must be able to do: proposing at a
-/// place, or approving there (`review` with the change's own action).
-type Unit = Vec<(&'static str, Vec<String>)>;
+/// What proposing a change at this place asks, with the Cedar the form writes: `propose`, with no
+/// touch. (Cedar written by hand also asks `write-cedar`, with a touch; changing roles and rules
+/// never needs it, so the no-lockout check does not.) The one list `propose` asks from.
+fn proposing(path: &str) -> Vec<Question> {
+    vec![Question::new("propose", &[path], false)]
+}
 
-/// What changing roles and rules takes (decision 4; review, 21 Nov, finding 1): proposing and
-/// approving a new role and a new rule, and proposing and approving a change to, or the retiring of,
-/// every role and rule in force, the one that would lock everyone out too. Asked on the real places,
-/// as proposals and decisions are.
-fn changing(rows: &[InForce]) -> Vec<Unit> {
-    let mut units: Vec<Unit> = vec![];
-    for place in ["noi.gov.roles", "noi.gov.rules"] {
-        units.push(vec![("propose", vec![place.to_string()])]);
-        let mut approve: Unit = vec![("review", vec![place.to_string()])];
-        approve.extend(change_questions(Operation::Add, place));
-        units.push(approve);
-    }
+/// What approving this change at this place asks: `review`, with the touch made for it, and the
+/// change's own action without one, as Mero asked its approver (review, finding 5): a new one is
+/// linked into noi.gov and made active; a change updates it; setting aside, bringing back and
+/// retiring move it through its lifecycle. The one list `decide_proposal` asks from.
+fn approving(operation: Operation, path: &str) -> Vec<Question> {
+    let mut asks = vec![Question::new("review", &[path], true)];
+    asks.extend(match operation {
+        Operation::Add => vec![
+            Question::new("relate", &["noi.gov", path], false),
+            Question::new("transition", &[path], false),
+        ],
+        Operation::Change => vec![Question::new("update", &[path], false)],
+        _ => vec![Question::new("transition", &[path], false)],
+    });
+    asks
+}
+
+/// One thing changing roles and rules takes: one of these lists of questions, all answered by one
+/// person.
+type Need = Vec<Vec<Question>>;
+
+/// What changing roles and rules takes (decision 4; the reviews of 21 Nov, findings 1, A and D):
+/// for every role and rule in force, the one that would lock everyone out too, someone may propose
+/// a change to it, and someone may approve either changing it or retiring it. Then any role or rule
+/// can be put right, so nobody is locked out. Built from the very lists `propose` and
+/// `decide_proposal` ask, with the proof each question carries, so the check asks exactly what a
+/// real change asks.
+fn changing(rows: &[InForce]) -> Vec<Need> {
+    let mut needs: Vec<Need> = vec![];
     for (path, _, _) in rows {
-        units.push(vec![("propose", vec![path.clone()])]);
-        let mut approve: Unit = vec![("review", vec![path.clone()])];
-        approve.extend(change_questions(Operation::Change, path));
-        approve.extend(change_questions(Operation::Retire, path));
-        units.push(approve);
+        needs.push(vec![proposing(path)]);
+        needs.push(vec![
+            approving(Operation::Change, path),
+            approving(Operation::Retire, path),
+        ]);
     }
-    units
+    needs
 }
 
 /// The grants that link into these roles and rules: grants of roles in force.
@@ -368,25 +391,30 @@ fn usable(rows: &[InForce], grants: &[Grant]) -> Vec<Grant> {
         .collect()
 }
 
-/// Whether this person may do every question of a unit, with a touch.
-fn does(set: &PolicySet, account: Uuid, grants: &[Grant], unit: &Unit) -> bool {
-    unit.iter().all(|(action, places)| {
-        places.iter().all(|place| {
+/// Whether this person may ask every one of these questions, each with the proof it carries.
+fn does(set: &PolicySet, account: Uuid, grants: &[Grant], asks: &[Question]) -> bool {
+    asks.iter().all(|q| {
+        q.places.iter().all(|place| {
             answer(
                 set,
                 account,
                 grants,
-                action,
+                q.action,
                 &Target::Path(place.clone()),
-                true,
+                q.touched,
             )
             .is_ok()
         })
     })
 }
 
+/// Whether this person meets a need: one of its lists, whole.
+fn meets(set: &PolicySet, account: Uuid, grants: &[Grant], need: &Need) -> bool {
+    need.iter().any(|asks| does(set, account, grants, asks))
+}
+
 /// Whether this account, holding these grants, could change roles and rules under these roles and
-/// rules: every one of `changing`, with a touch. Pure: it reads nothing.
+/// rules on its own: every one of `changing`. Pure: it reads nothing.
 pub(crate) fn can_change(rows: &[InForce], account: Uuid, grants: &[Grant]) -> bool {
     let grants = usable(rows, grants);
     let Ok(set) = policy_set_of(rows, account, &grants) else {
@@ -394,11 +422,13 @@ pub(crate) fn can_change(rows: &[InForce], account: Uuid, grants: &[Grant]) -> b
     };
     changing(rows)
         .iter()
-        .all(|unit| does(&set, account, &grants, unit))
+        .all(|need| meets(&set, account, &grants, need))
 }
 
 /// Whether, for each thing changing roles and rules takes, some one of these people could do it.
-/// Pure: it reads nothing.
+/// Pure: it reads nothing. (Cost, review E: each role and rule is parsed once per person, and the
+/// check runs at most twice per approval, grant or ended grant, inside the one write lock; fine at
+/// today's few roles and owners.)
 pub(crate) fn reachable(rows: &[InForce], people: &[(Uuid, Vec<Grant>)]) -> bool {
     let able: Vec<(Uuid, Vec<Grant>, PolicySet)> = people
         .iter()
@@ -409,10 +439,37 @@ pub(crate) fn reachable(rows: &[InForce], people: &[(Uuid, Vec<Grant>)]) -> bool
                 .map(|set| (*account, grants, set))
         })
         .collect();
-    changing(rows).iter().all(|unit| {
+    changing(rows).iter().all(|need| {
         able.iter()
-            .any(|(account, grants, set)| does(set, *account, grants, unit))
+            .any(|(account, grants, set)| meets(set, *account, grants, need))
     })
+}
+
+/// The questions as `decide_in` takes them, with the touch for the one that carries it.
+fn asks_of<'a>(
+    questions: &'a [(Question, Vec<Target>)],
+    touch: Option<Uuid>,
+    about: Option<&'a Value>,
+) -> Vec<Ask<'a>> {
+    questions
+        .iter()
+        .map(|(q, targets)| {
+            if q.touched {
+                Ask::new(q.action, targets, about, touch.map(Proof::Touch))
+            } else {
+                Ask::new(q.action, targets, None, None)
+            }
+        })
+        .collect()
+}
+fn with_targets(questions: Vec<Question>) -> Vec<(Question, Vec<Target>)> {
+    questions
+        .into_iter()
+        .map(|q| {
+            let targets = q.places.iter().cloned().map(Target::Path).collect();
+            (q, targets)
+        })
+        .collect()
 }
 
 /// Whether a role or rule loads into Cedar as Governance decides with it (review, finding 4): a
@@ -746,16 +803,13 @@ impl Governance {
         let by_hand = matches!(draft.operation, Operation::Add | Operation::Change)
             && !form_reads(kind, says.system.as_deref(), &says.cedar)
             && now.as_ref().is_none_or(|v| v.cedar != says.cedar);
-        let place = [Target::Path(path.to_string())];
-        let mut asks = vec![Ask::new("propose", &place, None, None)];
+        // The questions the no-lockout check asks too (`proposing`), and for Cedar by hand, writing it.
+        let mut questions = proposing(path);
         if by_hand {
-            asks.push(Ask::new(
-                "write-cedar",
-                &place,
-                None,
-                touch.map(Proof::Touch),
-            ));
+            questions.push(Question::new("write-cedar", &[path], true));
         }
+        let questions = with_targets(questions);
+        let asks = asks_of(&questions, touch, None);
         let (mut tx, by) = self.decide_in(tx, credential, &asks).await?;
         let id = Uuid::new_v4();
         sqlx::query(
@@ -827,26 +881,15 @@ impl Governance {
         let operation = Operation::parse(&p.operation)
             .ok_or_else(|| Error::Invalid(format!("{} is not an operation", p.operation)))?;
         let about = decide_about(decide, id);
-        let place = [Target::Path(p.path.clone())];
-        // Approving also asks the change's own action, without a touch, as Mero did (review 5).
-        let own: Vec<(&str, Vec<Target>)> = if decide == Decide::Approve {
-            change_questions(operation, &p.path)
-                .into_iter()
-                .map(|(action, places)| (action, places.into_iter().map(Target::Path).collect()))
-                .collect()
+        // Approving asks the very list the no-lockout check asks (`approving`): review with the
+        // touch, the change's own action without one, as Mero did (review 5). Sending back and
+        // rejecting ask review alone, with the touch.
+        let questions = with_targets(if decide == Decide::Approve {
+            approving(operation, &p.path)
         } else {
-            vec![]
-        };
-        let mut asks = vec![Ask::new(
-            "review",
-            &place,
-            Some(&about),
-            touch.map(Proof::Touch),
-        )];
-        asks.extend(
-            own.iter()
-                .map(|(action, targets)| Ask::new(action, targets, None, None)),
-        );
+            vec![Question::new("review", &[&p.path], true)]
+        });
+        let asks = asks_of(&questions, touch, Some(&about));
         let (mut tx, by) = self.decide_in(tx, credential, &asks).await?;
         let mut done = json!({"proposal": id, "decision": decide.as_str(), "path": p.path});
         if decide == Decide::Approve {
@@ -984,28 +1027,65 @@ impl Governance {
     /// The recovery command (decision 4), run on Governance's server like setup, for the worst case:
     /// no one can change roles and rules. Only for a Governance that holds roles and rules: a new one
     /// runs setup, and one before the move runs the move (review 2). For this person, one step at a
-    /// time and only while still needed: what does not load put right (Maintainer and Owner as first
-    /// agreed, anything else retired; review 4); Maintainer and Owner brought back into force; given
-    /// to them in all of noi; their Cedar as first agreed; then each rule that still says no, or can't
-    /// be evaluated, retired. Every step is a new version or grant, written in the record; a recovery
-    /// that can't succeed keeps nothing, and that is recorded too. Does nothing when someone can
-    /// already change them.
+    /// time and only while still needed:
+    /// 0. what does not load is put right: one of the four starting roles and rules written back as
+    ///    first agreed (second review, B: never retired, or approving would quietly stop needing a
+    ///    touch), anything else retired;
+    /// 1. Maintainer and Owner brought back into force; 2. given to them in all of noi;
+    /// 3. the four starting ones as first agreed, if they still can't;
+    /// 4. each other rule that still says no, or can't be evaluated, retired.
+    ///
+    /// Every step is a new version or grant, written in the record. A recovery refused, or one that
+    /// can't succeed, keeps nothing and is recorded (review 4). Does nothing when someone can already
+    /// change roles and rules.
     pub async fn recover(&self, handle: &str) -> Result<Value> {
-        let mut tx = self.write().await?;
+        let tx = self.write().await?;
+        let mut tx = tx;
         let (account, kind, state) =
-            super::accounts::account_by_handle(tx.as_mut(), handle).await?;
+            match super::accounts::account_by_handle(tx.as_mut(), handle).await {
+                Ok(found) => found,
+                Err(e) => {
+                    return Err(self
+                        .refused_after(
+                            tx,
+                            "recover",
+                            None,
+                            None,
+                            &["noi.gov".into()],
+                            &e.to_string(),
+                        )
+                        .await)
+                }
+            };
         if kind != "person" || state != "active" {
-            return Err(Error::Refused(format!(
+            let why = format!(
                 "{handle} is not an active person: recovery is for a person who can sign in"
-            )));
+            );
+            return Err(self
+                .refused_after(
+                    tx,
+                    "recover",
+                    Some(account),
+                    None,
+                    &["noi.gov".into()],
+                    &why,
+                )
+                .await);
         }
         let held: i64 = sqlx::query_scalar("SELECT count(*) FROM gov.versions")
             .fetch_one(tx.as_mut())
             .await?;
         if held == 0 {
-            return Err(Error::Refused(
-                "Governance holds no roles and rules yet: run setup or the move first. Recovery only brings back what it held".into(),
-            ));
+            return Err(self
+                .refused_after(
+                    tx,
+                    "recover",
+                    Some(account),
+                    None,
+                    &["noi.gov".into()],
+                    "Governance holds no roles and rules yet: run setup or the move first. Recovery only brings back what it held",
+                )
+                .await);
         }
         let rows = in_force_or_none(tx.as_mut()).await?;
         if someone_can_change(tx.as_mut(), &rows, None).await? {
@@ -1026,48 +1106,45 @@ impl Governance {
             if loads(path, kind, cedar) {
                 continue;
             }
+            if let Some(f) = first.iter().find(|f| &f.path == path) {
+                match self.as_first_agreed(tx.as_mut(), f, why).await {
+                    Ok(Some(said)) => done.push(format!("{path} did not load: {said}")),
+                    Ok(None) => {}
+                    Err(e) => {
+                        return Err(self
+                            .refused_after(
+                                tx,
+                                "recover",
+                                Some(account),
+                                None,
+                                &["noi.gov".into()],
+                                &e.to_string(),
+                            )
+                            .await)
+                    }
+                }
+                continue;
+            }
             let v = newest(tx.as_mut(), path)
                 .await?
                 .ok_or_else(|| Error::NotFound(path.clone()))?;
             let revision = v.revision + 1;
-            match firsts.iter().find(|f| &f.path == path) {
-                Some(f) => {
-                    write_version(
-                        tx.as_mut(),
-                        path,
-                        revision,
-                        "role",
-                        &first_says(f),
-                        "active",
-                        "recovery",
-                        None,
-                        None,
-                        Some(why),
-                    )
-                    .await?;
-                    done.push(format!(
-                        "{path} did not load: as first agreed, at revision {revision}"
-                    ));
-                }
-                None => {
-                    write_version(
-                        tx.as_mut(),
-                        path,
-                        revision,
-                        kind,
-                        &v.says(),
-                        "retired",
-                        "recovery",
-                        None,
-                        None,
-                        Some(why),
-                    )
-                    .await?;
-                    done.push(format!(
-                        "{path} did not load: retired at revision {revision}"
-                    ));
-                }
-            }
+            write_version(
+                tx.as_mut(),
+                path,
+                revision,
+                kind,
+                &v.says(),
+                "retired",
+                "recovery",
+                None,
+                None,
+                Some(why),
+            )
+            .await?;
+            done.push(format!(
+                "{path} did not load: retired at revision {revision}"
+            ));
         }
         // 1. Maintainer and Owner in force.
         for f in &firsts {
@@ -1115,36 +1192,30 @@ impl Governance {
                 done.push(format!("{handle} given {} in noi", f.path));
             }
         }
-        // 3. Their Cedar as first agreed, if they still can't.
+        // 3. The four starting ones as first agreed, if they still can't.
         let rows = in_force_or_none(tx.as_mut()).await?;
         if !can_change(&rows, account, &grants_of(tx.as_mut(), account).await?) {
-            for f in &firsts {
-                if let Some(v) = newest(tx.as_mut(), &f.path).await? {
-                    if v.cedar != f.cedar || v.system != f.system || v.state != "active" {
-                        write_version(
-                            tx.as_mut(),
-                            &f.path,
-                            v.revision + 1,
-                            "role",
-                            &first_says(f),
-                            "active",
-                            "recovery",
-                            None,
-                            None,
-                            Some(why),
-                        )
-                        .await?;
-                        done.push(format!(
-                            "{} as first agreed, at revision {}",
-                            f.path,
-                            v.revision + 1
-                        ));
+            for f in &first {
+                match self.as_first_agreed(tx.as_mut(), f, why).await {
+                    Ok(Some(said)) => done.push(format!("{}: {said}", f.path)),
+                    Ok(None) => {}
+                    Err(e) => {
+                        return Err(self
+                            .refused_after(
+                                tx,
+                                "recover",
+                                Some(account),
+                                None,
+                                &["noi.gov".into()],
+                                &e.to_string(),
+                            )
+                            .await)
                     }
                 }
             }
         }
-        // 4. Each rule that still says no, or can't be evaluated, retired.
-        for _ in 0..50 {
+        // 4. Each other rule that still says no, or can't be evaluated, retired, until none is left.
+        loop {
             let rows = in_force_or_none(tx.as_mut()).await?;
             let grants = usable(&rows, &grants_of(tx.as_mut(), account).await?);
             if can_change(&rows, account, &grants) {
@@ -1153,48 +1224,57 @@ impl Governance {
             let Ok(set) = policy_set_of(&rows, account, &grants) else {
                 break;
             };
-            let is_rule = |p: &String| rows.iter().any(|(path, k, _)| path == p && k == "rule");
+            let retirable = |p: &String| {
+                rows.iter().any(|(path, k, _)| path == p && k == "rule")
+                    && !first.iter().any(|f| &f.path == p)
+            };
             let mut blocking: Vec<String> = vec![];
-            for unit in changing(&rows) {
-                for (action, places) in &unit {
-                    for place in places {
-                        let Ok(said) = evaluate(
-                            &set,
-                            account,
-                            &grants,
-                            action,
-                            &Target::Path(place.clone()),
-                            true,
-                        ) else {
-                            continue;
-                        };
-                        if !said.allowed {
-                            blocking.extend(said.reasons.into_iter().filter(&is_rule));
+            for need in changing(&rows) {
+                for asks in &need {
+                    for q in asks {
+                        for place in &q.places {
+                            let Ok(said) = evaluate(
+                                &set,
+                                account,
+                                &grants,
+                                q.action,
+                                &Target::Path(place.clone()),
+                                q.touched,
+                            ) else {
+                                continue;
+                            };
+                            if !said.allowed {
+                                blocking.extend(said.reasons.into_iter().filter(&retirable));
+                            }
+                            blocking.extend(said.erring.into_iter().filter(&retirable));
                         }
-                        blocking.extend(said.erring.into_iter().filter(&is_rule));
                     }
                 }
             }
             blocking.sort();
             blocking.dedup();
-            let Some(rule) = blocking.first() else { break };
-            let v = newest(tx.as_mut(), rule)
-                .await?
-                .ok_or_else(|| Error::NotFound(rule.clone()))?;
-            write_version(
-                tx.as_mut(),
-                rule,
-                v.revision + 1,
-                "rule",
-                &v.says(),
-                "retired",
-                "recovery",
-                None,
-                None,
-                Some(why),
-            )
-            .await?;
-            done.push(format!("{rule} retired at revision {}", v.revision + 1));
+            if blocking.is_empty() {
+                break;
+            }
+            for rule in blocking {
+                let v = newest(tx.as_mut(), &rule)
+                    .await?
+                    .ok_or_else(|| Error::NotFound(rule.clone()))?;
+                write_version(
+                    tx.as_mut(),
+                    &rule,
+                    v.revision + 1,
+                    "rule",
+                    &v.says(),
+                    "retired",
+                    "recovery",
+                    None,
+                    None,
+                    Some(why),
+                )
+                .await?;
+                done.push(format!("{rule} retired at revision {}", v.revision + 1));
+            }
         }
         let rows = in_force_or_none(tx.as_mut()).await?;
         if !can_change(&rows, account, &grants_of(tx.as_mut(), account).await?) {
@@ -1222,6 +1302,46 @@ impl Governance {
         .await?;
         tx.commit().await?;
         Ok(json!({"done": done, "said": format!("{handle} can change roles and rules again")}))
+    }
+
+    /// One of the four starting roles and rules, written back as first agreed when its newest
+    /// version differs or is not active. Refused when the first text does not load either: never
+    /// retired (second review, B).
+    async fn as_first_agreed(
+        &self,
+        conn: &mut PgConnection,
+        f: &First,
+        why: &str,
+    ) -> Result<Option<String>> {
+        let kind = kind_of(&f.path)?;
+        if !loads(&f.path, kind, &f.cedar) {
+            return Err(Error::Refused(format!(
+                "{} as first agreed does not load either: recovery can't put it right",
+                f.path
+            )));
+        }
+        let now = newest(&mut *conn, &f.path).await?;
+        let same = now
+            .as_ref()
+            .is_some_and(|v| v.cedar == f.cedar && v.system == f.system && v.state == "active");
+        if same {
+            return Ok(None);
+        }
+        let revision = now.as_ref().map_or(1, |v| v.revision + 1);
+        write_version(
+            conn,
+            &f.path,
+            revision,
+            kind,
+            &first_says(f),
+            "active",
+            "recovery",
+            None,
+            None,
+            Some(why),
+        )
+        .await?;
+        Ok(Some(format!("as first agreed, at revision {revision}")))
     }
 
     /// The move (decision 5): takes in the roles and rules Mero held, with every revision, once. What
@@ -1266,8 +1386,7 @@ impl Governance {
             )));
         }
         // What will be in force, against what Governance last decided with.
-        type InForceRow = (String, String, String, String, i64);
-        let mut last: Vec<InForceRow> =
+        let mut last: Vec<Held> =
             sqlx::query_as("SELECT path, kind, cedar, state, revision FROM gov.last_copy")
                 .fetch_all(tx.as_mut())
                 .await?;
@@ -1287,7 +1406,7 @@ impl Governance {
                 newest_of.insert(&v.path, v);
             }
         }
-        let mut after: Vec<InForceRow> = newest_of
+        let mut after: Vec<Held> = newest_of
             .values()
             .filter(|v| v.state == "active" || v.state == "deprecated")
             .map(|v| {
@@ -1302,17 +1421,9 @@ impl Governance {
             .collect();
         after.sort();
         if after != last {
-            let mut differ: Vec<&str> = after
-                .iter()
-                .filter(|r| !last.contains(r))
-                .chain(last.iter().filter(|r| !after.contains(r)))
-                .map(|r| r.0.as_str())
-                .collect();
-            differ.sort();
-            differ.dedup();
             return Err(Error::Refused(format!(
-                "what would be in force after the move is not what Governance last decided with: {}. Nothing was kept",
-                differ.join(", ")
+                "what would be in force after the move is not what Governance last decided with. Nothing was kept. Row by row:\n{}\nGovernance decided from that copy until now, so the move must match it. Find why they differ (an approval in Mero that Governance never copied, or a changed file) and ask the owner: accepting a difference changes what the rules say.",
+                differences(&last, &after).join("\n")
             )));
         }
         for v in &versions {
@@ -1380,6 +1491,48 @@ impl Governance {
         out["moved"] = json!(true);
         Ok(out)
     }
+}
+
+/// A role or rule in force, as the last copy and the move each hold it: path, kind, Cedar, state,
+/// revision.
+type Held = (String, String, String, String, i64);
+
+/// What differs between the last copy and what the move would leave in force, one line a role or
+/// rule (second review, C): which holds it, and how they differ.
+fn differences(last: &[Held], after: &[Held]) -> Vec<String> {
+    let mut paths: Vec<&str> = last.iter().chain(after).map(|r| r.0.as_str()).collect();
+    paths.sort();
+    paths.dedup();
+    let words = |r: &Held| format!("{}, {}, revision {}", r.1, r.3, r.4);
+    paths
+        .into_iter()
+        .filter_map(|path| {
+            let was = last.iter().find(|r| r.0 == path);
+            let now = after.iter().find(|r| r.0 == path);
+            match (was, now) {
+                (Some(w), Some(n)) if w == n => None,
+                (Some(w), Some(n)) => Some(format!(
+                    "- {path}: the copy has {}; the move has {}{}",
+                    words(w),
+                    words(n),
+                    if w.2 == n.2 {
+                        ""
+                    } else {
+                        "; their Cedar differs"
+                    }
+                )),
+                (Some(w), None) => Some(format!(
+                    "- {path}: the copy has {}; the move leaves it out",
+                    words(w)
+                )),
+                (None, Some(n)) => Some(format!(
+                    "- {path}: the move has {}; the copy does not",
+                    words(n)
+                )),
+                (None, None) => None,
+            }
+        })
+        .collect()
 }
 
 /// One account's live grants.
@@ -1569,6 +1722,94 @@ mod tests {
         let new_only = r#"forbid (principal, action == Action::"review", resource in Scope::"noi.gov.roles.someday");"#;
         let fine = with_version(&rows(), "noi.gov.rules.someday", "rule", "active", new_only);
         assert!(can_change(&fine, YOU, &both));
+    }
+
+    /// Second review, C: the move's refusal says each difference, row by row.
+    #[test]
+    fn the_move_says_each_difference() {
+        let row = |p: &str, state: &str, revision: i64, cedar: &str| {
+            (
+                p.to_string(),
+                "rule".to_string(),
+                cedar.to_string(),
+                state.to_string(),
+                revision,
+            )
+        };
+        let last = [
+            row("noi.gov.rules.a", "active", 3, "x"),
+            row("noi.gov.rules.b", "active", 2, "y"),
+            row("noi.gov.rules.c", "active", 1, "z"),
+        ];
+        let after = [
+            row("noi.gov.rules.a", "active", 4, "x2"),
+            row("noi.gov.rules.c", "active", 1, "z"),
+            row("noi.gov.rules.d", "deprecated", 1, "w"),
+        ];
+        assert_eq!(
+            differences(&last, &after),
+            [
+                "- noi.gov.rules.a: the copy has rule, active, revision 3; the move has rule, active, revision 4; their Cedar differs",
+                "- noi.gov.rules.b: the copy has rule, active, revision 2; the move leaves it out",
+                "- noi.gov.rules.d: the move has rule, deprecated, revision 1; the copy does not",
+            ]
+        );
+    }
+
+    /// Second review, finding A (21 Nov): the check asks each question with the proof it really
+    /// carries. Proposing, and approving's own actions, carry no touch; only `review` does.
+    #[test]
+    fn a_rule_on_what_carries_no_touch_is_asked_without_one() {
+        let both = [grant(MAINTAINER, "noi"), grant(OWNER, "noi")];
+        let propose = r#"forbid (principal, action == Action::"propose", resource in Scope::"noi.gov") unless { context.fresh_signature };"#;
+        let locked = with_version(
+            &rows(),
+            "noi.gov.rules.propose-touch",
+            "rule",
+            "active",
+            propose,
+        );
+        assert!(
+            !can_change(&locked, YOU, &both),
+            "no proposal could ever be made"
+        );
+        let own = r#"forbid (principal, action in [Action::"update", Action::"transition"], resource in Scope::"noi.gov") unless { context.fresh_signature };"#;
+        let locked = with_version(&rows(), "noi.gov.rules.own-touch", "rule", "active", own);
+        assert!(
+            !can_change(&locked, YOU, &both),
+            "nothing could be changed or retired"
+        );
+        // A touch on review is what review really carries: a rule asking it changes nothing.
+        let review = r#"forbid (principal, action == Action::"review", resource in Scope::"noi.gov") unless { context.fresh_signature };"#;
+        let fine = with_version(
+            &rows(),
+            "noi.gov.rules.review-touch",
+            "rule",
+            "active",
+            review,
+        );
+        assert!(can_change(&fine, YOU, &both));
+    }
+
+    /// Second review, finding D (a design call, filed as a question): a role or rule counts as
+    /// within reach when it can be changed or retired; a rule that only stops Owner being retired
+    /// is not a lockout, since Owner can still be changed.
+    #[test]
+    fn a_rule_that_only_protects_owner_from_retiring_is_not_a_lockout() {
+        let both = [grant(MAINTAINER, "noi"), grant(OWNER, "noi")];
+        let keep = r#"forbid (principal, action == Action::"transition", resource in Scope::"noi.gov.roles.owner");"#;
+        let kept = with_version(&rows(), "noi.gov.rules.keep-owner", "rule", "active", keep);
+        assert!(can_change(&kept, YOU, &both));
+        // Neither changed nor retired: that is a lockout.
+        let frozen = r#"forbid (principal, action in [Action::"update", Action::"transition"], resource in Scope::"noi.gov.roles.owner");"#;
+        let stuck = with_version(
+            &rows(),
+            "noi.gov.rules.freeze-owner",
+            "rule",
+            "active",
+            frozen,
+        );
+        assert!(!can_change(&stuck, YOU, &both));
     }
 
     /// Review finding 5: approving also asks each change's own action, as Mero did, so a role
