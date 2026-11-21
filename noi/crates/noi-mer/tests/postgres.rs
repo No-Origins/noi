@@ -158,8 +158,8 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    // Every registry migration (15, the last landing by the files, 18 Nov) plus the other application's row.
-    assert_eq!(unmoved, 16);
+    // Every registry migration (16, the last "retire", 21 Nov) plus the other application's row.
+    assert_eq!(unmoved, 17);
     metadata
         .execute("DELETE FROM public._sqlx_migrations WHERE version=42")
         .await
@@ -169,7 +169,7 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    assert_eq!(own_count, 15);
+    assert_eq!(own_count, 16);
     assert_eq!(registry.snapshot(&actor).await.unwrap().merons.len(), 3);
     let root = registry.get(&actor, "noi").await.unwrap();
     let root_uid = root.identity.uid;
