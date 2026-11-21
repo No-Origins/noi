@@ -87,35 +87,45 @@ impl Person {
     }
 }
 
+/// The two checks run one after the other, each on a database and login of its own, dropped after:
+/// on a new Postgres, two migrations at once would both make Governance's runtime role, and one
+/// would fail (seen on GitHub, 21 Nov).
 #[tokio::test]
 #[ignore = "requires a reachable PostgreSQL admin URL and CREATE DATABASE; see noi/docs/verification.md"]
 async fn roles_and_rules_on_real_postgres() {
     let admin = std::env::var("NOI_TEST_ADMIN_URL").expect("set NOI_TEST_ADMIN_URL explicitly");
-    let name = format!("noi_roles_test_{}", Uuid::new_v4().simple());
-    let mut admin_conn = PgConnection::connect(&admin).await.unwrap();
-    admin_conn
-        .execute(format!("CREATE DATABASE {name}").as_str())
-        .await
-        .unwrap();
-    let mut opts: sqlx::postgres::PgConnectOptions = admin.parse().unwrap();
-    opts = opts.database(&name);
-    let url = sqlx::ConnectOptions::to_url_lossy(&opts).to_string();
-    let login = format!("noi_roles_test_login_{}", Uuid::new_v4().simple());
-    let task = tokio::spawn({
-        let login = login.clone();
-        async move { verify(&url, &login).await }
-    });
-    let result = task.await;
-    admin_conn
-        .execute(format!("DROP DATABASE {name} WITH (FORCE)").as_str())
-        .await
-        .unwrap();
-    admin_conn
-        .execute(format!("DROP ROLE IF EXISTS {login}").as_str())
-        .await
-        .unwrap();
-    if let Err(e) = result {
-        std::panic::resume_unwind(e.into_panic());
+    for check in ["roles", "move"] {
+        let name = format!("noi_{check}_test_{}", Uuid::new_v4().simple());
+        let mut admin_conn = PgConnection::connect(&admin).await.unwrap();
+        admin_conn
+            .execute(format!("CREATE DATABASE {name}").as_str())
+            .await
+            .unwrap();
+        let mut opts: sqlx::postgres::PgConnectOptions = admin.parse().unwrap();
+        opts = opts.database(&name);
+        let url = sqlx::ConnectOptions::to_url_lossy(&opts).to_string();
+        let login = format!("noi_{check}_test_login_{}", Uuid::new_v4().simple());
+        let task = tokio::spawn({
+            let login = login.clone();
+            async move {
+                match check {
+                    "roles" => verify(&url, &login).await,
+                    _ => verify_move(&url, &login).await,
+                }
+            }
+        });
+        let result = task.await;
+        admin_conn
+            .execute(format!("DROP DATABASE {name} WITH (FORCE)").as_str())
+            .await
+            .unwrap();
+        admin_conn
+            .execute(format!("DROP ROLE IF EXISTS {login}").as_str())
+            .await
+            .unwrap();
+        if let Err(e) = result {
+            std::panic::resume_unwind(e.into_panic());
+        }
     }
 }
 
@@ -1155,38 +1165,6 @@ fn move_file(items: &[Value]) -> MoveFile {
         })
         .collect();
     serde_json::from_value(json!({"moved_from": "mero", "written_at": "2026-11-21T00:00:00Z", "roles_and_rules": moving})).unwrap()
-}
-
-#[tokio::test]
-#[ignore = "requires a reachable PostgreSQL admin URL and CREATE DATABASE; see noi/docs/verification.md"]
-async fn recovery_and_the_move_on_real_postgres() {
-    let admin = std::env::var("NOI_TEST_ADMIN_URL").expect("set NOI_TEST_ADMIN_URL explicitly");
-    let name = format!("noi_move_test_{}", Uuid::new_v4().simple());
-    let mut admin_conn = PgConnection::connect(&admin).await.unwrap();
-    admin_conn
-        .execute(format!("CREATE DATABASE {name}").as_str())
-        .await
-        .unwrap();
-    let mut opts: sqlx::postgres::PgConnectOptions = admin.parse().unwrap();
-    opts = opts.database(&name);
-    let url = sqlx::ConnectOptions::to_url_lossy(&opts).to_string();
-    let login = format!("noi_move_test_login_{}", Uuid::new_v4().simple());
-    let task = tokio::spawn({
-        let login = login.clone();
-        async move { verify_move(&url, &login).await }
-    });
-    let result = task.await;
-    admin_conn
-        .execute(format!("DROP DATABASE {name} WITH (FORCE)").as_str())
-        .await
-        .unwrap();
-    admin_conn
-        .execute(format!("DROP ROLE IF EXISTS {login}").as_str())
-        .await
-        .unwrap();
-    if let Err(e) = result {
-        std::panic::resume_unwind(e.into_panic());
-    }
 }
 
 /// As this Mac stands when step 3's migration has run and the move has not: accounts and grants,
