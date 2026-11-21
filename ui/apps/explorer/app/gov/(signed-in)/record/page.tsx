@@ -4,9 +4,7 @@
 // of this page. Views: everything, changes, sign-ins, refused; one person's part; 50 at a time.
 import { Card, Tab, Tabs } from '@noi/eio-react'
 import { recordWords, when } from '../../../../lib/changes'
-import { recordPage, type RecordQuery } from '../../../../lib/governance'
-import { rolesIn } from '../../../../lib/cedar'
-import { govSnapshot } from '../../../../lib/mero'
+import { recordPage, roleNames, type RecordQuery } from '../../../../lib/governance'
 import { origins } from '../../../../lib/where'
 import { Line } from '../../Line'
 import { cx } from '../../../merons/parts'
@@ -27,9 +25,9 @@ export default async function Record({ searchParams }: { searchParams: Promise<{
   const show = VIEWS.find(([v]) => v === q.show)?.[0] ?? 'everything'
   const who = q.who?.trim() || undefined
   const before = Number(q.before) > 0 ? Number(q.before) : undefined
-  // Role names from noi.gov alone; the record reads without them if Mero can't say (9 Nov, step 6).
-  const [at, page, s] = await Promise.all([origins(), recordPage({ show, who, before }), govSnapshot().catch(() => undefined)])
-  const roles = s ? Object.fromEntries(rolesIn(s).map(r => [r.id, r.name])) : {}
+  // Role names from Governance, which keeps them (step 3); the record reads without them.
+  const [at, page, known] = await Promise.all([origins(), recordPage({ show, who, before }), roleNames()])
+  const roles = Object.fromEntries(known.map(r => [r.id, r.name]))
   const link = (o: { show?: string; who?: string; before?: number }) => {
     const p = new URLSearchParams()
     if (o.show && o.show !== 'everything') p.set('show', o.show)

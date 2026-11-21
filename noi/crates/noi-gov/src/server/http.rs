@@ -4,9 +4,10 @@
 //! SameSite=Strict cookie that no page script can read. Requests from other hosts or sites are
 //! refused.
 use super::{
-    accounts::GrantSpec, Change, Credential, Error, Governance, Target, FAILED_SIGN_INS,
-    SESSION_COOKIE, SESSION_DAYS, WAIT_MINUTES,
+    accounts::GrantSpec, Change, Credential, Decide, Draft, Error, Governance, Target,
+    FAILED_SIGN_INS, SESSION_COOKIE, SESSION_DAYS, WAIT_MINUTES,
 };
+use crate::form;
 use axum::{
     extract::{ConnectInfo, Path, Query, Request, State},
     http::{header, HeaderMap, HeaderValue, Method, StatusCode},
@@ -28,7 +29,6 @@ impl IntoResponse for Error {
             Error::Refused(_) => StatusCode::FORBIDDEN,
             Error::Invalid(_) | Error::Passkey(_) => StatusCode::BAD_REQUEST,
             Error::NotFound(_) => StatusCode::NOT_FOUND,
-            Error::Mero(_) => StatusCode::BAD_GATEWAY,
             Error::TooMany(_) => StatusCode::TOO_MANY_REQUESTS,
             Error::Mail(_) => StatusCode::BAD_GATEWAY,
             Error::Database(_) | Error::Migration(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -96,7 +96,13 @@ pub fn router(gov: Governance) -> Router {
         .route("/api/invitations", post(invite))
         .route("/api/agents", post(add_agent))
         .route("/api/sessions/end", post(end_sessions))
-        .route("/api/copy", post(copy))
+        .route("/api/roles-and-rules", get(roles_and_rules))
+        .route("/api/roles-and-rules/versions", get(versions))
+        .route("/api/proposals", get(proposals).post(propose))
+        .route("/api/proposals/decide", post(decide_proposal))
+        .route("/api/proposals/{id}", get(proposal))
+        .route("/api/cedar/read", post(cedar_read))
+        .route("/api/cedar/write", post(cedar_write))
         .layer(middleware::from_fn_with_state(
             (gov.clone(), Tries::new()),
             limit_starts,
@@ -610,10 +616,10 @@ struct TouchStart {
     #[serde(default)]
     about: Option<Value>,
 }
-/// Governance can decide when its database answers and it holds a copy of the roles and rules.
+/// Governance can decide when its database answers and it holds roles and rules.
 async fn ready(State(gov): State<Governance>) -> Response {
-    let (database, copy) = gov.readiness().await;
-    noi_log::health::ready(&[("database", database), ("roles and rules", copy)])
+    let (database, held) = gov.readiness().await;
+    noi_log::health::ready(&[("database", database), ("roles and rules", held)])
 }
 
 async fn touch_start(
@@ -644,8 +650,6 @@ struct Preview {
     #[serde(default)]
     credential: Option<Credential>,
     questions: Vec<Question>,
-    #[serde(default)]
-    rules_at: Option<String>,
 }
 #[derive(Deserialize)]
 struct Question {
@@ -658,9 +662,6 @@ async fn may_preview(
     Json(b): Json<Preview>,
 ) -> Result<Json<Value>> {
     let credential = b.credential.unwrap_or_else(|| viewer(&headers));
-    if let Some(at) = &b.rules_at {
-        gov.keep_up(at).await?;
-    }
     let questions: Vec<(String, Vec<Target>)> = b
         .questions
         .into_iter()
@@ -683,9 +684,6 @@ struct May {
     /// What else the touch named (step 7): it must be the same.
     #[serde(default)]
     about: Option<Value>,
-    /// How current Mero's roles and rules are (step 7): if the copy differs, copy first.
-    #[serde(default)]
-    rules_at: Option<String>,
 }
 async fn may(
     State(gov): State<Governance>,
@@ -696,9 +694,6 @@ async fn may(
         .credential
         .or_else(|| cookie_session(&headers).map(Credential::Session))
         .unwrap_or(Credential::Visitor);
-    if let Some(at) = &b.rules_at {
-        gov.keep_up(at).await?;
-    }
     let answer = gov
         .may_about(
             &credential,
@@ -839,7 +834,128 @@ async fn end_sessions(
         .await?;
     Ok(Json(json!({"ended": ended})))
 }
-/// Mero calls this after an approval in noi.gov. It only ever pulls what Mero has approved.
-async fn copy(State(gov): State<Governance>) -> Result<impl IntoResponse> {
-    Ok(Json(gov.copy_from_mero().await?))
+// ——— Roles and rules, kept by Governance (step 3, agreed 9 Nov: "Where Roles and Rules Live") ———
+
+/// Who is asking: a system names the credential it was given (an agent's run token); a browser's
+/// cookie is used otherwise; with neither, the asker is signed out.
+fn asker_of(given: Option<Credential>, headers: &HeaderMap) -> Credential {
+    given.unwrap_or_else(|| viewer(headers))
+}
+
+/// Every role and rule in force, for whoever may read them.
+async fn roles_and_rules(State(gov): State<Governance>, headers: HeaderMap) -> Result<Json<Value>> {
+    Ok(Json(gov.roles_and_rules(&viewer(&headers)).await?))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VersionsQuery {
+    path: String,
+}
+/// Every version of one role or rule, newest first.
+async fn versions(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Query(q): Query<VersionsQuery>,
+) -> Result<Json<Value>> {
+    Ok(Json(
+        json!({ "versions": gov.versions(&viewer(&headers), &q.path).await? }),
+    ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProposalsQuery {
+    #[serde(default)]
+    all: bool,
+}
+/// What waits (or every proposal), for Review.
+async fn proposals(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Query(q): Query<ProposalsQuery>,
+) -> Result<Json<Value>> {
+    Ok(Json(
+        json!({ "proposals": gov.proposals(&viewer(&headers), q.all).await? }),
+    ))
+}
+async fn proposal(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>> {
+    Ok(Json(json!(gov.proposal(&viewer(&headers), id).await?)))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Propose {
+    #[serde(default)]
+    credential: Option<Credential>,
+    /// The touch for writing Cedar by hand, when the Cedar is.
+    #[serde(default)]
+    touch: Option<Uuid>,
+    proposal: Draft,
+}
+/// A proposed change to roles and rules, waiting for an owner.
+async fn propose(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<Propose>,
+) -> Result<Json<Value>> {
+    let credential = asker_of(b.credential, &headers);
+    Ok(Json(json!(
+        gov.propose(&credential, b.touch, &b.proposal).await?
+    )))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DecideBody {
+    #[serde(default)]
+    credential: Option<Credential>,
+    #[serde(default)]
+    touch: Option<Uuid>,
+    proposal: Uuid,
+    decision: Decide,
+    #[serde(default)]
+    note: String,
+}
+/// Approve, send back or reject a proposal, with the touch made for exactly that.
+async fn decide_proposal(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<DecideBody>,
+) -> Result<Json<Value>> {
+    let credential = asker_of(b.credential, &headers);
+    Ok(Json(
+        gov.decide_proposal(&credential, b.touch, b.proposal, b.decision, &b.note)
+            .await?,
+    ))
+}
+
+/// Roles and rules as a form (agreed 8 Nov): pages never parse or write Cedar themselves. For
+/// people signed in only; it touches no data, only the text sent. Mero answered this before roles
+/// and rules moved to Governance.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CedarRead {
+    items: Vec<form::Text>,
+}
+async fn cedar_read(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<CedarRead>,
+) -> Result<Json<Value>> {
+    gov.me(&Credential::Session(session(&headers)?)).await?;
+    if b.items.len() > form::ITEMS {
+        return Err(Error::Invalid("too many roles and rules at once".into()));
+    }
+    Ok(Json(form::readings(&b.items)))
+}
+/// The Cedar a form says, checked as Governance will check it when it is proposed.
+async fn cedar_write(
+    State(gov): State<Governance>,
+    headers: HeaderMap,
+    Json(b): Json<form::Form>,
+) -> Result<Json<Value>> {
+    gov.me(&Credential::Session(session(&headers)?)).await?;
+    let cedar = form::written(&b).map_err(Error::Invalid)?;
+    Ok(Json(json!({ "cedar": cedar })))
 }

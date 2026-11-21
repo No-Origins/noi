@@ -11,11 +11,11 @@ use axum::{
 };
 use clap::{Args, Parser, Subcommand};
 use noi_gov::{
-    answer, form, Action, Actor, Answer, AuthorizationRequest, Authorizer, Credential, Decision,
+    answer, Action, Actor, Answer, AuthorizationRequest, Authorizer, Credential, Decision,
     GovernanceClient,
 };
 use noi_inv::{MeronState, NewMeron, Snapshot};
-use noi_mer::{Change, Error as MeroError, NewBatch, Proposal, Registry};
+use noi_mer::{Change, Error as MeroError, NewBatch, Registry};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
@@ -58,8 +58,11 @@ enum Command {
     /// The operator: a meron's release in effect.
     EffectiveRelease { uid: Uuid },
     /// The operator: the whole registry as JSON; or, with `eio`, the Eidos token files into --output.
+    /// With `gov` (step 3), every role and rule under noi.gov with every revision, for `noi gov
+    /// move-in`; with `gov-retire`, the batch that retires them here once they have moved, which an
+    /// agent proposes with `noi propose` and an owner approves in Review.
     Export {
-        #[arg(value_parser = ["eio"])]
+        #[arg(value_parser = ["eio", "gov", "gov-retire"])]
         target: Option<String>,
         #[arg(long)]
         output: Option<PathBuf>,
@@ -399,6 +402,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             print(reader().effective_release(&operator, uid).await?)?
         }
         Command::Export { target, output } => {
+            if let Some(gov) = target.as_deref().filter(|t| t.starts_with("gov")) {
+                let value = if gov == "gov" {
+                    serde_json::to_value(reader().roles_and_rules_to_move(&operator).await?)?
+                } else {
+                    let on = chrono::Utc::now().format("%-d %b %Y").to_string();
+                    // The whole registry, so an invariant that still covers a rule elsewhere stays.
+                    let held = reader().snapshot(&operator).await?;
+                    serde_json::to_value(noi_mer::retire_moved(&held.merons, &on))?
+                };
+                match output {
+                    Some(file) => std::fs::write(file, serde_json::to_vec_pretty(&value)?)?,
+                    None => print(value)?,
+                }
+                return Ok(());
+            }
             let snapshot = reader().snapshot(&operator).await?;
             if target.is_some() {
                 let dir =
@@ -485,11 +503,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Err(e) = governance.who(&Credential::Visitor).await {
                 tracing::warn!("{e}. Until Governance answers, Mero refuses everything");
             }
-            // How current the roles and rules are, sent with every question (9 Nov, step 7).
-            match registry.rules_version().await {
-                Ok(v) => governance.rules_now(v),
-                Err(e) => tracing::warn!("the roles and rules could not be read: {e}"),
-            }
             let app = Router::new()
                 .route("/health/alive", get(|| async { noi_log::health::alive() }))
                 .route("/health/ready", get(ready_handler))
@@ -501,12 +514,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .route("/api/review/approve", post(approve_handler))
                 .route("/api/review/send-back", post(send_back_handler))
                 .route("/api/review/reject", post(reject_handler))
-                .route(
-                    "/api/governance/roles-and-rules",
-                    get(roles_and_rules_handler),
-                )
-                .route("/api/cedar/read", post(cedar_read_handler))
-                .route("/api/cedar/write", post(cedar_write_handler))
                 .route("/api/problems", get(problems_handler))
                 .layer(middleware::from_fn(local_only))
                 .with_state(Served {
@@ -928,32 +935,7 @@ async fn approve_handler(
             }
         }
     }
-    // An approved role or rule reaches Governance at once: it copies them again from Mero. Should
-    // that fail, the next question says how current the rules are, and Governance copies then.
-    let copied = if touches(&approved, "noi.gov.") {
-        if let Ok(v) = served.registry.rules_version().await {
-            served.governance.rules_now(v);
-        }
-        match served.governance.copy().await {
-            Ok(c) => c,
-            Err(e) => {
-                json!({"error": format!("approved, but Governance has not copied it yet: {e}")})
-            }
-        }
-    } else {
-        Value::Null
-    };
-    Json(json!({"approved": approved, "copied": copied, "looked": looked})).into_response()
-}
-/// Whether an approval changed anything under this place, where it was or where it went.
-fn touches(approved: &[Proposal], prefix: &str) -> bool {
-    approved.iter().any(|p| {
-        ["meron", "before"].iter().any(|k| {
-            p.outcome[k]["identity"]["path"]
-                .as_str()
-                .is_some_and(|path| path.starts_with(prefix))
-        })
-    })
+    Json(json!({"approved": approved, "looked": looked})).into_response()
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -984,96 +966,6 @@ async fn reject_handler(
         Err(e) => failure(e),
     }
 }
-/// What Governance copies: the roles and rules under noi.gov, and nothing else.
-async fn roles_and_rules_handler(State(served): State<Served>) -> Response {
-    match served.registry.roles_and_rules().await {
-        Ok(snapshot) => Json(json!(snapshot)).into_response(),
-        Err(e) => failure(e),
-    }
-}
-
-/// Roles and rules as a form (agreed 8 Nov): the Explorer never parses or writes Cedar itself. Both
-/// reads and writes are for signed-in people only; they touch no data, only the text sent.
-#[derive(Deserialize)]
-#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
-enum CedarText {
-    Rule { cedar: String },
-    Role { system: String, cedar: String },
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CedarReadBody {
-    items: Vec<CedarText>,
-}
-/// At most this many roles and rules, each at most this long, per request.
-const CEDAR_ITEMS: usize = 200;
-const CEDAR_LENGTH: usize = 20_000;
-/// Each role or rule as the form, or why it is written by hand; and every system's verbs, for
-/// the form's checkboxes.
-async fn cedar_read_handler(
-    State(served): State<Served>,
-    headers: HeaderMap,
-    Json(body): Json<CedarReadBody>,
-) -> Response {
-    let _ = caller!(served, headers, None, true);
-    if body.items.len() > CEDAR_ITEMS {
-        return refused(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "too many roles and rules at once",
-        );
-    }
-    Json(cedar_readings(&body.items)).into_response()
-}
-fn cedar_readings(items: &[CedarText]) -> Value {
-    let readings: Vec<Value> = items
-        .iter()
-        .map(|item| {
-            let read = match item {
-                CedarText::Rule { cedar } if cedar.len() <= CEDAR_LENGTH => {
-                    form::read_rule(cedar).map(|f| json!(f))
-                }
-                CedarText::Role { system, cedar } if cedar.len() <= CEDAR_LENGTH => {
-                    form::read_role(system, cedar).map(|f| json!(f))
-                }
-                _ => Err("it is too long to read".into()),
-            };
-            match read {
-                Ok(form) => json!({ "form": form }),
-                Err(why) => json!({ "by_hand": why }),
-            }
-        })
-        .collect();
-    let verbs: serde_json::Map<String, Value> = form::verbs()
-        .into_iter()
-        .map(|(s, v)| (s.to_string(), json!(v)))
-        .collect();
-    json!({ "readings": readings, "verbs": verbs })
-}
-#[derive(Deserialize)]
-#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
-enum CedarForm {
-    Rule { form: form::RuleForm },
-    Role { form: form::RoleForm },
-}
-/// The Cedar a form says, checked as Mero will check it when it is proposed.
-async fn cedar_write_handler(
-    State(served): State<Served>,
-    headers: HeaderMap,
-    Json(body): Json<CedarForm>,
-) -> Response {
-    let _ = caller!(served, headers, None, true);
-    match cedar_written(&body) {
-        Ok(cedar) => Json(json!({ "cedar": cedar })).into_response(),
-        Err(e) => refused(StatusCode::UNPROCESSABLE_ENTITY, &e),
-    }
-}
-fn cedar_written(body: &CedarForm) -> Result<String, String> {
-    match body {
-        CedarForm::Rule { form } => form::write_rule(form),
-        CedarForm::Role { form } => form::write_role(form),
-    }
-}
-
 /// Writes the Eidos token files from the active Eidos merons. Returns how many merons it used.
 fn export_eio(snapshot: &Snapshot, dir: &Path) -> Result<usize, Box<dyn std::error::Error>> {
     // Active merons reach apps, and deprecated ones, marked, until they retire (18 Nov): what reads
@@ -1268,48 +1160,67 @@ mod tests {
     }
 
     #[test]
-    fn cedar_requests_read_and_write_as_the_explorer_sends_them() {
-        let fresh = r#"forbid (
-  principal,
-  action in [Action::"review",
-             Action::"governance"],
-  resource
-) unless { context.fresh_signature || action == Action::"view" };"#;
-        let items: Vec<CedarText> = serde_json::from_value(json!([
-            {"kind": "rule", "cedar": fresh},
-            {"kind": "role", "system": "mero", "cedar": "permit (\n  principal == ?principal,\n  action in Action::\"mero\",\n  resource in ?resource\n);"},
-            {"kind": "rule", "cedar": "forbid (principal, action, resource);"},
-        ]))
-        .unwrap();
-        let out = cedar_readings(&items);
-        assert_eq!(out["readings"][0]["form"]["unless"], json!(["fresh-touch"]));
-        assert_eq!(
-            out["readings"][1]["form"],
-            json!({"system": "mero", "pick": "every", "except": []})
-        );
-        assert!(out["readings"][2]["by_hand"]
+    fn the_retiring_batch_holds_the_roles_and_rules_in_force_and_their_invariants() {
+        let meron =
+            |path: &str, kind: &str, subtype: Option<&str>, state: &str| -> noi_inv::Meron {
+                serde_json::from_value(json!({
+                    "identity": {"uid": Uuid::new_v4(), "path": path, "name": path},
+                    "classification": {"type": kind, "subtype": subtype},
+                    "semantics": {"definition": "d", "responsibility": "r"},
+                    "lifecycle": {"state": state, "release_mode": "inherited"},
+                    "authority_scope": Uuid::nil(), "metadata": {}, "spec": {}, "revision": 4,
+                    "created_at": "2026-11-06T00:00:00Z", "updated_at": "2026-11-06T00:00:00Z",
+                }))
+                .unwrap()
+            };
+        let held = [
+            meron("noi.gov", "system", None, "active"),
+            meron("noi.gov.roles.owner", "rule", Some("role"), "active"),
+            meron("noi.gov.roles.observer", "rule", Some("role"), "deprecated"),
+            meron("noi.gov.roles.old", "rule", Some("role"), "retired"),
+            meron(
+                "noi.gov.rules.fresh-touch",
+                "rule",
+                Some("policy"),
+                "active",
+            ),
+            meron("noi.gov.inv.role", "invariant", None, "active"),
+            meron("noi.gov.inv.rule", "invariant", None, "active"),
+        ];
+        let batch = noi_mer::retire_moved(&held, "21 Nov 2026");
+        let retired: Vec<Uuid> = batch.changes.iter().filter_map(|c| c.target()).collect();
+        let expected: Vec<Uuid> = [1, 2, 4, 5, 6]
+            .iter()
+            .map(|&i| held[i].identity.uid)
+            .collect();
+        assert_eq!(retired, expected);
+        let value = serde_json::to_value(&batch).unwrap();
+        assert_eq!(value["changes"][0]["operation"], "retire");
+        assert_eq!(value["changes"][0]["expected_revision"], 4);
+        assert!(value["changes"][0]["reason"]
             .as_str()
             .unwrap()
-            .contains("names no actions"));
-        assert!(out["verbs"]["governance"]
-            .as_array()
+            .contains("Moved to Governance on 21 Nov 2026"));
+        assert!(value["changes"][3]["reason"]
+            .as_str()
             .unwrap()
-            .contains(&json!("view")));
-        let form = out["readings"][0]["form"].clone();
-        let body: CedarForm =
-            serde_json::from_value(json!({"kind": "rule", "form": form})).unwrap();
-        assert_eq!(cedar_written(&body).unwrap(), fresh);
-        let wrong: CedarForm = serde_json::from_value(
-            json!({"kind": "role", "form": {"system": "mero", "pick": "these", "verbs": []}}),
-        )
-        .unwrap();
-        assert!(cedar_written(&wrong)
-            .unwrap_err()
-            .contains("tick at least one"));
-        assert!(serde_json::from_value::<CedarForm>(
-            json!({"kind": "rule", "form": {}, "extra": 1})
-        )
-        .is_err());
+            .contains("with the roles and rules it checked"));
+        // What it writes is what `noi propose` reads.
+        let back: NewBatch = serde_json::from_value(value).unwrap();
+        assert_eq!(back.changes.len(), 5);
+        // Nothing left to retire, nothing in it.
+        assert!(noi_mer::retire_moved(&held[3..4], "21 Nov 2026")
+            .changes
+            .is_empty());
+        // A rule meron outside noi.gov keeps the rule invariant, which still covers it.
+        let mut more = held.to_vec();
+        more.push(meron("noi.eio.rules.x", "rule", Some("policy"), "active"));
+        let kept = noi_mer::retire_moved(&more, "21 Nov 2026");
+        assert_eq!(kept.changes.len(), 4);
+        assert!(!kept
+            .changes
+            .iter()
+            .any(|c| c.target() == Some(held[6].identity.uid)));
     }
 
     #[tokio::test]

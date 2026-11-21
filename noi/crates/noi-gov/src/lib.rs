@@ -8,6 +8,7 @@ mod cedar;
 #[cfg(feature = "client")]
 mod client;
 pub mod form;
+pub mod moving;
 mod policy;
 #[cfg(feature = "server")]
 pub mod server;
@@ -251,47 +252,5 @@ mod tests {
             now(grant.authorize(&request)),
             Decision::Deny { .. }
         ));
-    }
-}
-
-/// How current a copy of Governance's roles and rules is (9 Nov, step 7): every rule meron under
-/// noi.gov, by path, revision and state, in order. Mero says its own; Governance keeps the one it
-/// copied; when they differ, Governance copies again before it answers.
-pub fn rules_version<'a>(merons: impl IntoIterator<Item = (&'a str, i64, &'a str)>) -> String {
-    let mut held: Vec<String> = merons
-        .into_iter()
-        .map(|(path, revision, state)| format!("{path}@{revision}:{state}"))
-        .collect();
-    held.sort();
-    held.join(",")
-}
-
-#[cfg(test)]
-mod rules_version_tests {
-    #[test]
-    fn the_same_rules_in_any_order_are_one_version() {
-        let a = super::rules_version([
-            ("noi.gov.roles.b", 2, "active"),
-            ("noi.gov.roles.a", 1, "active"),
-        ]);
-        let b = super::rules_version([
-            ("noi.gov.roles.a", 1, "active"),
-            ("noi.gov.roles.b", 2, "active"),
-        ]);
-        assert_eq!(a, b);
-        assert_ne!(
-            a,
-            super::rules_version([
-                ("noi.gov.roles.a", 1, "active"),
-                ("noi.gov.roles.b", 3, "active")
-            ])
-        );
-        assert_ne!(
-            a,
-            super::rules_version([
-                ("noi.gov.roles.a", 1, "active"),
-                ("noi.gov.roles.b", 2, "deprecated")
-            ])
-        );
     }
 }

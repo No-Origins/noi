@@ -43,9 +43,10 @@ impl World {
         let mut roles: Vec<(String, Value)> = ["maintainer", "owner"]
             .iter()
             .map(|r| {
+                let f = file(&format!("roles/{r}.json"));
                 (
                     r.to_string(),
-                    file(&format!("roles/{r}.json"))["spec"].clone(),
+                    json!({"system": f["system"], "cedar": f["cedar"]}),
                 )
             })
             .collect();
@@ -62,8 +63,8 @@ impl World {
         }
         for rule in ["fresh-touch", "owners-approve-gov"] {
             let meron = file(&format!("rules/{rule}.json"));
-            noi_gov::check_rule(&meron["spec"]).unwrap();
-            let cedar = meron["spec"]["cedar"].as_str().unwrap();
+            noi_gov::check_rule(&json!({"cedar": meron["cedar"]})).unwrap();
+            let cedar = meron["cedar"].as_str().unwrap();
             policies
                 .add(Policy::parse(Some(PolicyId::new(rule)), cedar).unwrap())
                 .unwrap();
