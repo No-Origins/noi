@@ -648,7 +648,14 @@ pub(crate) fn answer(
     target: &Target,
     fresh: bool,
 ) -> std::result::Result<Vec<String>, String> {
-    let (allowed, reasons) = evaluate(policies, account, grants, action, target, fresh)?;
+    let Evaluated {
+        allowed,
+        reasons,
+        erring,
+    } = evaluate(policies, account, grants, action, target, fresh)?;
+    if !erring.is_empty() {
+        return Err("a policy could not be evaluated, so no".into());
+    }
     if allowed {
         return Ok(reasons);
     }
@@ -670,8 +677,17 @@ pub(crate) fn answer(
     })
 }
 
-/// Whether Cedar allows it, and the policies that decided: the grants that allowed it, or the
-/// rules that said no. Err only when it could not be asked at all.
+/// What Cedar said about one question.
+pub(crate) struct Evaluated {
+    pub allowed: bool,
+    /// The policies that decided: the grants that allowed it, or the rules that said no.
+    pub reasons: Vec<String>,
+    /// The policies that could not be evaluated. Any one of them means no.
+    pub erring: Vec<String>,
+}
+
+/// Whether Cedar allows it, which policies decided, and which could not be evaluated. Err only when
+/// it could not be asked at all.
 pub(crate) fn evaluate(
     policies: &PolicySet,
     account: Uuid,
@@ -679,7 +695,7 @@ pub(crate) fn evaluate(
     action: &str,
     target: &Target,
     fresh: bool,
-) -> std::result::Result<(bool, Vec<String>), String> {
+) -> std::result::Result<Evaluated, String> {
     let schema = crate::cedar::schema();
     let action_uid = quoted("Action", action);
     let context = Context::from_json_value(
@@ -733,10 +749,18 @@ pub(crate) fn evaluate(
         .reason()
         .map(|p| p.to_string())
         .collect();
-    if response.diagnostics().errors().next().is_some() {
-        return Err("a policy could not be evaluated, so no".into());
-    }
-    Ok((response.decision() == Decision::Allow, reasons))
+    let erring = response
+        .diagnostics()
+        .errors()
+        .map(|e| match e {
+            cedar_policy::AuthorizationError::PolicyEvaluationError(e) => e.policy_id().to_string(),
+        })
+        .collect();
+    Ok(Evaluated {
+        allowed: response.decision() == Decision::Allow,
+        reasons,
+        erring,
+    })
 }
 
 /// Why a question wasn't allowed: a refusal, whose reason is safe to show and keep; or Governance

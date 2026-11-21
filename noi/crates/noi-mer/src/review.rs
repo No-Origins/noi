@@ -341,6 +341,12 @@ impl Registry {
         for change in &batch.changes {
             change.validate()?;
         }
+        {
+            let mut conn = self.pool.acquire().await?;
+            for change in &batch.changes {
+                not_governances(&mut conn, change).await?;
+            }
+        }
         let branch = batch
             .branch
             .as_deref()
@@ -1042,6 +1048,7 @@ impl Registry {
         let note = note_text(note, false)?;
         change.validate()?;
         let mut conn = self.pool.acquire().await?;
+        not_governances(&mut conn, &change).await?;
         refuse_no_op(&mut conn, &change).await?;
         let row = proposal_row(&mut conn, uid).await?;
         let owner: String = sqlx::query_scalar("SELECT proposer FROM mer.batches WHERE uid=$1")
@@ -1232,6 +1239,8 @@ impl Registry {
         approver: &Actor,
         change: &Change,
     ) -> Result<Value> {
+        // A batch proposed before roles and rules moved, approved after: refused here too.
+        not_governances(conn, change).await?;
         let before: i64 = sqlx::query_scalar("SELECT coalesce(max(sequence),0) FROM mer.events")
             .fetch_one(&mut *conn)
             .await?;
@@ -1740,5 +1749,32 @@ pub fn retire_moved(held: &[Meron], on: &str) -> NewBatch {
         touch: None,
         branch: None,
         commit: None,
+    }
+}
+
+/// Roles and rules live in Governance since the build order's step 3 (review, 21 Nov, finding 9):
+/// Mero takes no change to a role or rule meron under noi.gov, new or old, which would change
+/// nothing anyone may do. Retiring the ones it kept is the one change left, for the move.
+async fn not_governances(conn: &mut PgConnection, change: &Change) -> Result<()> {
+    let mut paths: Vec<String> = match change {
+        Change::Retire { .. } => return Ok(()),
+        Change::Add { meron, .. } => vec![meron.path.clone()],
+        Change::Update { uid, meron, .. } => {
+            vec![load(conn, *uid).await?.identity.path, meron.path.clone()]
+        }
+        Change::Rename { uid, path, .. } => {
+            vec![load(conn, *uid).await?.identity.path, path.clone()]
+        }
+        Change::Deprecate { uid, .. } | Change::Reinstate { uid, .. } => {
+            vec![load(conn, *uid).await?.identity.path]
+        }
+    };
+    paths.retain(|p| p.starts_with("noi.gov.roles.") || p.starts_with("noi.gov.rules."));
+    match paths.first() {
+        Some(path) => Err(ValidationError(format!(
+            "{path}: roles and rules live in Governance now; propose this on Governance's Roles page"
+        ))
+        .into()),
+        None => Ok(()),
     }
 }

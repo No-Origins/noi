@@ -67,12 +67,30 @@ CREATE TABLE gov.proposals (
  CHECK (state IN ('waiting','approved') OR length(btrim(coalesce(note, ''))) > 0)
 );
 CREATE INDEX proposals_waiting ON gov.proposals (proposed_at) WHERE state = 'waiting';
+-- A proposal never changes once made (review, 21 Nov): only its decision is written, once, while it
+-- waits. So the touch that decides it, which names its ID, names exactly what it says.
+CREATE FUNCTION gov.proposal_decided_once() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+ IF OLD.state <> 'waiting' THEN RAISE EXCEPTION 'a decided proposal does not change'; END IF;
+ IF (NEW.id, NEW.path, NEW.kind, NEW.operation, NEW.base_revision, NEW.name, NEW.definition, NEW.responsibility,
+     NEW.system, NEW.cedar, NEW.by_hand, NEW.why, NEW.proposed_by, NEW.proposed_at)
+    IS DISTINCT FROM
+    (OLD.id, OLD.path, OLD.kind, OLD.operation, OLD.base_revision, OLD.name, OLD.definition, OLD.responsibility,
+     OLD.system, OLD.cedar, OLD.by_hand, OLD.why, OLD.proposed_by, OLD.proposed_at)
+ THEN RAISE EXCEPTION 'a proposal does not change once made: only its decision is written'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER proposals_decided_once BEFORE UPDATE ON gov.proposals FOR EACH ROW EXECUTE FUNCTION gov.proposal_decided_once();
+CREATE TRIGGER proposals_kept BEFORE DELETE ON gov.proposals FOR EACH ROW EXECUTE FUNCTION gov.append_only();
+REVOKE ALL ON FUNCTION gov.proposal_decided_once() FROM PUBLIC;
 ALTER TABLE gov.versions ADD CONSTRAINT versions_proposal FOREIGN KEY (proposal) REFERENCES gov.proposals(id);
 
 -- The copy goes (decision 5): no more copies of Mero, and no version of Mero's to keep up with. The
--- record keeps every copy that was taken.
-DROP TABLE gov.policies;
-DROP TABLE gov.copies;
+-- last copy Governance decided with is kept aside, read only, so the move can be checked against it
+-- (review, 21 Nov): what is in force after the move must be exactly what it held. A later migration
+-- removes both once the move has run. The record keeps every copy that was taken.
+ALTER TABLE gov.policies RENAME TO last_copy;
+REVOKE INSERT, UPDATE, DELETE ON gov.last_copy, gov.copies FROM noi_gov_runtime;
 
 -- What Governance decides with: the newest version of each role and rule, when it is in force.
 CREATE VIEW gov.policies AS

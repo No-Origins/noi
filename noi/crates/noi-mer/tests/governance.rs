@@ -168,7 +168,9 @@ async fn verify(url: &str) {
     proposer.spec["cedar"] = json!(
         r#"permit (principal == ?principal, action in [Action::"read", Action::"propose"], resource in ?resource);"#
     );
-    let mut changes: Vec<Change> = [
+    // Put there as Review used to: filed under noi.gov, proposed, registered and made active, the
+    // invariants first. Mero's Review takes no role or rule meron now (review, finding 9).
+    let mut olds: Vec<NewMeron> = [
         "role-invariant.json",
         "rule-invariant.json",
         "roles/maintainer.json",
@@ -177,14 +179,23 @@ async fn verify(url: &str) {
         "rules/owners-approve-gov.json",
     ]
     .iter()
-    .map(|n| add(file(n)))
+    .map(|n| file(n))
     .collect();
-    changes.push(add(proposer));
-    let roles = boot
-        .propose_batch(&dev, batch("Roles and rules", changes))
-        .await
-        .unwrap();
-    boot.approve(&dev, &[roles.uid]).await.unwrap();
+    olds.push(proposer);
+    for m in olds {
+        let m = boot.propose(&dev, m).await.unwrap();
+        boot.relate(&dev, gov_scope, Predicate::Contains, m.identity.uid)
+            .await
+            .unwrap();
+        let m = boot.get(&dev, &m.identity.uid.to_string()).await.unwrap();
+        let m = boot
+            .transition(&dev, m.identity.uid, m.revision, MeronState::Registered)
+            .await
+            .unwrap();
+        boot.transition(&dev, m.identity.uid, m.revision, MeronState::Active)
+            .await
+            .unwrap();
+    }
 
     // Governance, on its own port. As before the move, it knows you and the roles you hold, but
     // holds no roles and rules of its own (the copy went with step 3), so it allows nothing.
@@ -245,7 +256,30 @@ async fn verify(url: &str) {
         assert_eq!(states, ["proposed", "registered", "active"], "{}", m.path);
         assert!(m.revisions.iter().all(|r| r.by == "test-developer"));
     }
+    // The last copy Governance decided with before the move, as the migration keeps it aside: what
+    // Mero holds now. The move must leave exactly that in force (review, finding 3).
+    let copy: i64 = sqlx::query_scalar(
+        "INSERT INTO gov.copies(source, roles, rules, version) VALUES('mero', 3, 2, 'test') RETURNING id",
+    )
+    .fetch_one(&mut sql)
+    .await
+    .unwrap();
+    for m in &file.roles_and_rules {
+        let last = m.revisions.last().unwrap();
+        sqlx::query("INSERT INTO gov.last_copy(path, kind, system, cedar, state, revision, copy) VALUES($1,$2,$3,$4,$5,$6,$7)")
+            .bind(&m.path)
+            .bind(if m.subtype == "role" { "role" } else { "rule" })
+            .bind(last.spec["system"].as_str())
+            .bind(last.spec["cedar"].as_str().unwrap())
+            .bind(&m.state)
+            .bind(m.revision)
+            .bind(copy)
+            .execute(&mut sql)
+            .await
+            .unwrap();
+    }
     let moved = gov.move_in(&file).await.unwrap();
+    assert_eq!(moved["same_as_the_last_copy"], true);
     assert_eq!(
         (moved["roles"].as_u64(), moved["rules"].as_u64()),
         (Some(3), Some(2))
@@ -597,8 +631,8 @@ async fn verify(url: &str) {
         "touch",
     );
 
-    // Cedar the form didn't write asks "write Cedar", with a touch (9 Nov, step 7): refused
-    // without one, proposed with one made for it.
+    // Roles and rules live in Governance now (review, finding 9): Mero refuses a rule meron under
+    // noi.gov, with a touch or without, and before anything else is asked.
     let mut by_hand = meron(gov_scope, "noi.gov.rules.by-hand");
     by_hand.classification = Classification {
         kind: MeronType::Rule,
@@ -606,50 +640,19 @@ async fn verify(url: &str) {
         roles: vec![],
     };
     by_hand.spec = json!({"cedar": "forbid (principal, action, resource) when { context.fresh_signature && !context.fresh_signature };"});
-    let by_hand_batch = || batch("By hand", vec![add(by_hand.clone())]);
-    denied(
-        with(you.clone(), None)
-            .propose_batch(&me, by_hand_batch())
-            .await,
-        "fresh-touch",
-    );
     let written = vec![Target::Path("noi.gov.rules.by-hand".into())];
     let t = person
         .touch_for(&gov, &session, "write-cedar", &written, None)
         .await;
-    let mut with_touch = by_hand_batch();
+    let mut with_touch = batch("By hand", vec![add(by_hand.clone())]);
     with_touch.touch = Some(t);
-    assert!(with(you.clone(), Some(t))
+    match with(you.clone(), Some(t))
         .propose_batch(&me, with_touch)
         .await
-        .is_ok());
-    // Revising asks it too (10 Nov): a rule the form wrote can't be revised into Cedar written by
-    // hand without that touch.
-    let mut formed = by_hand.clone();
-    formed.path = "noi.gov.rules.formed".into();
-    formed.spec = json!({"cedar": noi_gov::form::write_rule(&noi_gov::form::RuleForm {
-        effect: noi_gov::form::Effect::Forbid,
-        who: noi_gov::form::Who::Anyone,
-        doing: vec![noi_gov::form::Doing {
-            system: "mero".into(),
-            pick: noi_gov::form::Pick::These { verbs: vec!["transition".into()] },
-        }],
-        place: noi_gov::form::Where::Everywhere,
-        unless: vec![],
-    })
-    .unwrap()});
-    let waiting = with(you.clone(), None)
-        .propose_batch(&me, batch("Formed", vec![add(formed.clone())]))
-        .await
-        .unwrap();
-    let mut rewritten = formed.clone();
-    rewritten.spec = by_hand.spec.clone();
-    denied(
-        with(you.clone(), None)
-            .revise(&me, waiting.proposals[0].uid, add(rewritten), None)
-            .await,
-        "fresh-touch",
-    );
+    {
+        Err(Error::Validation(e)) => assert!(e.to_string().contains("live in Governance"), "{e}"),
+        other => panic!("a rule meron was not refused: {other:?}"),
+    }
     // Governance's record holds every answer Mero asked for, refusals too, but not an allowed read
     // (agreed 9 Nov, finding I).
     let asked: Vec<(Option<String>, bool)> =

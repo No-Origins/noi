@@ -2608,8 +2608,9 @@ async fn verify_review(url: &str) {
     );
 }
 
-/// Governance's roles and rules come in through Review, checked as Cedar against the actions each
-/// system declares.
+/// Since the build order's step 3, roles and rules live in Governance (review, 21 Nov, finding 9):
+/// Mero takes no new role or rule meron under noi.gov and no change to the ones it kept, and the one
+/// change left is retiring them, which first takes each out of the links to it.
 async fn verify_governance(url: &str) {
     let developer = Actor {
         subject: "test-developer".into(),
@@ -2627,6 +2628,50 @@ async fn verify_governance(url: &str) {
         .unwrap()
         .identity
         .uid;
+    let file = |name: &str| -> NewMeron {
+        // Mero's role and rule merons as they were before they moved to Governance (step 3).
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/before-step-3")
+            .join(name);
+        let mut m: NewMeron =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        m.authority_scope = Some(gov);
+        m
+    };
+    // Mero as it stood before the move: the two invariants, then the roles and rules, each filed
+    // under noi.gov, proposed, registered and made active, as Review used to.
+    let names = [
+        "role-invariant.json",
+        "rule-invariant.json",
+        "roles/maintainer.json",
+        "roles/owner.json",
+        "rules/fresh-touch.json",
+        "rules/owners-approve-gov.json",
+    ];
+    for name in names {
+        let m = bootstrap.propose(&developer, file(name)).await.unwrap();
+        bootstrap
+            .relate(&developer, gov, Predicate::Contains, m.identity.uid)
+            .await
+            .unwrap();
+        let m = bootstrap
+            .get(&developer, &m.identity.uid.to_string())
+            .await
+            .unwrap();
+        let m = bootstrap
+            .transition(
+                &developer,
+                m.identity.uid,
+                m.revision,
+                MeronState::Registered,
+            )
+            .await
+            .unwrap();
+        bootstrap
+            .transition(&developer, m.identity.uid, m.revision, MeronState::Active)
+            .await
+            .unwrap();
+    }
     let grant = |subject: &str, role| Grant {
         subject: subject.into(),
         scope: root,
@@ -2650,26 +2695,10 @@ async fn verify_governance(url: &str) {
             grant("maintainer", Role::Maintainer),
         ],
     };
+    let reader = bootstrap.clone();
     let registry = bootstrap.with_authorizer(Arc::new(ScopedAuthorizer::new(policy).unwrap()));
-    let agent = Actor {
-        subject: "design-agent".into(),
-    };
     let human = Actor {
         subject: "maintainer".into(),
-    };
-    let file = |name: &str| -> NewMeron {
-        // Mero's role and rule merons as they were before they moved to Governance (step 3).
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/before-step-3")
-            .join(name);
-        let mut m: NewMeron =
-            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        m.authority_scope = Some(gov);
-        m
-    };
-    let add = |meron: NewMeron| Change::Add {
-        meron,
-        container: None,
     };
     let batch = |title: &str, changes: Vec<Change>| NewBatch {
         title: title.into(),
@@ -2679,117 +2708,129 @@ async fn verify_governance(url: &str) {
         branch: None,
         commit: None,
     };
-    let names = [
-        "role-invariant.json",
-        "rule-invariant.json",
-        "roles/maintainer.json",
-        "roles/owner.json",
-        "rules/fresh-touch.json",
-        "rules/owners-approve-gov.json",
-    ];
-    // The roles come before their invariant in the batch; order does not matter.
-    let mut changes: Vec<Change> = names.iter().rev().map(|n| add(file(n))).collect();
-    // A role granting another system's actions, and a rule with blanks, fail their test run.
+    let refused = |result: std::result::Result<noi_mer::Batch, Error>| match result {
+        Err(Error::Validation(e)) => assert!(e.to_string().contains("live in Governance"), "{e}"),
+        other => panic!("not refused: {other:?}"),
+    };
+    let snapshot = reader.snapshot(&developer).await.unwrap();
+    let owner = snapshot
+        .merons
+        .iter()
+        .find(|m| m.identity.path == "noi.gov.roles.owner")
+        .unwrap()
+        .clone();
+    // A new role, a change to one, a rename and setting one aside: refused.
     let mut stray = file("roles/owner.json");
     stray.path = "noi.gov.roles.stray".into();
-    stray.spec["system"] = json!("mero");
-    let mut blank = file("rules/fresh-touch.json");
-    blank.path = "noi.gov.rules.blank".into();
-    blank.spec["cedar"] = json!("forbid (principal == ?principal, action, resource);");
-    changes.push(add(stray));
-    changes.push(add(blank));
-    // Some of these rules are written by hand, which an agent may not propose (9 Nov, step 7: it
-    // asks "write Cedar"); a maintainer proposes them here, as the local policy allows.
-    assert!(registry
-        .propose_batch(&agent, batch("Governance roles and rules", changes.clone()))
-        .await
-        .is_err());
-    let sent = registry
-        .propose_batch(&human, batch("Governance roles and rules", changes))
-        .await
-        .unwrap();
-    let outcome = |path: &str| {
-        sent.proposals
-            .iter()
-            .find(|p| serde_json::to_value(&p.change).unwrap()["meron"]["path"] == json!(path))
-            .unwrap()
-            .outcome
-            .clone()
-    };
-    for p in &sent.proposals[..names.len()] {
-        assert_eq!(p.outcome["ok"], json!(true), "{:#?}", p);
-    }
-    let stray = outcome("noi.gov.roles.stray");
-    assert!(
-        stray["error"]
-            .as_str()
-            .unwrap()
-            .contains(r#"Action::"governance" is not an action mero declares"#),
-        "{stray}"
-    );
-    let blank = outcome("noi.gov.rules.blank");
-    assert!(
-        blank["error"].as_str().unwrap().contains("is a role"),
-        "{blank}"
-    );
-    assert!(
-        registry.approve(&human, &[sent.uid]).await.is_err(),
-        "nothing is approved while two fail"
-    );
-    for p in &sent.proposals[names.len()..] {
+    refused(
         registry
-            .reject(&human, p.uid, "Not a role or rule we agreed")
-            .await
-            .unwrap();
+            .propose_batch(
+                &human,
+                batch(
+                    "A role",
+                    vec![Change::Add {
+                        meron: stray,
+                        container: None,
+                    }],
+                ),
+            )
+            .await,
+    );
+    let mut changed = file("roles/owner.json");
+    changed.name = "Owner, renamed".into();
+    refused(
+        registry
+            .propose_batch(
+                &human,
+                batch(
+                    "Change Owner",
+                    vec![Change::Update {
+                        uid: owner.identity.uid,
+                        expected_revision: owner.revision,
+                        meron: changed,
+                        compatibility: CompatibilityEvidence {
+                            impact: Impact::NonBreaking,
+                            rationale: "A test".into(),
+                            invariant_checks: vec!["none".into()],
+                            migration_plan: None,
+                        },
+                    }],
+                ),
+            )
+            .await,
+    );
+    refused(
+        registry
+            .propose_batch(
+                &human,
+                batch(
+                    "Rename Owner",
+                    vec![Change::Rename {
+                        uid: owner.identity.uid,
+                        expected_revision: owner.revision,
+                        path: "noi.gov.roles.boss".into(),
+                    }],
+                ),
+            )
+            .await,
+    );
+    refused(
+        registry
+            .propose_batch(
+                &human,
+                batch(
+                    "Set Owner aside",
+                    vec![Change::Deprecate {
+                        uid: owner.identity.uid,
+                        expected_revision: owner.revision,
+                    }],
+                ),
+            )
+            .await,
+    );
+    // Retiring them, and their invariants, each with its note: one batch, approved.
+    let retiring = noi_mer::retire_moved(&snapshot.merons, "21 Nov 2026");
+    assert_eq!(retiring.changes.len(), 6);
+    let sent = registry.propose_batch(&human, retiring).await.unwrap();
+    for p in &sent.proposals {
+        assert_eq!(p.outcome["ok"], json!(true), "{:#?}", p.outcome);
     }
     let approved = registry.approve(&human, &[sent.uid]).await.unwrap();
-    assert_eq!(approved.len(), names.len());
-    // The whole test database spans scopes this policy does not list, so read it as the developer.
-    let reader = Registry::connect(url)
-        .await
-        .unwrap()
-        .with_authorizer(Arc::new(
-            LocalDevelopmentGrant::new(developer.subject.clone(), "noi".into()).unwrap(),
-        ));
-    let snapshot = reader.snapshot(&developer).await.unwrap();
-    for path in [
-        "noi.gov.inv.role",
-        "noi.gov.inv.rule",
-        "noi.gov.roles.maintainer",
-        "noi.gov.roles.owner",
-        "noi.gov.rules.fresh-touch",
-        "noi.gov.rules.owners-approve-gov",
-    ] {
-        let m = snapshot
+    assert_eq!(approved.len(), 6);
+    let after = reader.snapshot(&developer).await.unwrap();
+    for path in names.map(|n| match n {
+        "role-invariant.json" => "noi.gov.inv.role".to_string(),
+        "rule-invariant.json" => "noi.gov.inv.rule".to_string(),
+        other => format!(
+            "noi.gov.{}",
+            other.trim_end_matches(".json").replace('/', ".")
+        ),
+    }) {
+        let m = after
             .merons
             .iter()
             .find(|m| m.identity.path == path)
             .unwrap_or_else(|| panic!("{path}"));
-        assert_eq!(m.lifecycle.state, MeronState::Active, "{path}");
+        assert_eq!(m.lifecycle.state, MeronState::Retired, "{path}");
         assert!(
-            snapshot.relationships.iter().any(|r| r.source == gov
-                && r.predicate == Predicate::Contains
-                && r.target == m.identity.uid),
-            "{path}"
+            !after
+                .relationships
+                .iter()
+                .any(|r| r.target == m.identity.uid),
+            "{path}: nothing links to a retired meron"
         );
     }
-    // Once admitted, the role invariant refuses a role naming an action nobody declares.
-    let mut unknown = file("roles/maintainer.json");
-    unknown.path = "noi.gov.roles.unknown".into();
-    unknown.spec["cedar"] = json!(
-        r#"permit (principal == ?principal, action == Action::"delete", resource in ?resource);"#
-    );
-    // Cedar the form can't read is written by hand: a maintainer's to propose here (step 7).
-    let later = registry
-        .propose_batch(&human, batch("Unknown action", vec![add(unknown)]))
+    let history = reader
+        .history(&developer, owner.identity.uid)
         .await
         .unwrap();
-    assert!(
-        later.proposals[0].outcome["error"]
-            .as_str()
-            .unwrap()
-            .contains("noi.gov.inv.role"),
-        "{:#?}",
-        later.proposals[0]
-    );
+    assert!(history.iter().any(|e| e.action == "relationship.remove"));
+    assert!(history.iter().any(|e| e.payload["reason"]
+        .as_str()
+        .is_some_and(|r| r.contains("Moved to Governance"))));
+    // A retired meron changes no more: retiring it again is refused.
+    let again = registry
+        .propose_batch(&human, noi_mer::retire_moved(&after.merons, "21 Nov 2026"))
+        .await;
+    assert!(again.is_err() || again.unwrap().proposals.is_empty());
 }

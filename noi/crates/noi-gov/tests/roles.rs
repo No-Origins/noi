@@ -5,7 +5,7 @@
 //! and drops it; never touches the shared one.
 //! Explicit opt-in: NOI_TEST_ADMIN_URL=... cargo test -p noi-gov --features server --test roles -- --ignored
 #![cfg(feature = "server")]
-use noi_gov::form::{write_role, Pick, RoleForm};
+use noi_gov::form::{write_role, write_rule, Doing, Effect, Pick, RoleForm, RuleForm, Where, Who};
 use noi_gov::moving::MoveFile;
 use noi_gov::server::{
     decide_about, grant_about, http, new_voucher_key, vouch, Config, Credential, Decide, Draft,
@@ -420,6 +420,15 @@ async fn verify(url: &str, login: &str) {
     assert_eq!(history[0].name, "Proposer of changes");
     assert_eq!(history[0].approved_by.as_deref(), Some("hiddenstack"));
     assert_eq!(history[0].why.as_deref(), Some("A clearer name."));
+    // Review 5: approving the change also asked `update` of the approver, as Mero did.
+    let asked: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM gov.record WHERE kind = 'decision' AND action = 'update' AND allowed
+         AND resources = '[\"noi.gov.roles.proposer\"]'",
+    )
+    .fetch_one(&mut sql)
+    .await
+    .unwrap();
+    assert!(asked >= 1, "update asked on approval");
 
     // 5 · Cedar the form can't read is for owners, with a touch for writing it (as in Mero before).
     let by_hand = draft(json!({
@@ -536,6 +545,158 @@ async fn verify(url: &str, login: &str) {
         .unwrap_err()
         .to_string()
         .contains("no one could change roles and rules"));
+    // Review 6: and the refusal is in the record.
+    let kept: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM gov.record WHERE kind = 'end-grant' AND NOT allowed",
+    )
+    .fetch_one(&mut sql)
+    .await
+    .unwrap();
+    assert_eq!(kept, 1);
+
+    // Review 1: a rule that stops approving one role only (here Owner) is a lockout too.
+    let rule = |name: &str, who: Who, place: &str| {
+        let cedar = write_rule(&RuleForm {
+            effect: Effect::Forbid,
+            who,
+            doing: vec![Doing {
+                system: "mero".into(),
+                pick: Pick::These {
+                    verbs: vec!["review".into()],
+                },
+            }],
+            place: Where::Place(place.into()),
+            unless: vec![],
+        })
+        .unwrap();
+        draft(json!({
+            "operation": "add", "path": format!("noi.gov.rules.{name}"), "name": name,
+            "definition": "A test rule.", "responsibility": "Test.", "cedar": cedar, "why": "To test the lockout check.",
+        }))
+    };
+    let lock_b = gov
+        .propose(
+            &you_c,
+            None,
+            &rule("lock-b", Who::Anyone, "noi.gov.roles.owner"),
+        )
+        .await
+        .unwrap();
+    assert!(!lock_b.by_hand);
+    let t = you
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.rules.lock-b",
+            Decide::Approve,
+            lock_b.id,
+        )
+        .await;
+    let refused = gov
+        .decide_proposal(&you_c, Some(t), lock_b.id, Decide::Approve, "")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(refused.contains("nobody is locked out"), "{refused}");
+
+    // Review 6: giving a role can lock everyone out too. A role no one holds, a rule that stops its
+    // holders approving roles and rules, and that role given to the only owner: refused, and recorded.
+    let marked = write_role(&RoleForm {
+        system: "mero".into(),
+        pick: Pick::These {
+            verbs: vec!["read".into()],
+        },
+    })
+    .unwrap();
+    let role = gov
+        .propose(&you_c, None, &draft(json!({
+            "operation": "add", "path": "noi.gov.roles.marked", "name": "Marked", "definition": "A test role.",
+            "responsibility": "Test.", "system": "mero", "cedar": marked, "why": "To test giving a role.",
+        })))
+        .await
+        .unwrap();
+    let t = you
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.roles.marked",
+            Decide::Approve,
+            role.id,
+        )
+        .await;
+    gov.decide_proposal(&you_c, Some(t), role.id, Decide::Approve, "")
+        .await
+        .unwrap();
+    let never = gov
+        .propose(
+            &you_c,
+            None,
+            &rule(
+                "marked-never-approve",
+                Who::Role("marked".into()),
+                "noi.gov",
+            ),
+        )
+        .await
+        .unwrap();
+    let t = you
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.rules.marked-never-approve",
+            Decide::Approve,
+            never.id,
+        )
+        .await;
+    gov.decide_proposal(&you_c, Some(t), never.id, Decide::Approve, "")
+        .await
+        .unwrap();
+    let giving = GrantSpec {
+        role: "noi.gov.roles.marked".into(),
+        scope: "noi".into(),
+    };
+    let t = you
+        .touch(
+            &gov,
+            &session,
+            "grant",
+            &[Target::Account(your_id)],
+            Some(grant_about(&giving)),
+        )
+        .await;
+    let refused = gov
+        .grant(&you_c, Some(t), "hiddenstack", &giving)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        refused.contains("no one could change roles and rules"),
+        "{refused}"
+    );
+    let kept: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM gov.record WHERE kind = 'grant' AND NOT allowed")
+            .fetch_one(&mut sql)
+            .await
+            .unwrap();
+    assert_eq!(kept, 1);
+
+    // Review 10: a proposal can't be changed in the database once made, and a decided one stays
+    // decided, even by Governance's own login.
+    let mut as_runtime = PgConnection::connect(&runtime).await.unwrap();
+    assert!(as_runtime
+        .execute(format!("UPDATE gov.proposals SET cedar = 'permit (principal, action, resource);' WHERE id = '{}'", lock_b.id).as_str())
+        .await
+        .is_err());
+    assert!(as_runtime
+        .execute(
+            format!(
+                "UPDATE gov.proposals SET state = 'waiting', decided_at = NULL WHERE id = '{}'",
+                hand.id
+            )
+            .as_str()
+        )
+        .await
+        .is_err());
 
     // 7 · Retiring a role ends its grants: the agent proposes no more.
     let retire = draft(json!({
@@ -667,7 +828,11 @@ async fn verify(url: &str, login: &str) {
         .json()
         .await
         .unwrap();
-    assert_eq!(read["roles"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        read["roles"].as_array().unwrap().len(),
+        3,
+        "maintainer, owner and marked"
+    );
     let listed: Value = get("/api/proposals?all=true", true)
         .send()
         .await
@@ -734,4 +899,261 @@ async fn verify(url: &str, login: &str) {
         .await
         .unwrap();
     assert_eq!(copy.status(), 404);
+}
+
+/// The four roles and rules every Governance starts with, as files.
+fn first_files() -> Vec<Value> {
+    [
+        "roles/maintainer.json",
+        "roles/owner.json",
+        "rules/fresh-touch.json",
+        "rules/owners-approve-gov.json",
+    ]
+    .iter()
+    .map(|f| {
+        let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data/gov")
+            .join(f);
+        serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()
+    })
+    .collect()
+}
+
+/// A move file from Mero holding these roles and rules, each proposed, registered and made active
+/// (revisions 1 to 3): by `someone` proposed, by hiddenstack approved.
+fn move_file(items: &[Value]) -> MoveFile {
+    let moving: Vec<Value> = items
+        .iter()
+        .map(|f| {
+            let path = f["path"].as_str().unwrap();
+            let role = path.starts_with("noi.gov.roles.");
+            let spec = if role { json!({"system": f["system"], "cedar": f["cedar"]}) } else { json!({"cedar": f["cedar"]}) };
+            let revision = |n: i64, state: &str, by: &str, action: &str| json!({
+                "revision": n, "path": path, "name": f["name"], "definition": f["definition"],
+                "responsibility": f["responsibility"], "spec": spec, "state": state,
+                "at": format!("2026-11-06T10:0{n}:00Z"), "by": by, "action": action,
+                "reference": format!("governance:record:{n}"),
+            });
+            json!({
+                "uid": Uuid::new_v4().to_string(), "path": path, "subtype": if role { "role" } else { "policy" },
+                "state": "active", "revision": 3,
+                "revisions": [
+                    revision(1, "proposed", "someone", "meron.propose"),
+                    revision(2, "registered", "hiddenstack", "meron.transition"),
+                    revision(3, "active", "hiddenstack", "meron.transition"),
+                ],
+            })
+        })
+        .collect();
+    serde_json::from_value(json!({"moved_from": "mero", "written_at": "2026-11-21T00:00:00Z", "roles_and_rules": moving})).unwrap()
+}
+
+#[tokio::test]
+#[ignore = "requires a reachable PostgreSQL admin URL and CREATE DATABASE; see noi/docs/verification.md"]
+async fn recovery_and_the_move_on_real_postgres() {
+    let admin = std::env::var("NOI_TEST_ADMIN_URL").expect("set NOI_TEST_ADMIN_URL explicitly");
+    let name = format!("noi_move_test_{}", Uuid::new_v4().simple());
+    let mut admin_conn = PgConnection::connect(&admin).await.unwrap();
+    admin_conn
+        .execute(format!("CREATE DATABASE {name}").as_str())
+        .await
+        .unwrap();
+    let mut opts: sqlx::postgres::PgConnectOptions = admin.parse().unwrap();
+    opts = opts.database(&name);
+    let url = sqlx::ConnectOptions::to_url_lossy(&opts).to_string();
+    let login = format!("noi_move_test_login_{}", Uuid::new_v4().simple());
+    let task = tokio::spawn({
+        let login = login.clone();
+        async move { verify_move(&url, &login).await }
+    });
+    let result = task.await;
+    admin_conn
+        .execute(format!("DROP DATABASE {name} WITH (FORCE)").as_str())
+        .await
+        .unwrap();
+    admin_conn
+        .execute(format!("DROP ROLE IF EXISTS {login}").as_str())
+        .await
+        .unwrap();
+    if let Err(e) = result {
+        std::panic::resume_unwind(e.into_panic());
+    }
+}
+
+/// As this Mac stands when step 3's migration has run and the move has not: accounts and grants,
+/// the last copy of Mero's roles and rules kept aside, and no roles and rules of Governance's own.
+async fn verify_move(url: &str, login: &str) {
+    let config = Config {
+        origin: Url::parse("http://localhost:8788").unwrap(),
+        pages: Url::parse("https://gov.no-origins.localhost:3000").unwrap(),
+        domain: "no-origins.localhost".into(),
+        mail: Mailer::None,
+    };
+    let owner = Governance::connect(url, config.clone()).await.unwrap();
+    owner.migrate().await.unwrap();
+    let mut sql = PgConnection::connect(url).await.unwrap();
+    sql.execute(
+        format!("CREATE ROLE {login} LOGIN PASSWORD 'test-only' IN ROLE noi_gov_runtime").as_str(),
+    )
+    .await
+    .unwrap();
+    let runtime: sqlx::postgres::PgConnectOptions = url.parse().unwrap();
+    let runtime =
+        sqlx::ConnectOptions::to_url_lossy(&runtime.username(login).password("test-only"))
+            .to_string();
+    let gov = Governance::connect(&runtime, config).await.unwrap();
+    let you = Uuid::new_v4();
+    sql.execute(
+        format!(
+            "INSERT INTO gov.accounts(id, handle, display_name, kind, state, email) VALUES('{you}', 'hiddenstack', 'Ada', 'person', 'active', 'ada@example.com');
+             INSERT INTO gov.handles(handle, account) VALUES('hiddenstack', '{you}');
+             INSERT INTO gov.grants(id, account, role, scope) VALUES ('{}', '{you}', 'noi.gov.roles.maintainer', 'noi'), ('{}', '{you}', 'noi.gov.roles.owner', 'noi');",
+            Uuid::new_v4(),
+            Uuid::new_v4()
+        )
+        .as_str(),
+    )
+    .await
+    .unwrap();
+    let files = first_files();
+    // The last copy Governance decided with before the migration, kept aside by it (review 3).
+    let copy: i64 = sqlx::query_scalar("INSERT INTO gov.copies(source, roles, rules, version) VALUES('test', 2, 2, 'test') RETURNING id")
+        .fetch_one(&mut sql)
+        .await
+        .unwrap();
+    for f in &files {
+        let path = f["path"].as_str().unwrap();
+        let kind = if path.starts_with("noi.gov.roles.") {
+            "role"
+        } else {
+            "rule"
+        };
+        sqlx::query("INSERT INTO gov.last_copy(path, kind, system, cedar, state, revision, copy) VALUES($1,$2,$3,$4,'active',3,$5)")
+            .bind(path)
+            .bind(kind)
+            .bind(f["system"].as_str())
+            .bind(f["cedar"].as_str().unwrap())
+            .bind(copy)
+            .execute(&mut sql)
+            .await
+            .unwrap();
+    }
+    let me = Credential::Visitor;
+    assert!(
+        !gov.may(&me, "read", &[path("noi")], None)
+            .await
+            .unwrap()
+            .allowed
+    );
+
+    // Review 2: the recovery command on an empty Governance refuses, and leaves the move possible.
+    let refused = gov.recover("hiddenstack").await.unwrap_err().to_string();
+    assert!(refused.contains("run setup or the move first"), "{refused}");
+    let held: i64 = sqlx::query_scalar("SELECT count(*) FROM gov.versions")
+        .fetch_one(&mut sql)
+        .await
+        .unwrap();
+    assert_eq!(held, 0);
+
+    // Review 3: the move must leave in force exactly what the last copy held: path, kind, Cedar,
+    // state and revision. A rule missing, or a Cedar that differs, refuses it, and nothing is kept.
+    let without_touch: Vec<Value> = files
+        .iter()
+        .filter(|f| f["path"] != "noi.gov.rules.fresh-touch")
+        .cloned()
+        .collect();
+    let e = gov
+        .move_in(&move_file(&without_touch))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        e.contains("not what Governance last decided with")
+            && e.contains("noi.gov.rules.fresh-touch"),
+        "{e}"
+    );
+    let mut changed = files.clone();
+    changed[2]["cedar"] = json!("forbid (principal, action == Action::\"review\", resource);");
+    let e = gov
+        .move_in(&move_file(&changed))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("noi.gov.rules.fresh-touch"), "{e}");
+    let held: i64 = sqlx::query_scalar("SELECT count(*) FROM gov.versions")
+        .fetch_one(&mut sql)
+        .await
+        .unwrap();
+    assert_eq!(held, 0, "nothing kept");
+    let file = move_file(&files);
+    let moved = gov.move_in(&file).await.unwrap();
+    assert_eq!(
+        (
+            moved["roles"].as_u64(),
+            moved["rules"].as_u64(),
+            moved["versions"].as_u64()
+        ),
+        (Some(2), Some(2), Some(12))
+    );
+    // Review 7: run again, it says it is done, whatever the database's sort order.
+    assert_eq!(gov.move_in(&file).await.unwrap()["already"], true);
+    // Review 7: revision 1 was proposed, not approved: no approver for it.
+    let approvers: Vec<(i64, Option<Uuid>)> = sqlx::query_as(
+        "SELECT revision, approved_by FROM gov.versions WHERE path = 'noi.gov.roles.owner' ORDER BY revision",
+    )
+    .fetch_all(&mut sql)
+    .await
+    .unwrap();
+    assert_eq!(approvers, [(1, None), (2, Some(you)), (3, Some(you))]);
+
+    // Review 4: Cedar that doesn't load stops every answer; recovery retires it, and says so.
+    sql.execute(
+        "INSERT INTO gov.versions(path, revision, kind, name, definition, responsibility, cedar, state, came, why)
+         VALUES('noi.gov.rules.broken', 1, 'rule', 'Broken', 'd', 'r', 'forbid (principal, action, resource) unless {', 'active', 'recovery', 'a bad edit')",
+    )
+    .await
+    .unwrap();
+    let no = gov
+        .may(&Credential::Visitor, "read", &[path("noi")], None)
+        .await
+        .unwrap();
+    assert!(!no.allowed && no.reason.contains("do not load"), "{no:?}");
+    let recovered = gov.recover("hiddenstack").await.unwrap();
+    assert!(
+        recovered["done"]
+            .to_string()
+            .contains("noi.gov.rules.broken"),
+        "{recovered}"
+    );
+    // A rule that loads but can't be evaluated is the same.
+    sql.execute(
+        "INSERT INTO gov.versions(path, revision, kind, name, definition, responsibility, cedar, state, came, why)
+         VALUES('noi.gov.rules.erring', 1, 'rule', 'Erring', 'd', 'r', 'forbid (principal, action, resource) when { context.nothing };', 'active', 'recovery', 'a bad edit')",
+    )
+    .await
+    .unwrap();
+    let recovered = gov.recover("hiddenstack").await.unwrap();
+    assert!(
+        recovered["done"]
+            .to_string()
+            .contains("noi.gov.rules.erring"),
+        "{recovered}"
+    );
+    let in_force: Vec<String> = sqlx::query_scalar("SELECT path FROM gov.policies ORDER BY path")
+        .fetch_all(&mut sql)
+        .await
+        .unwrap();
+    assert_eq!(in_force.len(), 4, "{in_force:?}");
+    let recorded: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM gov.record WHERE kind = 'recover' AND allowed")
+            .fetch_one(&mut sql)
+            .await
+            .unwrap();
+    assert_eq!(recorded, 2);
+    // The old copy is kept, read only, for a later migration to remove.
+    let mut as_runtime = PgConnection::connect(&runtime).await.unwrap();
+    assert!(as_runtime
+        .execute("DELETE FROM gov.last_copy")
+        .await
+        .is_err());
 }
