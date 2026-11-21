@@ -1,6 +1,6 @@
-//! "May they?" Governance finds who is asking, links their grants into the roles it copied from
-//! Mero, adds the rules, and asks Cedar about every resource. No answer, no copy, an unknown action
-//! or any doubt means no, and every answer is recorded.
+//! "May they?" Governance finds who is asking, links their grants into the roles it keeps, adds the
+//! rules, and asks Cedar about every resource. No answer, no roles and rules, an unknown action or
+//! any doubt means no, and every answer is recorded.
 use super::{digest, record, Error, Governance, Result, SESSION_DAYS, SESSION_HOURS, VISITORS};
 use crate::{Action, Credential, Target, GOVERNANCE_ACTIONS};
 use cedar_policy::{
@@ -504,109 +504,17 @@ impl Governance {
             Proof::WithTheFirst | Proof::AsIfTouched => true,
             Proof::Nothing => false,
         };
-        let policies = self
-            .policy_set(conn, asker.account)
-            .await
-            .map_err(|e| (who, Failure::from(e)))?;
+        let in_force = in_force(conn).await.map_err(|e| (who, Failure::from(e)))?;
         let grants = self
             .live_grants(conn, asker.account)
             .await
             .map_err(|e| (who, Failure::from(e)))?;
-        let schema = crate::cedar::schema();
-        let action_uid = quoted("Action", action);
-        let context = Context::from_json_value(
-            json!({"fresh_signature": fresh}),
-            Some((schema, &action_uid)),
-        )
-        .map_err(|e| (who, format!("context: {e}").into()))?;
-        let principal = quoted("Account", &asker.account.to_string());
+        let policies = policy_set_of(&in_force, asker.account, &grants)
+            .map_err(|e| (who, Failure::from(e)))?;
         let mut determined = HashSet::new();
         for target in targets {
-            let (resource, place, mut extra) = match target {
-                Target::Path(p) => (quoted("Scope", p), p.clone(), vec![]),
-                Target::Account(id) => {
-                    let account = quoted("Account", &id.to_string());
-                    let entity = Entity::new_no_attrs(
-                        account.clone(),
-                        HashSet::from([quoted("Scope", "noi")]),
-                    );
-                    (
-                        account,
-                        "noi".to_string(),
-                        if *id == asker.account {
-                            vec![]
-                        } else {
-                            vec![entity]
-                        },
-                    )
-                }
-            };
-            // The asker is in each role they hold where this resource is.
-            let mut parents: HashSet<EntityUid> = HashSet::from([quoted("Scope", "noi")]);
-            for (role, scope) in &grants {
-                if covers(scope, &place) {
-                    parents.insert(quoted("Role", role_name(role)));
-                }
-            }
-            let mut entities: Vec<Entity> =
-                vec![Entity::new_no_attrs(principal.clone(), parents.clone())];
-            for role in &parents {
-                if role.type_name().to_string() == "Role" {
-                    entities.push(Entity::new_no_attrs(role.clone(), HashSet::new()));
-                }
-            }
-            let chain = ancestry(&place);
-            for (i, p) in chain.iter().enumerate() {
-                let up = chain
-                    .get(i + 1)
-                    .map(|q| HashSet::from([quoted("Scope", q)]))
-                    .unwrap_or_default();
-                entities.push(Entity::new_no_attrs(quoted("Scope", p), up));
-            }
-            entities.append(&mut extra);
-            let entities = Entities::from_entities(entities, Some(schema))
-                .map_err(|e| (who, format!("entities: {e}").into()))?;
-            let request = Request::new(
-                principal.clone(),
-                action_uid.clone(),
-                resource,
-                context.clone(),
-                Some(schema),
-            )
-            .map_err(|e| (who, format!("{action} does not apply here: {e}").into()))?;
-            let response = Authorizer::new().is_authorized(&request, &policies, &entities);
-            let reasons: Vec<String> = response
-                .diagnostics()
-                .reason()
-                .map(|p| p.to_string())
-                .collect();
-            if !response
-                .diagnostics()
-                .errors()
-                .collect::<Vec<_>>()
-                .is_empty()
-            {
-                return Err((who, "a policy could not be evaluated, so no".into()));
-            }
-            if response.decision() != Decision::Allow {
-                let forbids: Vec<&String> = reasons
-                    .iter()
-                    .filter(|r| !r.starts_with("grant:"))
-                    .collect();
-                let why = if forbids.is_empty() {
-                    format!("no grant allows {action} on {}", target.label())
-                } else {
-                    format!(
-                        "{} says no",
-                        forbids
-                            .iter()
-                            .map(|s| s.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
-                };
-                return Err((who, why.into()));
-            }
+            let reasons = answer(&policies, asker.account, &grants, action, target, fresh)
+                .map_err(|why| (who, Failure::No(why)))?;
             determined.extend(reasons);
         }
         let mut determined: Vec<String> = determined.into_iter().collect();
@@ -614,66 +522,19 @@ impl Governance {
         Ok((asker.account, determined))
     }
 
-    /// The live grants of an account whose role is in the copy: (role path, scope).
-    async fn live_grants(
+    /// The live grants of an account whose role is in force: (grant, role path, scope).
+    pub(crate) async fn live_grants(
         &self,
         conn: &mut PgConnection,
         account: Uuid,
-    ) -> Result<Vec<(String, String)>> {
+    ) -> Result<Vec<Grant>> {
         Ok(sqlx::query_as(
-            "SELECT g.role, g.scope FROM gov.grants g JOIN gov.policies p ON p.path = g.role AND p.kind = 'role'
+            "SELECT g.id, g.role, g.scope FROM gov.grants g JOIN gov.policies p ON p.path = g.role AND p.kind = 'role'
              WHERE g.account = $1 AND g.ended_at IS NULL ORDER BY g.granted_at",
         )
         .bind(account)
         .fetch_all(conn)
         .await?)
-    }
-
-    /// The copied roles as templates, the copied rules, and this account's grants linked in.
-    async fn policy_set(&self, conn: &mut PgConnection, account: Uuid) -> Result<PolicySet> {
-        let copied: Vec<(String, String, String)> =
-            sqlx::query_as("SELECT path, kind, cedar FROM gov.policies ORDER BY path")
-                .fetch_all(&mut *conn)
-                .await?;
-        if copied.is_empty() {
-            return Err(Error::Refused(
-                "Governance has no copy of the roles and rules yet".into(),
-            ));
-        }
-        let mut set = PolicySet::new();
-        let broken =
-            |e: String| Error::Refused(format!("the copied roles and rules do not load: {e}"));
-        for (path, kind, cedar) in &copied {
-            if kind == "role" {
-                let t = Template::parse(Some(PolicyId::new(path)), cedar)
-                    .map_err(|e| broken(e.to_string()))?;
-                set.add_template(t).map_err(|e| broken(e.to_string()))?;
-            } else {
-                let p = Policy::parse(Some(PolicyId::new(path)), cedar)
-                    .map_err(|e| broken(e.to_string()))?;
-                set.add(p).map_err(|e| broken(e.to_string()))?;
-            }
-        }
-        let grants: Vec<(Uuid, String, String)> = sqlx::query_as(
-            "SELECT g.id, g.role, g.scope FROM gov.grants g JOIN gov.policies p ON p.path = g.role AND p.kind = 'role'
-             WHERE g.account = $1 AND g.ended_at IS NULL",
-        )
-        .bind(account)
-        .fetch_all(&mut *conn)
-        .await?;
-        for (id, role, scope) in grants {
-            let fill = HashMap::from([
-                (SlotId::principal(), quoted("Account", &account.to_string())),
-                (SlotId::resource(), quoted("Scope", &scope)),
-            ]);
-            set.link(
-                PolicyId::new(&role),
-                PolicyId::new(format!("grant:{id}")),
-                fill,
-            )
-            .map_err(|e| broken(e.to_string()))?;
-        }
-        Ok(set)
     }
 
     /// A touch counts once, for the session and person that made it, for exactly what it approved,
@@ -715,6 +576,167 @@ impl Governance {
             Error::Refused("the touch is used, expired, or was for something else".into())
         })
     }
+}
+
+/// A grant as Governance links it: its ID, the role's path, and where.
+pub(crate) type Grant = (Uuid, String, String);
+/// A role or rule Governance decides with: its path, role or rule, and its Cedar.
+pub(crate) type InForce = (String, String, String);
+
+/// The roles and rules in force now (agreed 9 Nov, "Where Roles and Rules Live", decision 1): the
+/// newest version of each, kept by Governance itself. None means no one may do anything.
+pub(crate) async fn in_force(conn: &mut PgConnection) -> Result<Vec<InForce>> {
+    let rows: Vec<InForce> =
+        sqlx::query_as("SELECT path, kind, cedar FROM gov.policies ORDER BY path")
+            .fetch_all(conn)
+            .await?;
+    if rows.is_empty() {
+        return Err(Error::Refused(
+            "Governance holds no roles and rules yet".into(),
+        ));
+    }
+    Ok(rows)
+}
+
+/// The roles as templates, the rules, and this account's grants of roles in force linked in. A
+/// grant of a role that is not in force links nothing.
+pub(crate) fn policy_set_of(
+    in_force: &[InForce],
+    account: Uuid,
+    grants: &[Grant],
+) -> Result<PolicySet> {
+    let mut set = PolicySet::new();
+    let broken =
+        |e: String| Error::Refused(format!("the roles and rules in force do not load: {e}"));
+    for (path, kind, cedar) in in_force {
+        if kind == "role" {
+            let t = Template::parse(Some(PolicyId::new(path)), cedar)
+                .map_err(|e| broken(e.to_string()))?;
+            set.add_template(t).map_err(|e| broken(e.to_string()))?;
+        } else {
+            let p = Policy::parse(Some(PolicyId::new(path)), cedar)
+                .map_err(|e| broken(e.to_string()))?;
+            set.add(p).map_err(|e| broken(e.to_string()))?;
+        }
+    }
+    for (id, role, scope) in grants {
+        if !in_force.iter().any(|(p, k, _)| p == role && k == "role") {
+            continue;
+        }
+        let fill = HashMap::from([
+            (SlotId::principal(), quoted("Account", &account.to_string())),
+            (SlotId::resource(), quoted("Scope", scope)),
+        ]);
+        set.link(
+            PolicyId::new(role),
+            PolicyId::new(format!("grant:{id}")),
+            fill,
+        )
+        .map_err(|e| broken(e.to_string()))?;
+    }
+    Ok(set)
+}
+
+/// Cedar's answer for one account, action and target: the policies that allowed it, or why not.
+/// Nothing here reads the database, so the no-lockout check can ask about roles and rules that are
+/// only proposed (decision 4).
+pub(crate) fn answer(
+    policies: &PolicySet,
+    account: Uuid,
+    grants: &[Grant],
+    action: &str,
+    target: &Target,
+    fresh: bool,
+) -> std::result::Result<Vec<String>, String> {
+    let (allowed, reasons) = evaluate(policies, account, grants, action, target, fresh)?;
+    if allowed {
+        return Ok(reasons);
+    }
+    let forbids: Vec<&String> = reasons
+        .iter()
+        .filter(|r| !r.starts_with("grant:"))
+        .collect();
+    Err(if forbids.is_empty() {
+        format!("no grant allows {action} on {}", target.label())
+    } else {
+        format!(
+            "{} says no",
+            forbids
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    })
+}
+
+/// Whether Cedar allows it, and the policies that decided: the grants that allowed it, or the
+/// rules that said no. Err only when it could not be asked at all.
+pub(crate) fn evaluate(
+    policies: &PolicySet,
+    account: Uuid,
+    grants: &[Grant],
+    action: &str,
+    target: &Target,
+    fresh: bool,
+) -> std::result::Result<(bool, Vec<String>), String> {
+    let schema = crate::cedar::schema();
+    let action_uid = quoted("Action", action);
+    let context = Context::from_json_value(
+        json!({"fresh_signature": fresh}),
+        Some((schema, &action_uid)),
+    )
+    .map_err(|e| format!("context: {e}"))?;
+    let principal = quoted("Account", &account.to_string());
+    let (resource, place, mut extra) = match target {
+        Target::Path(p) => (quoted("Scope", p), p.clone(), vec![]),
+        Target::Account(id) => {
+            let other = quoted("Account", &id.to_string());
+            let entity =
+                Entity::new_no_attrs(other.clone(), HashSet::from([quoted("Scope", "noi")]));
+            (
+                other,
+                "noi".to_string(),
+                if *id == account { vec![] } else { vec![entity] },
+            )
+        }
+    };
+    // The asker is in each role they hold where this resource is.
+    let mut parents: HashSet<EntityUid> = HashSet::from([quoted("Scope", "noi")]);
+    for (_, role, scope) in grants {
+        if covers(scope, &place) {
+            parents.insert(quoted("Role", role_name(role)));
+        }
+    }
+    let mut entities: Vec<Entity> = vec![Entity::new_no_attrs(principal.clone(), parents.clone())];
+    for role in &parents {
+        if role.type_name().to_string() == "Role" {
+            entities.push(Entity::new_no_attrs(role.clone(), HashSet::new()));
+        }
+    }
+    let chain = ancestry(&place);
+    for (i, p) in chain.iter().enumerate() {
+        let up = chain
+            .get(i + 1)
+            .map(|q| HashSet::from([quoted("Scope", q)]))
+            .unwrap_or_default();
+        entities.push(Entity::new_no_attrs(quoted("Scope", p), up));
+    }
+    entities.append(&mut extra);
+    let entities =
+        Entities::from_entities(entities, Some(schema)).map_err(|e| format!("entities: {e}"))?;
+    let request = Request::new(principal, action_uid, resource, context, Some(schema))
+        .map_err(|e| format!("{action} does not apply here: {e}"))?;
+    let response = Authorizer::new().is_authorized(&request, policies, &entities);
+    let reasons: Vec<String> = response
+        .diagnostics()
+        .reason()
+        .map(|p| p.to_string())
+        .collect();
+    if response.diagnostics().errors().next().is_some() {
+        return Err("a policy could not be evaluated, so no".into());
+    }
+    Ok((response.decision() == Decision::Allow, reasons))
 }
 
 /// Why a question wasn't allowed: a refusal, whose reason is safe to show and keep; or Governance

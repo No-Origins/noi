@@ -504,6 +504,59 @@ pub fn read_role(system: &str, cedar: &str) -> Result<RoleForm, String> {
     Ok(form)
 }
 
+/// A role's or rule's Cedar, as a page sends it to be read into the form (agreed 8 Nov). Governance
+/// reads it since roles and rules moved in (step 3); Mero did before.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum Text {
+    Rule { cedar: String },
+    Role { system: String, cedar: String },
+}
+/// At most this many roles and rules, each at most this long, per request.
+pub const ITEMS: usize = 200;
+pub const LENGTH: usize = 20_000;
+
+/// Each role or rule as the form, or why it is written by hand; and every system's verbs, for the
+/// form's checkboxes. It touches no data, only the text sent.
+pub fn readings(items: &[Text]) -> Value {
+    let readings: Vec<Value> = items
+        .iter()
+        .map(|item| {
+            let read = match item {
+                Text::Rule { cedar } if cedar.len() <= LENGTH => read_rule(cedar).map(|f| json!(f)),
+                Text::Role { system, cedar } if cedar.len() <= LENGTH => {
+                    read_role(system, cedar).map(|f| json!(f))
+                }
+                _ => Err("it is too long to read".into()),
+            };
+            match read {
+                Ok(form) => json!({ "form": form }),
+                Err(why) => json!({ "by_hand": why }),
+            }
+        })
+        .collect();
+    let verbs: serde_json::Map<String, Value> = verbs()
+        .into_iter()
+        .map(|(s, v)| (s.to_string(), json!(v)))
+        .collect();
+    json!({ "readings": readings, "verbs": verbs })
+}
+
+/// A form, as a page sends it to have its Cedar written.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum Form {
+    Rule { form: RuleForm },
+    Role { form: RoleForm },
+}
+/// The Cedar a form says, checked as Governance checks it when it is proposed.
+pub fn written(body: &Form) -> Result<String, String> {
+    match body {
+        Form::Rule { form } => write_rule(form),
+        Form::Role { form } => write_role(form),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,12 +569,12 @@ mod tests {
     #[test]
     fn every_rule_and_role_today_goes_to_the_form_and_back_unchanged() {
         for rule in ["rules/fresh-touch.json", "rules/owners-approve-gov.json"] {
-            let cedar = data(rule)["spec"]["cedar"].as_str().unwrap().to_string();
+            let cedar = data(rule)["cedar"].as_str().unwrap().to_string();
             let form = read_rule(&cedar).unwrap_or_else(|e| panic!("{rule}: {e}"));
             assert_eq!(write_rule(&form).unwrap(), cedar, "{rule}");
         }
         for role in ["roles/maintainer.json", "roles/owner.json"] {
-            let spec = data(role)["spec"].clone();
+            let spec = data(role);
             let (system, cedar) = (
                 spec["system"].as_str().unwrap(),
                 spec["cedar"].as_str().unwrap(),
@@ -534,12 +587,7 @@ mod tests {
 
     #[test]
     fn the_fresh_touch_rule_reads_as_its_five_parts() {
-        let form = read_rule(
-            data("rules/fresh-touch.json")["spec"]["cedar"]
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap();
+        let form = read_rule(data("rules/fresh-touch.json")["cedar"].as_str().unwrap()).unwrap();
         assert_eq!(
             serde_json::to_value(&form).unwrap(),
             json!({
@@ -554,7 +602,7 @@ mod tests {
             })
         );
         let owners = read_rule(
-            data("rules/owners-approve-gov.json")["spec"]["cedar"]
+            data("rules/owners-approve-gov.json")["cedar"]
                 .as_str()
                 .unwrap(),
         )
@@ -741,6 +789,48 @@ mod tests {
         assert!(
             SYSTEMS.iter().all(|s| !all.contains(s)),
             "a system's name is not a verb"
+        );
+    }
+
+    #[test]
+    fn cedar_requests_read_and_write_as_the_explorer_sends_them() {
+        let fresh = r#"forbid (
+  principal,
+  action in [Action::"review",
+             Action::"governance"],
+  resource
+) unless { context.fresh_signature || action == Action::"view" };"#;
+        let items: Vec<Text> = serde_json::from_value(json!([
+            {"kind": "rule", "cedar": fresh},
+            {"kind": "role", "system": "mero", "cedar": "permit (\n  principal == ?principal,\n  action in Action::\"mero\",\n  resource in ?resource\n);"},
+            {"kind": "rule", "cedar": "forbid (principal, action, resource);"},
+        ]))
+        .unwrap();
+        let out = readings(&items);
+        assert_eq!(out["readings"][0]["form"]["unless"], json!(["fresh-touch"]));
+        assert_eq!(
+            out["readings"][1]["form"],
+            json!({"system": "mero", "pick": "every", "except": []})
+        );
+        assert!(out["readings"][2]["by_hand"]
+            .as_str()
+            .unwrap()
+            .contains("names no actions"));
+        assert!(out["verbs"]["governance"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("view")));
+        let form = out["readings"][0]["form"].clone();
+        let body: Form = serde_json::from_value(json!({"kind": "rule", "form": form})).unwrap();
+        assert_eq!(written(&body).unwrap(), fresh);
+        let wrong: Form = serde_json::from_value(
+            json!({"kind": "role", "form": {"system": "mero", "pick": "these", "verbs": []}}),
+        )
+        .unwrap();
+        assert!(written(&wrong).unwrap_err().contains("tick at least one"));
+        assert!(
+            serde_json::from_value::<Form>(json!({"kind": "rule", "form": {}, "extra": 1}))
+                .is_err()
         );
     }
 }

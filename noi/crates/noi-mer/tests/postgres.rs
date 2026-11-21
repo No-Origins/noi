@@ -2658,8 +2658,9 @@ async fn verify_governance(url: &str) {
         subject: "maintainer".into(),
     };
     let file = |name: &str| -> NewMeron {
+        // Mero's role and rule merons as they were before they moved to Governance (step 3).
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../data/gov")
+            .join("tests/before-step-3")
             .join(name);
         let mut m: NewMeron =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();

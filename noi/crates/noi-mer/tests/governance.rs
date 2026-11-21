@@ -1,6 +1,8 @@
-//! Step 3, end to end: Mero asks a real Governance server about every request, on real PostgreSQL,
-//! with a software passkey standing in for Touch ID. Creates a disposable database and drops it;
-//! never touches the shared one.
+//! End to end: Mero asks a real Governance server about every request, on real PostgreSQL, with a
+//! software passkey standing in for Touch ID. It starts as this Mac stood before the build order's
+//! step 3 (roles and rules as merons in Mero, accounts and grants in Governance), makes the move into
+//! Governance, and ends with Mero retiring those merons through Review. Creates a disposable
+//! database and drops it; never touches the shared one.
 //! Explicit opt-in: NOI_TEST_ADMIN_URL=... cargo test -p noi-mer --test governance -- --ignored
 use noi_gov::server::{grant_about, http, new_voucher_key, vouch, Config, Governance, GrantSpec};
 use noi_gov::*;
@@ -137,8 +139,8 @@ fn denied<T: std::fmt::Debug>(result: std::result::Result<T, Error>, why: &str) 
 }
 
 async fn verify(url: &str) {
-    // Mero, holding the agreed roles and rules and a proposer role an owner made in the UI. They
-    // are put there the old way, with a test-only authorizer.
+    // Mero, holding the agreed roles and rules and a proposer role an owner made in the UI, as
+    // before the move. They are put there the old way, with a test-only authorizer.
     let mero = Registry::connect(url).await.unwrap();
     mero.migrate().await.unwrap();
     let dev = Actor {
@@ -151,8 +153,9 @@ async fn verify(url: &str) {
     let gov_scope = boot.get(&dev, "noi.gov").await.unwrap().identity.uid;
     let inv_scope = boot.get(&dev, "noi.inv").await.unwrap().identity.uid;
     let file = |name: &str| -> NewMeron {
+        // Mero's role and rule merons as they were before they moved to Governance (step 3).
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../data/gov")
+            .join("tests/before-step-3")
             .join(name);
         let mut m: NewMeron =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
@@ -183,15 +186,8 @@ async fn verify(url: &str) {
         .unwrap();
     boot.approve(&dev, &[roles.uid]).await.unwrap();
 
-    // The door Governance copies through holds the roles and rules under noi.gov, and nothing else.
-    let door = mero.roles_and_rules().await.unwrap();
-    assert_eq!(door.merons.len(), 5, "three roles and two rules");
-    assert!(door.merons.iter().all(
-        |m| m.identity.path.starts_with("noi.gov.") && m.classification.kind == MeronType::Rule
-    ));
-    assert!(door.relationships.is_empty() && door.releases.is_empty());
-
-    // Governance, on its own port, with its copy.
+    // Governance, on its own port. As before the move, it knows you and the roles you hold, but
+    // holds no roles and rules of its own (the copy went with step 3), so it allows nothing.
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let origin = Url::parse(&format!("http://localhost:{port}")).unwrap();
@@ -202,17 +198,89 @@ async fn verify(url: &str) {
             pages: Url::parse("https://gov.no-origins.localhost:3000/").unwrap(),
             domain: "no-origins.localhost".into(),
             mail: noi_gov::server::Mailer::None,
-            mero: None,
         },
     )
     .await
     .unwrap();
     gov.migrate().await.unwrap();
-    let copied = gov
-        .copy_from_snapshot(&serde_json::to_value(&door).unwrap(), "mero")
+    let mut sql = PgConnection::connect(url).await.unwrap();
+    let your_id = Uuid::new_v4();
+    sql.execute(
+        format!(
+            "INSERT INTO gov.accounts(id, handle, display_name, kind, state, email)
+             VALUES('{your_id}', 'hiddenstack', 'Ada', 'person', 'active', 'ada@example.com');
+             INSERT INTO gov.handles(handle, account) VALUES('hiddenstack', '{your_id}');
+             INSERT INTO gov.grants(id, account, role, scope) VALUES
+               ('{}', '{your_id}', 'noi.gov.roles.maintainer', 'noi'),
+               ('{}', '{your_id}', 'noi.gov.roles.owner', 'noi');",
+            Uuid::new_v4(),
+            Uuid::new_v4()
+        )
+        .as_str(),
+    )
+    .await
+    .unwrap();
+    assert!(!gov.readiness().await.1);
+
+    // The move (step 3, decision 5): Mero writes out every role and rule with every revision; nothing
+    // else under noi.gov goes. Governance takes it in once.
+    let file = boot.roles_and_rules_to_move(&dev).await.unwrap();
+    let paths: Vec<&str> = file
+        .roles_and_rules
+        .iter()
+        .map(|m| m.path.as_str())
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "noi.gov.roles.maintainer",
+            "noi.gov.roles.owner",
+            "noi.gov.roles.proposer",
+            "noi.gov.rules.fresh-touch",
+            "noi.gov.rules.owners-approve-gov",
+        ]
+    );
+    for m in &file.roles_and_rules {
+        let states: Vec<&str> = m.revisions.iter().map(|r| r.state.as_str()).collect();
+        assert_eq!(states, ["proposed", "registered", "active"], "{}", m.path);
+        assert!(m.revisions.iter().all(|r| r.by == "test-developer"));
+    }
+    let moved = gov.move_in(&file).await.unwrap();
+    assert_eq!(
+        (moved["roles"].as_u64(), moved["rules"].as_u64()),
+        (Some(3), Some(2))
+    );
+    assert_eq!(moved["versions"], 15);
+    // Again with the same file: nothing changes. A different file: refused.
+    let again = gov.move_in(&file).await.unwrap();
+    assert_eq!(again["already"], true);
+    let mut other = file.clone();
+    other.roles_and_rules.pop();
+    assert!(gov
+        .move_in(&other)
         .await
-        .unwrap();
-    assert_eq!((copied.roles, copied.rules), (3, 2));
+        .unwrap_err()
+        .to_string()
+        .contains("the move runs once"));
+    let kept: Vec<(String, i64, String, Value)> = sqlx::query_as(
+        "SELECT path, revision, came, mero FROM gov.versions WHERE path = 'noi.gov.roles.owner' ORDER BY revision",
+    )
+    .fetch_all(&mut sql)
+    .await
+    .unwrap();
+    assert_eq!(kept.len(), 3);
+    assert!(kept
+        .iter()
+        .all(|(_, _, came, mero)| came == "moved" && mero["by"] == "test-developer"));
+    assert!(gov.readiness().await.1);
+    // Setup is for a new Governance only: you are an owner already.
+    assert!(gov
+        .setup("someone", "Someone", "someone@example.com")
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("an owner exists"));
+
     let app = http::router(gov.clone());
     tokio::spawn(async move { axum::serve(listener, app).await });
     let client = GovernanceClient::new(&format!("http://127.0.0.1:{port}"));
@@ -221,18 +289,15 @@ async fn verify(url: &str) {
             .with_authorizer(Arc::new(client.asking(credential, touch)))
     };
 
-    // You: the first owner, a passkey, a session.
-    let setup = gov
-        .setup("hiddenstack", "Ada", "ada@example.com")
-        .await
-        .unwrap();
+    // You: your first passkey, a session.
+    let link = gov.first_passkey_link("hiddenstack").await.unwrap();
     // Where the passkey is used: the app's pages on the subdomains (agreed 8 Nov); https, as the
     // software passkey takes http only for plain localhost.
     let mut person = Person {
         key: SoftPasskey::new(true),
         origin: Url::parse("https://mero.no-origins.localhost:3000").unwrap(),
     };
-    person.add_passkey(&gov, &setup.link).await;
+    person.add_passkey(&gov, &link).await;
     let session = person.sign_in(&gov, "hiddenstack").await;
     let you = Credential::Session(session.clone());
     let who = client.who(&you).await.unwrap();
@@ -587,7 +652,6 @@ async fn verify(url: &str) {
     );
     // Governance's record holds every answer Mero asked for, refusals too, but not an allowed read
     // (agreed 9 Nov, finding I).
-    let mut sql = PgConnection::connect(url).await.unwrap();
     let asked: Vec<(Option<String>, bool)> =
         sqlx::query_as("SELECT action, allowed FROM gov.record WHERE kind = 'decision'")
             .fetch_all(&mut sql)
@@ -620,6 +684,98 @@ async fn verify(url: &str) {
             "{action} refused"
         );
     }
+
+    // The move's last part (step 3, decision 5): Mero retires the roles and rules that moved, and the
+    // two invariants that checked them, each with a note saying where it went. It is a batch like
+    // any other, approved in Review by an owner with a touch; Governance decides it from the roles
+    // and rules it now keeps.
+    let held = with(you.clone(), None)
+        .snapshot_under(&me, Some("noi.gov"))
+        .await
+        .unwrap();
+    let retiring = noi_mer::retire_moved(&held.merons, "21 Nov 2026");
+    assert_eq!(
+        retiring.changes.len(),
+        7,
+        "five roles and rules, two invariants"
+    );
+    let sent = with(you.clone(), None)
+        .propose_batch(&me, retiring)
+        .await
+        .unwrap();
+    assert!(
+        sent.proposals
+            .iter()
+            .all(|p| p.outcome["ok"] == json!(true)),
+        "{:?}",
+        sent.proposals
+            .iter()
+            .map(|p| &p.outcome)
+            .collect::<Vec<_>>()
+    );
+    let (places, about) = with(you.clone(), None)
+        .review_places_for(&me, &[sent.uid], true, Some("approve"))
+        .await
+        .unwrap();
+    let targets: Vec<Target> = places.iter().cloned().map(Target::Path).collect();
+    let touch = person
+        .touch_for(&gov, &session, "review", &targets, about)
+        .await;
+    with(you.clone(), Some(touch))
+        .approve(&me, &[sent.uid])
+        .await
+        .unwrap();
+    let owner = with(you.clone(), None)
+        .get(&me, "noi.gov.roles.owner")
+        .await
+        .unwrap();
+    assert_eq!(owner.lifecycle.state, MeronState::Retired);
+    let notes = with(you.clone(), None)
+        .history(&me, owner.identity.uid)
+        .await
+        .unwrap();
+    assert!(notes.iter().any(|e| e.payload["reason"]
+        .as_str()
+        .is_some_and(|r| r.contains("Moved to Governance on 21 Nov 2026"))));
+    let invariant = with(you.clone(), None)
+        .get(&me, "noi.gov.inv.role")
+        .await
+        .unwrap();
+    assert_eq!(invariant.lifecycle.state, MeronState::Retired);
+    // Nothing is left to retire, and Governance decides as before: you may still propose.
+    let left = with(you.clone(), None)
+        .snapshot_under(&me, Some("noi.gov"))
+        .await
+        .unwrap();
+    assert!(noi_mer::retire_moved(&left.merons, "21 Nov 2026")
+        .changes
+        .is_empty());
+    assert!(
+        gov.may(
+            &you,
+            "propose",
+            &[Target::Path("noi.gov.roles.proposer".into())],
+            None
+        )
+        .await
+        .unwrap()
+        .allowed
+    );
+    // A role meron proposed in Mero now has no invariant to meet, so its Cedar is refused there.
+    let mut late = meron(gov_scope, "noi.gov.roles.late");
+    late.classification = Classification {
+        kind: MeronType::Rule,
+        subtype: Some("role".into()),
+        roles: vec![],
+    };
+    late.spec = json!({"system": "mero", "cedar": "permit (principal == ?principal, action == Action::\"read\", resource in ?resource);"});
+    let refused = with(you.clone(), None)
+        .propose_batch(&me, batch("Late", vec![add(late)]))
+        .await;
+    assert!(
+        refused.is_err() || refused.as_ref().unwrap().proposals[0].outcome["ok"] == json!(false),
+        "{refused:?}"
+    );
 
     // Governance down: Mero refuses everything, reading too.
     let down = GovernanceClient::new("http://127.0.0.1:9");

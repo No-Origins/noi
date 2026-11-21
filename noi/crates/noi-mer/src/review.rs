@@ -38,6 +38,14 @@ pub enum Change {
         expected_revision: i64,
         reason: String,
     },
+    /// Retires a meron for good, with a note saying why or where it went (step 3: the roles and
+    /// rules that moved to Governance). An active one is deprecated first, in the same step, so
+    /// the lifecycle still moves one step at a time; both steps carry the note.
+    Retire {
+        uid: Uuid,
+        expected_revision: i64,
+        reason: String,
+    },
 }
 impl Change {
     pub fn operation(&self) -> &'static str {
@@ -47,6 +55,7 @@ impl Change {
             Change::Rename { .. } => "rename",
             Change::Deprecate { .. } => "deprecate",
             Change::Reinstate { .. } => "reinstate",
+            Change::Retire { .. } => "retire",
         }
     }
     pub fn target(&self) -> Option<Uuid> {
@@ -55,7 +64,8 @@ impl Change {
             Change::Update { uid, .. }
             | Change::Rename { uid, .. }
             | Change::Deprecate { uid, .. }
-            | Change::Reinstate { uid, .. } => Some(*uid),
+            | Change::Reinstate { uid, .. }
+            | Change::Retire { uid, .. } => Some(*uid),
         }
     }
     fn expected_revision(&self) -> Option<i64> {
@@ -71,6 +81,9 @@ impl Change {
                 expected_revision, ..
             }
             | Change::Reinstate {
+                expected_revision, ..
+            }
+            | Change::Retire {
                 expected_revision, ..
             } => Some(*expected_revision),
         }
@@ -105,6 +118,15 @@ impl Change {
                 if reason.is_empty() || reason.chars().count() > 400 {
                     return Err(ValidationError(
                         "a reinstatement needs its reason, in at most 400 characters".into(),
+                    )
+                    .into());
+                }
+            }
+            Change::Retire { reason, .. } => {
+                let reason = reason.trim();
+                if reason.is_empty() || reason.chars().count() > 400 {
+                    return Err(ValidationError(
+                        "retiring needs its note, in at most 400 characters".into(),
                     )
                     .into());
                 }
@@ -1305,6 +1327,35 @@ impl Registry {
                 )
                 .await?
             }
+            Change::Retire {
+                uid,
+                expected_revision,
+                reason,
+            } => {
+                let mut revision = *expected_revision;
+                if load(&mut *conn, *uid).await?.lifecycle.state == MeronState::Active {
+                    revision = self
+                        .transition_in(
+                            conn,
+                            approver,
+                            *uid,
+                            revision,
+                            MeronState::Deprecated,
+                            Some(reason.trim()),
+                        )
+                        .await?
+                        .revision;
+                }
+                self.transition_in(
+                    conn,
+                    approver,
+                    *uid,
+                    revision,
+                    MeronState::Retired,
+                    Some(reason.trim()),
+                )
+                .await?
+            }
         };
         let rows: Vec<(String, Value)> = sqlx::query_as(
             "SELECT action,payload FROM mer.events WHERE sequence > $1 ORDER BY sequence",
@@ -1549,7 +1600,9 @@ async fn change_actions(
                 moved.path = path.clone();
                 add(&mut by, Action::Rename, vec![resource(&meron), moved]);
             }
-            Change::Deprecate { uid, .. } | Change::Reinstate { uid, .. } => {
+            Change::Deprecate { uid, .. }
+            | Change::Reinstate { uid, .. }
+            | Change::Retire { uid, .. } => {
                 add(
                     &mut by,
                     Action::Transition,
@@ -1600,4 +1653,53 @@ async fn hand_written(conn: &mut PgConnection, changes: &[Change]) -> Result<Vec
 /// The places a component's change touches: a component's meron, or the rule every component meets.
 fn is_component_place(path: &str) -> bool {
     crate::approved::covers(path)
+}
+
+/// The batch that retires the roles and rules under noi.gov once they have moved to Governance
+/// (step 3, decision 5): each role and rule in force, with a note saying where it went, and the two
+/// invariants that checked them, which would check nothing. Mero settles a batch in passes, so the
+/// invariants retire after what they cover. Empty when nothing is left to retire.
+pub fn retire_moved(held: &[Meron], on: &str) -> NewBatch {
+    use noi_gov::moving::{retired_invariant_note, retired_note};
+    let in_force = |m: &&Meron| {
+        matches!(
+            m.lifecycle.state,
+            MeronState::Active | MeronState::Deprecated
+        )
+    };
+    let retire = |m: &Meron, reason: String| Change::Retire {
+        uid: m.identity.uid,
+        expected_revision: m.revision,
+        reason,
+    };
+    let mut changes: Vec<Change> = held
+        .iter()
+        .filter(in_force)
+        .filter(|m| {
+            m.classification.kind == MeronType::Rule
+                && matches!(m.classification.subtype.as_deref(), Some("role" | "policy"))
+        })
+        .map(|m| retire(m, retired_note(on)))
+        .collect();
+    changes.extend(
+        held.iter()
+            .filter(in_force)
+            .filter(|m| {
+                matches!(
+                    m.identity.path.as_str(),
+                    "noi.gov.inv.role" | "noi.gov.inv.rule"
+                )
+            })
+            .map(|m| retire(m, retired_invariant_note(on))),
+    );
+    NewBatch {
+        title: "Retire the roles and rules: they moved to Governance".into(),
+        note: Some(format!(
+            "Step 3 (agreed 9 Nov, \"Where Roles and Rules Live\", decision 5): Governance took these in on {on}, with every revision. Approving retires them here, each with a note saying where it went, so they are kept in one place."
+        )),
+        changes,
+        touch: None,
+        branch: None,
+        commit: None,
+    }
 }

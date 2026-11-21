@@ -4,17 +4,14 @@
 #![cfg(feature = "server")]
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use noi_gov::server::{
-    grant_about, http, invite_about, new_voucher_key, vouch, Change, Config, Credential,
-    Governance, GrantSpec, Mailer, RecordFilter, Target, Vouch, EMAIL_SENT, SENT,
+    decide_about, grant_about, http, invite_about, new_voucher_key, vouch, Change, Config,
+    Credential, Decide, Draft, Governance, GrantSpec, Mailer, RecordFilter, Target, Vouch,
+    EMAIL_SENT, SENT,
 };
 use serde_json::{json, Value};
 use sha2::Digest;
 use sqlx::{Connection, Executor, PgConnection};
-use std::{
-    fs,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use url::Url;
 use uuid::Uuid;
@@ -25,45 +22,36 @@ use webauthn_authenticator_rs::{
 
 const ORIGIN: &str = "http://localhost:8788";
 
-fn data(file: &str) -> Value {
-    let p = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../data/gov")
-        .join(file);
-    serde_json::from_str(&fs::read_to_string(p).unwrap()).unwrap()
-}
-/// A Mero snapshot holding the given rule merons, as Mero's read API returns them.
-fn snapshot(merons: &[(Value, &str)]) -> Value {
-    let merons: Vec<Value> = merons
-        .iter()
-        .map(|(m, state)| {
-            json!({"identity": {"path": m["path"]}, "classification": m["classification"],
-            "lifecycle": {"state": state}, "revision": 3, "spec": m["spec"]})
-        })
-        .collect();
-    json!({"merons": merons})
-}
-fn role(path: &str, system: &str, cedar: &str) -> Value {
-    json!({"path": path, "classification": {"type": "rule", "subtype": "role"}, "spec": {"system": system, "cedar": cedar}})
-}
 const EIDOS_PROPOSER: &str = r#"permit (principal == ?principal, action in [Action::"read", Action::"propose"], resource in ?resource);"#;
 const READER: &str =
     r#"permit (principal == ?principal, action == Action::"read", resource in ?resource);"#;
-/// What Mero holds after 6 Nov: two active roles, two deprecated, two rules; plus roles an owner
-/// made later in the UI.
-fn approved(extra: &[(Value, &str)]) -> Value {
-    let mut merons = vec![
-        (data("roles/maintainer.json"), "active"),
-        (data("roles/owner.json"), "active"),
-        (role("noi.gov.roles.observer", "mero", READER), "deprecated"),
-        (data("rules/fresh-touch.json"), "active"),
-        (data("rules/owners-approve-gov.json"), "active"),
-        (
-            json!({"path": "noi.eio.color.text.muted", "classification": {"type": "token", "subtype": "color-role"}, "spec": {}}),
-            "active",
-        ),
-    ];
-    merons.extend(extra.iter().cloned());
-    snapshot(&merons)
+
+/// Puts roles in force as an owner's approval would have (step 3): a new version of each, written
+/// straight into Governance's table, for the checks that are not about approving. Approving itself
+/// is checked through Governance's own proposals (`tests/roles.rs`, and retiring below).
+async fn hold(url: &str, roles: &[(&str, &str, &str, &str)]) {
+    let mut sql = PgConnection::connect(url).await.unwrap();
+    for (path, system, cedar, state) in roles {
+        let newest: Option<i64> =
+            sqlx::query_scalar("SELECT max(revision) FROM gov.versions WHERE path = $1")
+                .bind(path)
+                .fetch_one(&mut sql)
+                .await
+                .unwrap();
+        sqlx::query(
+            "INSERT INTO gov.versions(path, revision, kind, name, definition, responsibility, system, cedar, state, came, why)
+             VALUES($1, $2, 'role', $3, 'Made for a test.', 'Test.', $4, $5, $6, 'approved', 'test')",
+        )
+        .bind(path)
+        .bind(newest.unwrap_or(0) + 1)
+        .bind(path.rsplit('.').next().unwrap())
+        .bind(system)
+        .bind(cedar)
+        .bind(state)
+        .execute(&mut sql)
+        .await
+        .unwrap();
+    }
 }
 
 fn token_of(link: &str) -> String {
@@ -238,7 +226,6 @@ async fn verify(url: &str, login: &str) {
         origin: origin(),
         pages: pages(),
         domain: DOMAIN.into(),
-        mero: None,
         mail: Mailer::Smtp {
             server: catcher,
             from: "No Origins <no-reply@no-origins.localhost>".into(),
@@ -281,28 +268,15 @@ async fn verify(url: &str, login: &str) {
         assert!(ok, "sign-ups need {right}");
     }
 
-    // No copy yet: nothing is allowed, and setup cannot grant roles Governance does not hold.
+    // No roles and rules yet: nothing is allowed.
     let answer = gov
         .may(&Credential::Visitor, "read", &[path(MUTED)], None)
         .await
         .unwrap();
     assert!(
-        !answer.allowed && answer.reason.contains("no copy"),
+        !answer.allowed && answer.reason.contains("holds no roles and rules"),
         "{answer:?}"
     );
-    assert!(gov
-        .setup("hiddenstack", "Ada", "ada@example.com")
-        .await
-        .unwrap_err()
-        .to_string()
-        .contains("copy the roles and rules"));
-
-    // The copy: retired and draft roles and anything outside noi.gov are left out.
-    let copied = gov
-        .copy_from_snapshot(&approved(&[]), "test")
-        .await
-        .unwrap();
-    assert_eq!((copied.roles, copied.rules), (3, 2));
 
     // The first owner, once.
     let setup = gov
@@ -318,6 +292,35 @@ async fn verify(url: &str, login: &str) {
         .unwrap_err()
         .to_string()
         .contains("an owner exists"));
+    // Setup gave Governance the roles and rules every Governance starts with (step 3), once.
+    let held: Vec<(String, i64, String, String)> =
+        sqlx::query_as("SELECT path, revision, state, came FROM gov.versions ORDER BY path")
+            .fetch_all(&mut sql)
+            .await
+            .unwrap();
+    assert_eq!(
+        held,
+        [
+            ("noi.gov.roles.maintainer", 1, "active", "setup"),
+            ("noi.gov.roles.owner", 1, "active", "setup"),
+            ("noi.gov.rules.fresh-touch", 1, "active", "setup"),
+            ("noi.gov.rules.owners-approve-gov", 1, "active", "setup"),
+        ]
+        .map(|(p, r, s, c)| (p.to_string(), r, s.to_string(), c.to_string()))
+    );
+    // An Observer an owner made and set aside (sign-ups wait for it to be active).
+    hold(
+        url,
+        &[("noi.gov.roles.observer", "mero", READER, "deprecated")],
+    )
+    .await;
+    let in_force: Vec<(String, String)> =
+        sqlx::query_as("SELECT kind, state FROM gov.policies ORDER BY path")
+            .fetch_all(&mut sql)
+            .await
+            .unwrap();
+    assert_eq!(in_force.iter().filter(|(k, _)| k == "role").count(), 3);
+    assert_eq!(in_force.iter().filter(|(k, _)| k == "rule").count(), 2);
     let mut you = Person::new();
     let first = you.add_passkey(&gov, &setup.link).await;
     // The link works once; and a first-passkey link is refused once a passkey exists.
@@ -554,19 +557,20 @@ async fn verify(url: &str, login: &str) {
         .await
         .unwrap();
     assert!(gate.reason.contains("at most reading"));
-    // An owner makes roles in the UI; here they arrive with the next copy.
-    gov.copy_from_snapshot(
-        &approved(&[
-            (role("noi.gov.roles.reader", "mero", READER), "active"),
+    // Roles an owner made on Governance's pages.
+    hold(
+        url,
+        &[
+            ("noi.gov.roles.reader", "mero", READER, "active"),
             (
-                role("noi.gov.roles.eidos-proposer", "mero", EIDOS_PROPOSER),
+                "noi.gov.roles.eidos-proposer",
+                "mero",
+                EIDOS_PROPOSER,
                 "active",
             ),
-        ]),
-        "test",
+        ],
     )
-    .await
-    .unwrap();
+    .await;
     let reader = GrantSpec {
         role: "noi.gov.roles.reader".into(),
         scope: "noi".into(),
@@ -592,19 +596,11 @@ async fn verify(url: &str, login: &str) {
     // Visitors may also be given a role that reads Review, as Observer does since step 6 (found 9
     // Nov when giving visitors Observer was refused); rule 5 still keeps Review from them.
     const OBSERVING: &str = r#"permit (principal == ?principal, action in [Action::"read", Action::"read-review"], resource in ?resource);"#;
-    gov.copy_from_snapshot(
-        &approved(&[
-            (role("noi.gov.roles.reader", "mero", READER), "active"),
-            (
-                role("noi.gov.roles.eidos-proposer", "mero", EIDOS_PROPOSER),
-                "active",
-            ),
-            (role("noi.gov.roles.observing", "mero", OBSERVING), "active"),
-        ]),
-        "test",
+    hold(
+        url,
+        &[("noi.gov.roles.observing", "mero", OBSERVING, "active")],
     )
-    .await
-    .unwrap();
+    .await;
     let t = you
         .touch_for(
             &gov,
@@ -1004,22 +1000,11 @@ async fn verify(url: &str, login: &str) {
     const INVITER: &str =
         r#"permit (principal == ?principal, action == Action::"invite", resource in ?resource);"#;
     // The roles made above stay; the inviter joins them.
-    gov.copy_from_snapshot(
-        &approved(&[
-            (role("noi.gov.roles.reader", "mero", READER), "active"),
-            (
-                role("noi.gov.roles.eidos-proposer", "mero", EIDOS_PROPOSER),
-                "active",
-            ),
-            (
-                role("noi.gov.roles.inviter", "governance", INVITER),
-                "active",
-            ),
-        ]),
-        "test",
+    hold(
+        url,
+        &[("noi.gov.roles.inviter", "governance", INVITER, "active")],
     )
-    .await
-    .unwrap();
+    .await;
     let steward_id: Uuid =
         serde_json::from_value(gov.me(&sc).await.unwrap()["account"].clone()).unwrap();
     let t = you
@@ -1337,6 +1322,9 @@ async fn verify(url: &str, login: &str) {
         "invite",
         "sign-up",
         "copy",
+        "approve",
+        "move",
+        "recover",
     ];
     assert!(
         changes
@@ -1435,16 +1423,28 @@ async fn verify(url: &str, login: &str) {
     assert_eq!(gov.sign_out_everywhere(&s).await.unwrap(), 2);
     assert!(gov.profile(&s).await.is_err());
 
-    // Retiring a role ends its grants; a copy that fails a check, or holds no roles, is refused.
-    let copied = gov
-        .copy_from_snapshot(
-            &approved(&[(role("noi.gov.roles.reader", "mero", READER), "active")]),
-            "test",
-        )
-        .await
+    // Retiring a role ends its grants (step 3: proposed and approved in Governance, with a touch
+    // naming the decision and the proposal); a role whose Cedar fails its check is never proposed.
+    let mut ended = 0;
+    for retiring in ["noi.gov.roles.eidos-proposer", "noi.gov.roles.inviter"] {
+        let draft: Draft = serde_json::from_value(json!({
+            "operation": "retire", "path": retiring, "base_revision": 1, "why": "No longer needed.",
+        }))
         .unwrap();
+        let p = gov.propose(&you_c, None, &draft).await.unwrap();
+        let about = decide_about(Decide::Approve, p.id);
+        let t = you
+            .touch_for(&gov, &session, "review", &[path(retiring)], about)
+            .await;
+        let done = gov
+            .decide_proposal(&you_c, Some(t), p.id, Decide::Approve, "")
+            .await
+            .unwrap();
+        assert_eq!(done["state"], "retired");
+        ended += done["ended_grants"].as_u64().unwrap();
+    }
     // The agent's Eidos proposer, and the steward's inviter from the invite check above.
-    assert_eq!(copied.ended_grants, 2);
+    assert_eq!(ended, 2);
     let reason: Option<String> =
         sqlx::query_scalar("SELECT end_reason FROM gov.grants WHERE id=$1")
             .bind(grant)
@@ -1452,25 +1452,24 @@ async fn verify(url: &str, login: &str) {
             .await
             .unwrap();
     assert_eq!(reason.as_deref(), Some("role retired"));
-    let bad = approved(&[(
-        role(
-            "noi.gov.roles.bad",
-            "mero",
-            r#"permit (principal == ?principal, action == Action::"grant", resource in ?resource);"#,
-        ),
-        "active",
-    )]);
-    assert!(gov.copy_from_snapshot(&bad, "test").await.is_err());
+    let bad: Draft = serde_json::from_value(json!({
+        "operation": "add", "path": "noi.gov.roles.bad", "name": "Bad", "definition": "d",
+        "responsibility": "r", "system": "mero", "why": "w",
+        "cedar": r#"permit (principal == ?principal, action == Action::"grant", resource in ?resource);"#,
+    }))
+    .unwrap();
     assert!(gov
-        .copy_from_snapshot(&json!({"merons": []}), "test")
+        .propose(&you_c, None, &bad)
         .await
-        .is_err());
+        .unwrap_err()
+        .to_string()
+        .contains("not an action mero declares"));
     assert!(
         gov.may(&Credential::Visitor, "read", &[path(MUTED)], None)
             .await
             .unwrap()
             .allowed,
-        "the last copy stays"
+        "what is held stays"
     );
 
     // Signing out ends the session at once.
@@ -1509,7 +1508,8 @@ async fn verify(url: &str, login: &str) {
             .unwrap();
     for k in [
         "setup",
-        "copy",
+        "propose",
+        "approve",
         "passkey-add",
         "sign-in",
         "touch",
@@ -1546,22 +1546,7 @@ async fn verify(url: &str, login: &str) {
     .await
     .unwrap();
     assert_eq!(left, 0);
-    // Never a stale copy (9 Nov, step 7): with Mero's version the same as the last copy's, it
-    // answers; different, it copies first, and here, with no Mero to copy from, says no.
-    let current: String =
-        sqlx::query_scalar("SELECT version FROM gov.copies ORDER BY id DESC LIMIT 1")
-            .fetch_one(&mut sql)
-            .await
-            .unwrap();
-    assert!(current.contains("noi.gov.roles.owner@"), "{current}");
-    gov.keep_up(&current).await.unwrap();
-    assert!(gov
-        .keep_up("noi.gov.roles.owner@99:active")
-        .await
-        .unwrap_err()
-        .to_string()
-        .contains("behind Mero's"));
-    // When Governance itself fails (here it may not read its copy of the rules), it answers with an
+    // When Governance itself fails (here it may not read its roles and rules), it answers with an
     // error, not a refusal, and the record keeps only that it said no (architecture review, 9 Nov).
     sql.execute("REVOKE SELECT ON gov.policies FROM noi_gov_runtime")
         .await
@@ -1661,13 +1646,7 @@ async fn verify_sign_up(url: &str, gov: &Governance, mails: &Kept) {
         .unwrap_err()
         .to_string()
         .contains("Observer"));
-    let mut back = approved(&[]);
-    for m in back["merons"].as_array_mut().unwrap() {
-        if m["identity"]["path"] == "noi.gov.roles.observer" {
-            m["lifecycle"]["state"] = json!("active");
-        }
-    }
-    gov.copy_from_snapshot(&back, "test").await.unwrap();
+    hold(url, &[("noi.gov.roles.observer", "mero", READER, "active")]).await;
     // A bad email or a taken handle is said, and nothing is sent.
     let n = count();
     assert!(gov
@@ -2083,7 +2062,6 @@ async fn verify_http(url: &str, runtime: &str, lib: &Governance, you: &mut Perso
             origin: origin.clone(),
             pages: pages(),
             domain: DOMAIN.into(),
-            mero: None,
             mail: Mailer::None,
         },
     )
@@ -2300,7 +2278,7 @@ async fn verify_http(url: &str, runtime: &str, lib: &Governance, you: &mut Perso
         .unwrap();
     assert_eq!(made_up.status(), 403);
 
-    // Health (8 Nov): alive, and ready with a database and a copy of the roles and rules; no sign-in.
+    // Health (8 Nov): alive, and ready with a database and roles and rules to decide with; no sign-in.
     let alive = client
         .get(at("/health/alive"))
         .header("host", format!("localhost:{port}"))
