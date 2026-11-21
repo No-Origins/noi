@@ -580,14 +580,15 @@ impl Governance {
 
 /// A grant as Governance links it: its ID, the role's path, and where.
 pub(crate) type Grant = (Uuid, String, String);
-/// A role or rule Governance decides with: its path, role or rule, and its Cedar.
-pub(crate) type InForce = (String, String, String);
+/// A role or rule Governance decides with: its path, role or rule, its Cedar, and its state (active,
+/// or deprecated: set aside).
+pub(crate) type InForce = (String, String, String, String);
 
 /// The roles and rules in force now (agreed 9 Nov, "Where Roles and Rules Live", decision 1): the
 /// newest version of each, kept by Governance itself. None means no one may do anything.
 pub(crate) async fn in_force(conn: &mut PgConnection) -> Result<Vec<InForce>> {
     let rows: Vec<InForce> =
-        sqlx::query_as("SELECT path, kind, cedar FROM gov.policies ORDER BY path")
+        sqlx::query_as("SELECT path, kind, cedar, state FROM gov.policies ORDER BY path")
             .fetch_all(conn)
             .await?;
     if rows.is_empty() {
@@ -608,7 +609,7 @@ pub(crate) fn policy_set_of(
     let mut set = PolicySet::new();
     let broken =
         |e: String| Error::Refused(format!("the roles and rules in force do not load: {e}"));
-    for (path, kind, cedar) in in_force {
+    for (path, kind, cedar, _) in in_force {
         if kind == "role" {
             let t = Template::parse(Some(PolicyId::new(path)), cedar)
                 .map_err(|e| broken(e.to_string()))?;
@@ -620,7 +621,7 @@ pub(crate) fn policy_set_of(
         }
     }
     for (id, role, scope) in grants {
-        if !in_force.iter().any(|(p, k, _)| p == role && k == "role") {
+        if !in_force.iter().any(|(p, k, _, _)| p == role && k == "role") {
             continue;
         }
         let fill = HashMap::from([

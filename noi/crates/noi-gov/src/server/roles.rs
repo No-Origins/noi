@@ -364,29 +364,43 @@ fn approving(operation: Operation, path: &str) -> Vec<Question> {
 /// person.
 type Need = Vec<Vec<Question>>;
 
-/// What changing roles and rules takes (decision 4; the reviews of 21 Nov, findings 1, A and D):
-/// for every role and rule in force, the one that would lock everyone out too, someone may propose
-/// a change to it, and someone may approve either changing it or retiring it. Then any role or rule
-/// can be put right, so nobody is locked out. Built from the very lists `propose` and
-/// `decide_proposal` ask, with the proof each question carries, so the check asks exactly what a
-/// real change asks.
+/// What changing roles and rules takes (decision 4; the reviews of 21 Nov, findings 1, A, D and the
+/// third read's 2): for every role and rule in force, the one that would lock everyone out too,
+/// someone may propose for it, and someone may approve a way to put it right: changing or retiring
+/// it while active; retiring or bringing it back while set aside (a change starts only from
+/// active). Built from the very lists `propose` and `decide_proposal` ask, with the proof each
+/// question carries, so the check asks exactly what a real change asks.
 fn changing(rows: &[InForce]) -> Vec<Need> {
     let mut needs: Vec<Need> = vec![];
-    for (path, _, _) in rows {
+    for (path, _, _, state) in rows {
         needs.push(vec![proposing(path)]);
-        needs.push(vec![
-            approving(Operation::Change, path),
-            approving(Operation::Retire, path),
-        ]);
+        needs.push(if state == "deprecated" {
+            vec![
+                approving(Operation::Retire, path),
+                approving(Operation::BringBack, path),
+            ]
+        } else {
+            vec![
+                approving(Operation::Change, path),
+                approving(Operation::Retire, path),
+            ]
+        });
     }
     needs
+}
+
+/// Whether any role is in force. With none, nobody may do anything at all, so roles and rules are
+/// out of reach however few needs there are (third read, finding 1: an empty list of needs is not
+/// met by default).
+fn any_role(rows: &[InForce]) -> bool {
+    rows.iter().any(|(_, kind, _, _)| kind == "role")
 }
 
 /// The grants that link into these roles and rules: grants of roles in force.
 fn usable(rows: &[InForce], grants: &[Grant]) -> Vec<Grant> {
     grants
         .iter()
-        .filter(|(_, role, _)| rows.iter().any(|(p, k, _)| p == role && k == "role"))
+        .filter(|(_, role, _)| rows.iter().any(|(p, k, _, _)| p == role && k == "role"))
         .cloned()
         .collect()
 }
@@ -416,6 +430,9 @@ fn meets(set: &PolicySet, account: Uuid, grants: &[Grant], need: &Need) -> bool 
 /// Whether this account, holding these grants, could change roles and rules under these roles and
 /// rules on its own: every one of `changing`. Pure: it reads nothing.
 pub(crate) fn can_change(rows: &[InForce], account: Uuid, grants: &[Grant]) -> bool {
+    if !any_role(rows) {
+        return false;
+    }
     let grants = usable(rows, grants);
     let Ok(set) = policy_set_of(rows, account, &grants) else {
         return false;
@@ -430,6 +447,9 @@ pub(crate) fn can_change(rows: &[InForce], account: Uuid, grants: &[Grant]) -> b
 /// check runs at most twice per approval, grant or ended grant, inside the one write lock; fine at
 /// today's few roles and owners.)
 pub(crate) fn reachable(rows: &[InForce], people: &[(Uuid, Vec<Grant>)]) -> bool {
+    if !any_role(rows) {
+        return false;
+    }
     let able: Vec<(Uuid, Vec<Grant>, PolicySet)> = people
         .iter()
         .filter_map(|(account, grants)| {
@@ -475,7 +495,12 @@ fn with_targets(questions: Vec<Question>) -> Vec<(Question, Vec<Target>)> {
 /// Whether a role or rule loads into Cedar as Governance decides with it (review, finding 4): a
 /// rule as a policy, a role as a template a grant links into.
 fn loads(path: &str, kind: &str, cedar: &str) -> bool {
-    let row = [(path.to_string(), kind.to_string(), cedar.to_string())];
+    let row = [(
+        path.to_string(),
+        kind.to_string(),
+        cedar.to_string(),
+        "active".to_string(),
+    )];
     let grants: Vec<Grant> = if kind == "role" {
         vec![(Uuid::nil(), path.to_string(), "noi".to_string())]
     } else {
@@ -538,9 +563,18 @@ fn with_version(
     state: &str,
     cedar: &str,
 ) -> Vec<InForce> {
-    let mut out: Vec<InForce> = rows.iter().filter(|(p, _, _)| p != path).cloned().collect();
+    let mut out: Vec<InForce> = rows
+        .iter()
+        .filter(|(p, _, _, _)| p != path)
+        .cloned()
+        .collect();
     if state == "active" || state == "deprecated" {
-        out.push((path.to_string(), kind.to_string(), cedar.to_string()));
+        out.push((
+            path.to_string(),
+            kind.to_string(),
+            cedar.to_string(),
+            state.to_string(),
+        ));
         out.sort();
     }
     out
@@ -1102,7 +1136,7 @@ impl Governance {
             .collect();
         let why = "the recovery command on Governance's server";
         // 0. What does not load stops every answer: put right.
-        for (path, kind, cedar) in &rows {
+        for (path, kind, cedar, _) in &rows {
             if loads(path, kind, cedar) {
                 continue;
             }
@@ -1225,30 +1259,58 @@ impl Governance {
                 break;
             };
             let retirable = |p: &String| {
-                rows.iter().any(|(path, k, _)| path == p && k == "rule")
+                rows.iter().any(|(path, k, _, _)| path == p && k == "rule")
                     && !first.iter().any(|f| &f.path == p)
             };
+            // Only what stands in the way (third read, finding 3): for each need this person fails,
+            // the rules that block every way of meeting it, or else the way blocked by the fewest;
+            // then look again. A rule that refuses one way while another can be opened (say, one
+            // that only keeps Owner from being retired) stays.
             let mut blocking: Vec<String> = vec![];
             for need in changing(&rows) {
-                for asks in &need {
-                    for q in asks {
-                        for place in &q.places {
-                            let Ok(said) = evaluate(
-                                &set,
-                                account,
-                                &grants,
-                                q.action,
-                                &Target::Path(place.clone()),
-                                q.touched,
-                            ) else {
-                                continue;
-                            };
-                            if !said.allowed {
-                                blocking.extend(said.reasons.into_iter().filter(&retirable));
+                if meets(&set, account, &grants, &need) {
+                    continue;
+                }
+                let ways: Vec<Vec<String>> = need
+                    .iter()
+                    .map(|asks| {
+                        let mut found: Vec<String> = vec![];
+                        for q in asks {
+                            for place in &q.places {
+                                let Ok(said) = evaluate(
+                                    &set,
+                                    account,
+                                    &grants,
+                                    q.action,
+                                    &Target::Path(place.clone()),
+                                    q.touched,
+                                ) else {
+                                    continue;
+                                };
+                                if !said.allowed {
+                                    found.extend(said.reasons.into_iter().filter(&retirable));
+                                }
+                                found.extend(said.erring.into_iter().filter(&retirable));
                             }
-                            blocking.extend(said.erring.into_iter().filter(&retirable));
                         }
-                    }
+                        found.sort();
+                        found.dedup();
+                        found
+                    })
+                    .collect();
+                let in_every: Vec<String> = ways[0]
+                    .iter()
+                    .filter(|r| ways.iter().all(|w| w.contains(r)))
+                    .cloned()
+                    .collect();
+                if !in_every.is_empty() {
+                    blocking.extend(in_every);
+                } else if let Some(fewest) = ways
+                    .iter()
+                    .filter(|w| !w.is_empty())
+                    .min_by_key(|w| w.len())
+                {
+                    blocking.extend(fewest.iter().cloned());
                 }
             }
             blocking.sort();
@@ -1594,7 +1656,7 @@ mod tests {
                 } else {
                     "rule"
                 };
-                (f.path, kind.to_string(), f.cedar)
+                (f.path, kind.to_string(), f.cedar, "active".to_string())
             })
             .collect();
         rows.sort();
@@ -1724,6 +1786,32 @@ mod tests {
         assert!(can_change(&fine, YOU, &both));
     }
 
+    /// Third review, finding 1: with nothing in force, nobody can do anything, so it is never within
+    /// reach (an empty list of needs is not met by default).
+    #[test]
+    fn nothing_in_force_is_not_within_reach() {
+        let both = [grant(MAINTAINER, "noi"), grant(OWNER, "noi")];
+        assert!(!can_change(&[], YOU, &both));
+        assert!(!reachable(&[], &[(YOU, both.to_vec())]));
+        // Rules alone, with no role in force: nobody holds anything.
+        let rules_only: Vec<InForce> = rows().into_iter().filter(|r| r.1 == "rule").collect();
+        assert!(!can_change(&rules_only, YOU, &both));
+    }
+
+    /// Third review, finding 2: a set-aside role or rule can only be retired or brought back, so
+    /// that is what must be possible for it, not a change.
+    #[test]
+    fn a_set_aside_rule_must_be_retirable_or_brought_back() {
+        let both = [grant(MAINTAINER, "noi"), grant(OWNER, "noi")];
+        let stuck = r#"forbid (principal, action == Action::"transition", resource in Scope::"noi.gov.rules.stuck") unless { principal in Role::"temp" };"#;
+        // In force and active, it can still be changed: within reach.
+        let active = with_version(&rows(), "noi.gov.rules.stuck", "rule", "active", stuck);
+        assert!(can_change(&active, YOU, &both));
+        // Set aside, it can only be retired or brought back, and neither is allowed: stuck.
+        let aside = with_version(&rows(), "noi.gov.rules.stuck", "rule", "deprecated", stuck);
+        assert!(!can_change(&aside, YOU, &both));
+    }
+
     /// Second review, C: the move's refusal says each difference, row by row.
     #[test]
     fn the_move_says_each_difference() {
@@ -1822,6 +1910,7 @@ mod tests {
             "noi.gov.roles.reviewer".into(),
             "role".into(),
             reviewer.into(),
+            "active".into(),
         ));
         rows.sort();
         let grants = [grant("noi.gov.roles.reviewer", "noi"), grant(OWNER, "noi")];

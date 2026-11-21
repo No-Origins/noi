@@ -1366,4 +1366,109 @@ async fn verify_move(url: &str, login: &str) {
         .execute("DELETE FROM gov.last_copy")
         .await
         .is_err());
+
+    // Third review, 3: recovery retires only what stands in the way. A rule that only keeps Owner
+    // from being retired stays; the rule that stops every approval goes.
+    let insert = |path: &str, cedar: &str| {
+        format!(
+            "INSERT INTO gov.versions(path, revision, kind, name, definition, responsibility, cedar, state, came, why)
+             VALUES('{path}', 1, 'rule', 'Test', 'd', 'r', '{cedar}', 'active', 'recovery', 'a bad edit')"
+        )
+    };
+    sql.execute(insert("noi.gov.rules.keep-owner", r#"forbid (principal, action == Action::"transition", resource in Scope::"noi.gov.roles.owner");"#).as_str())
+        .await
+        .unwrap();
+    sql.execute(
+        insert(
+            "noi.gov.rules.no-approving",
+            r#"forbid (principal, action == Action::"review", resource in Scope::"noi.gov");"#,
+        )
+        .as_str(),
+    )
+    .await
+    .unwrap();
+    let recovered = gov.recover("hiddenstack").await.unwrap();
+    let done = recovered["done"].to_string();
+    assert!(
+        done.contains("noi.gov.rules.no-approving retired"),
+        "{done}"
+    );
+    assert!(!done.contains("keep-owner"), "{done}");
+
+    // Third review, 1: retiring roles and rules one by one can never leave nothing in force. Each
+    // step is a real approval, through the server, with your touch.
+    let link = gov.first_passkey_link("hiddenstack").await.unwrap();
+    let mut person = Person {
+        key: SoftPasskey::new(true),
+    };
+    person.add_passkey(&gov, &link).await;
+    let session = person.sign_in(&gov, "hiddenstack").await;
+    let you_c = Credential::Session(session.clone());
+    let retire =
+        |gov: Governance, you_c: Credential, path: &'static str| async move {
+            let base = gov.versions(&you_c, path).await.unwrap()[0].revision;
+            gov.propose(&you_c, None, &draft(json!({
+            "operation": "retire", "path": path, "base_revision": base, "why": "Step by step.",
+        })))
+        .await
+        .unwrap()
+        };
+    for path in [
+        "noi.gov.rules.keep-owner",
+        "noi.gov.rules.owners-approve-gov",
+        "noi.gov.rules.fresh-touch",
+        "noi.gov.roles.owner",
+    ] {
+        let p = retire(gov.clone(), you_c.clone(), path).await;
+        let t = person
+            .touch_to_decide(&gov, &session, path, Decide::Approve, p.id)
+            .await;
+        gov.decide_proposal(&you_c, Some(t), p.id, Decide::Approve, "")
+            .await
+            .unwrap_or_else(|e| panic!("{path}: {e}"));
+    }
+    let last = retire(gov.clone(), you_c.clone(), "noi.gov.roles.maintainer").await;
+    let t = person
+        .touch_to_decide(
+            &gov,
+            &session,
+            "noi.gov.roles.maintainer",
+            Decide::Approve,
+            last.id,
+        )
+        .await;
+    let refused = gov
+        .decide_proposal(&you_c, Some(t), last.id, Decide::Approve, "")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(refused.contains("nobody is locked out"), "{refused}");
+
+    // Third review, 1: with nothing in force but people present, recovery acts. Here a bad edit
+    // retires Maintainer straight in the database.
+    sql.execute(
+        "INSERT INTO gov.versions(path, revision, kind, name, definition, responsibility, system, cedar, state, came, why)
+         SELECT path, revision + 1, kind, name, definition, responsibility, system, cedar, 'retired', 'recovery', 'a bad edit'
+         FROM gov.versions WHERE path = 'noi.gov.roles.maintainer' ORDER BY revision DESC LIMIT 1",
+    )
+    .await
+    .unwrap();
+    let none: i64 = sqlx::query_scalar("SELECT count(*) FROM gov.policies")
+        .fetch_one(&mut sql)
+        .await
+        .unwrap();
+    assert_eq!(none, 0, "nothing in force");
+    let recovered = gov.recover("hiddenstack").await.unwrap();
+    assert!(
+        recovered["done"].to_string().contains("back in force"),
+        "{recovered}"
+    );
+    assert!(
+        gov.may_preview(
+            &you_c,
+            &[("review".into(), vec![path("noi.gov.roles.maintainer")])]
+        )
+        .await
+        .unwrap()[0]
+    );
 }
