@@ -17,11 +17,14 @@ export default async function Review() {
   if (next) return <BatchScreen batch={next.uid} />
   return (
     <div className={styles.empty}>
-      <h1 className="eio-type-style-title">Nothing to review</h1>
+      <h1 className="eio-type-style-title">{gov.ok ? 'Nothing to review' : 'Nothing from Mero to review'}</h1>
       <p className="eio-type-style-body">
         Changes arrive here when an agent proposes them with <code className="eio-type-style-mono">noi propose</code>, when you press
         Change on a meron, or when a role or rule is proposed on Governance’s Roles page. Nothing changes until it is approved here.
       </p>
+      {!gov.ok && (
+        <p className="eio-type-style-body" role="alert">Changes to roles and rules can’t be shown: {gov.error}</p>
+      )}
     </div>
   )
 }

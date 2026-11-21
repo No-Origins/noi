@@ -322,11 +322,11 @@ export const rolesAndRules = cache(async (): Promise<Answer<RolesAndRules>> => {
   return r.ok ? { ok: true, data: r.data } : r
 })
 
-/** The roles in force, by the name rules use (`owner`) and their own (`Owner`). Empty when
-    Governance won't say. */
-export async function roleNames(): Promise<{ id: string; name: string }[]> {
+/** The roles in force, by the name rules use (`owner`) and their own (`Owner`), and whether each is
+    active or set aside (set aside: no new grants). Empty when Governance won't say. */
+export async function roleNames(): Promise<{ id: string; name: string; state: Version['state'] }[]> {
   const r = await rolesAndRules()
-  return r.ok ? r.data.roles.map(v => ({ id: v.path.slice('noi.gov.roles.'.length), name: v.name })) : []
+  return r.ok ? r.data.roles.map(v => ({ id: v.path.slice('noi.gov.roles.'.length), name: v.name, state: v.state })) : []
 }
 
 /** Every version of one role or rule, newest first. */

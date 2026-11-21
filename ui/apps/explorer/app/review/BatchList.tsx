@@ -16,7 +16,8 @@ export interface BatchItem {
 }
 
 /** `next` is the batch /review shows beside the list, so it is the one marked there. */
-export function BatchList({ batches, next, writable, reviewer }: { batches: BatchItem[]; next?: string; writable: boolean; reviewer: string | null }) {
+/** `problem` says that Governance's changes could not be shown, so none may seem to wait that do. */
+export function BatchList({ batches, next, writable, reviewer, problem }: { batches: BatchItem[]; next?: string; writable: boolean; reviewer: string | null; problem?: string }) {
   const pathname = usePathname()
   const router = useRouter()
   // Rows are plain links; open them inside the app.
@@ -36,6 +37,13 @@ export function BatchList({ batches, next, writable, reviewer }: { batches: Batc
       label="Review"
       onClick={follow}
       top={
+        <>
+        {problem && (
+          <p className={[styles.status, 'eio-type-style-caption'].join(' ')} role="alert">
+            <Icon name="warn" size="small" />
+            {problem}
+          </p>
+        )}
         <p className={[styles.status, 'eio-type-style-caption'].join(' ')}>
           <Icon name={writable ? 'user' : 'eye'} size="small" />
           {writable
@@ -44,6 +52,7 @@ export function BatchList({ batches, next, writable, reviewer }: { batches: Batc
               ? `Signed in as ${reviewer}. You may read Review; deciding needs a role that may approve.`
               : 'Signed out: you see only what visitors may read.'}
         </p>
+        </>
       }
       groups={groups.filter(([, list]) => list.length).map(([name, list]) => ({
         name,

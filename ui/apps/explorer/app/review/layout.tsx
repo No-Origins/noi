@@ -42,10 +42,12 @@ export default async function ReviewLayout({ children }: { children: ReactNode }
   const next = nextBatch(r.batches)
   const first = next?.proposals.some(p => p.state === 'waiting') ? next.uid : (changes.findLast(c => c.waiting)?.uid ?? next?.uid)
   // The batches: beside the page where two panes fit, in the menu where one pane fills the window.
-  const list = <BatchList batches={items} next={first} writable={r.writable} reviewer={r.reviewer} />
+  // Governance not answering is said, not hidden (review, finding 8): changes may be waiting there.
+  const govProblem = gov.ok ? undefined : `Changes to roles and rules can’t be shown: ${gov.error}`
+  const list = <BatchList batches={items} next={first} writable={r.writable} reviewer={r.reviewer} problem={govProblem} />
   return (
     <>
-      <TopBar view="review" live={s.merons.length} waiting={items.reduce((n, b) => n + b.waiting, 0)} list={list} />
+      <TopBar view="review" live={s.merons.length} waiting={gov.ok ? items.reduce((n, b) => n + b.waiting, 0) : undefined} list={list} />
       <Panes list={<div className={styles.left}>{list}</div>}>
         <div className={styles.right}>{children}</div>
       </Panes>

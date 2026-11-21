@@ -49,7 +49,8 @@ export default async function Profile({ params }: { params: Promise<{ handle: st
   // The roles' own names, from Governance, which keeps them (step 3); without them, by their ID.
   const known = roles ? await roleNames() : []
   const names = Object.fromEntries(known.map(r => [r.id, r.name]))
-  const offered = known.map(r => ({ path: `noi.gov.roles.${r.id}`, name: r.name }))
+  // Only an active role can be given; one set aside keeps the grants it has (review, finding 8).
+  const offered = known.filter(r => r.state === 'active').map(r => ({ path: `noi.gov.roles.${r.id}`, name: r.name }))
   const agent = shown.kind === 'agent'
   const what = agent ? 'An agent' : shown.kind === 'person' ? 'A person' : 'Everyone signed out'
   const sponsor = full?.sponsor ?? shown.sponsor

@@ -184,7 +184,7 @@ export const nextBatch = (batches: Batch[]): Batch | undefined =>
   batches.filter(b => b.proposals.some(p => p.state === 'waiting')).at(-1) ?? batches[0]
 
 /** How many proposals wait for a decision in Review: Mero's, counted without every batch (9 Nov,
- * step 6), and Governance's (one Review page, step 3). Undefined when neither will or can say:
+ * step 6), and Governance's (one Review page, step 3). Undefined when either won't or can't say:
  * signed out, Review is closed. */
 export async function waitingCount(): Promise<number | undefined> {
   // Signed out, Review is closed: don't ask, so a visitor's page view leaves nothing behind (10 Nov).
@@ -193,7 +193,8 @@ export async function waitingCount(): Promise<number | undefined> {
     read<{ waiting: number }>('/api/review/waiting').then(r => r.waiting, () => undefined),
     govWaiting(),
   ])
-  return mero === undefined && gov === undefined ? undefined : (mero ?? 0) + (gov ?? 0)
+  // Either one unable to say, the count is not known (review, finding 8): no count, rather than too few.
+  return mero === undefined || gov === undefined ? undefined : mero + gov
 }
 
 /** Sends a write to Mero. Returns its answer, or the error Mero gave in words. */
