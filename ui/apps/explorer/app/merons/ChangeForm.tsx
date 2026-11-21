@@ -2,11 +2,10 @@
 // Change: your own edit to a meron, sent to Review as a proposal like an agent's. Nothing in Mero
 // changes until it is approved there.
 import Link from 'next/link'
-import { useActionState, useState, type ReactNode } from 'react'
+import { useActionState, useState } from 'react'
 import { Button, Choices, Field, Radio, TextArea } from '@noi/eio-react'
 import { proposeChange } from '../review/actions'
 import { Message } from '../review/Decide'
-import { useCedarTouch } from './cedar-touch'
 import styles from '../review/review.module.css'
 
 export interface Editable {
@@ -18,14 +17,13 @@ export interface Editable {
   spec: string
 }
 
-/** `spec`, for a role or rule, is the editor that takes the place of the JSON box. */
-export function ChangeForm({ m, back, spec }: { m: Editable; back: string; spec?: ReactNode }) {
+/** Roles and rules are changed on Governance's pages since step 3, with their own editor. */
+export function ChangeForm({ m, back }: { m: Editable; back: string }) {
   const [state, action, pending] = useActionState(proposeChange, {})
-  const { submit, said } = useCedarTouch(action, () => ({ uid: m.uid }))
   const [breaking, setBreaking] = useState(false)
   const label = (text: string) => <span className={[styles.muted, 'eio-type-style-label'].join(' ')}>{text}</span>
   return (
-    <form action={submit} className={styles.form}>
+    <form action={action} className={styles.form}>
       <input type="hidden" name="uid" value={m.uid} />
       <input type="hidden" name="revision" value={m.revision} />
       <label className={styles.row}>
@@ -40,17 +38,10 @@ export function ChangeForm({ m, back, spec }: { m: Editable; back: string; spec?
         {label('Responsibility: what it must do')}
         <TextArea name="responsibility" rows={2} defaultValue={m.responsibility} required />
       </label>
-      {spec ? (
-        <div className={styles.row}>
-          {label('What it says')}
-          {spec}
-        </div>
-      ) : (
-        <label className={styles.row}>
-          {label('Spec, as JSON. Its invariants check it.')}
-          <TextArea mono name="spec" rows={14} defaultValue={m.spec} />
-        </label>
-      )}
+      <label className={styles.row}>
+        {label('Spec, as JSON. Its invariants check it.')}
+        <TextArea mono name="spec" rows={14} defaultValue={m.spec} />
+      </label>
       <label className={styles.row}>
         {label('Why')}
         <Field label="Why" name="rationale" placeholder="What this change is for. Review reads this first." required />
@@ -66,7 +57,6 @@ export function ChangeForm({ m, back, spec }: { m: Editable; back: string; spec?
         </label>
       )}
       <Message state={state} />
-      {said}
       <div className={styles.buttons}>
         <Button variant="primary" icon="arrow" type="submit" disabled={pending}>
           {pending ? 'Checking…' : 'Send to Review'}

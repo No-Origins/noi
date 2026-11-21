@@ -1,7 +1,7 @@
 'use client'
-// The role and rule editor (agreed 8 Nov): you pick the parts, Mero writes the Cedar, and the
+// The role and rule editor (agreed 8 Nov): you pick the parts, Governance writes the Cedar, and the
 // sentence says what it means. Cedar stays what is stored: the hidden "spec" field carries it to
-// Review like any other change. A rule the form can't show is written by hand: owners may change
+// the proposal, which waits in Review. A rule the form can't show is written by hand: owners may change
 // its Cedar directly; everyone else sees it as it is.
 import { useEffect, useRef, useState } from 'react'
 import { Button, Checkbox, Choices, Disclosure, Field, Radio, Select, TextArea } from '@noi/eio-react'
@@ -15,7 +15,7 @@ import styles from './cedar.module.css'
 
 export interface CedarEditorProps {
   kind: 'rule' | 'role'
-  /** The form Mero read from the stored Cedar, or why it is written by hand. */
+  /** The form Governance read from the stored Cedar, or why it is written by hand. */
   form?: AnyReadingForm
   byHand?: string
   /** The stored Cedar, and the rest of the spec (a role's system). */
@@ -27,7 +27,7 @@ export interface CedarEditorProps {
   places: string[]
   /** Owners may write Cedar by hand. */
   owner: boolean
-  /** A new role or rule: nothing stored yet, so Mero writes its Cedar at once. */
+  /** A new role or rule: nothing stored yet, so Governance writes its Cedar at once. */
   fresh?: boolean
   /** A new role picks its system. */
   pickSystem?: boolean
@@ -44,17 +44,17 @@ export function CedarEditor(p: CedarEditorProps) {
   const [written, setWritten] = useState<Written>({ ok: true, cedar: p.cedar })
   const [pending, setPending] = useState(Boolean(p.fresh))
   const seq = useRef(0)
-  // The form Mero last wrote, so opening the editor, or a click that changes nothing, asks for nothing.
+  // The form Governance last wrote, so opening the editor, or a click that changes nothing, asks for nothing.
   const sent = useRef(p.fresh ? '' : JSON.stringify(p.form))
 
-  // Each change to the form asks Mero for its Cedar, a moment after the last click.
+  // Each change to the form asks Governance for its Cedar, a moment after the last click.
   useEffect(() => {
     if (mode !== 'form' || !form || JSON.stringify(form) === sent.current) return
     sent.current = JSON.stringify(form)
     const id = ++seq.current
     setPending(true)
     const t = setTimeout(async () => {
-      const r = await cedarFor(p.kind, form).catch(() => ({ ok: false as const, error: 'Mero isn’t answering.' }))
+      const r = await cedarFor(p.kind, form).catch(() => ({ ok: false as const, error: 'Governance isn’t answering.' }))
       if (id === seq.current) {
         setWritten(r)
         setPending(false)
@@ -70,7 +70,7 @@ export function CedarEditor(p: CedarEditorProps) {
   const cedar = mode === 'hand' ? hand : written.ok ? written.cedar : undefined
   const problem = mode === 'hand'
     ? (hand.trim() ? undefined : 'Write the Cedar, or go back to the form.')
-    : pending ? 'Wait a moment: Mero is still writing the Cedar.' : written.ok ? undefined : written.error
+    : pending ? 'Wait a moment: Governance is still writing the Cedar.' : written.ok ? undefined : written.error
 
   return (
     <div className={styles.editor}>

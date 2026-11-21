@@ -5,10 +5,10 @@
 // person's profile, an agent added on Accounts.
 import { Button, Card, Panes } from '@noi/eio-react'
 import { notHostedWords, notHostedYet } from '../../lib/backend'
-import { readCedar } from '../../lib/cedar'
+import { readCedar, versionText } from '../../lib/cedar'
 import { changeWords, when } from '../../lib/changes'
-import { dashboard, type Dashboard, type Held } from '../../lib/governance'
-import { govSnapshot, meroProblems, waitingCount, type Meron } from '../../lib/mero'
+import { dashboard, rolesAndRules, type Dashboard, type Held, type Version } from '../../lib/governance'
+import { meroProblems, waitingCount } from '../../lib/mero'
 import { plain, roleSentence, type RoleForm } from '../../lib/sentence'
 import { origins } from '../../lib/where'
 import { cx } from '../merons/parts'
@@ -106,21 +106,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
   }
   const { you, view, held, changes, attention }: Dashboard = d.data
   if (!you) return null
-  // The roles themselves are merons in Mero: read them as Mero lets you, and say each in words.
-  let roleMerons: Meron[] = []
-  try {
-    // Only noi.gov's merons, not the whole registry (9 Nov, step 6).
-    const s = await govSnapshot()
-    roleMerons = s.merons.filter(m => m.identity.path.startsWith('noi.gov.roles.') && m.lifecycle.state === 'active')
-  } catch {
-    // Refused, or Mero down: Governance's home works without the roles in words (9 Nov, step 6).
-  }
+  // The roles, as Governance keeps them (step 3), each in words. Governance's home works without
+  // them if Governance won't say.
+  const held_ = await rolesAndRules()
+  const roles: Version[] = held_.ok ? held_.data.roles.filter(v => v.state === 'active') : []
   const [cedar, waiting, mero] = await Promise.all([
-    roleMerons.length ? readCedar(roleMerons) : undefined,
+    roles.length ? readCedar(roles.map(versionText)) : undefined,
     waitingCount(),
     view ? meroProblems() : undefined,
   ])
-  const names = Object.fromEntries(roleMerons.map(m => [m.identity.path.slice('noi.gov.roles.'.length), m.identity.name]))
+  const names = Object.fromEntries(roles.map(v => [v.path.slice('noi.gov.roles.'.length), v.name]))
   const meroToday = mero?.ok ? mero.data.filter(p => Date.now() - new Date(p.at).getTime() < DAY).length : 0
   const problems = (attention?.problems_today ?? 0) + meroToday
   const nav = <GovNav at={at} owner={Boolean(view)} handle={you.handle} />
@@ -147,19 +142,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
               </Card>
             </Section>
 
-            {roleMerons.length > 0 && (
+            {roles.length > 0 && (
               <Section title="The roles" note="A role does nothing until it is given somewhere: in a place, and everything under it.">
                 <Card>
-                  {roleMerons.map((m, i) => {
-                    const id = m.identity.path.slice('noi.gov.roles.'.length)
+                  {roles.map((v, i) => {
+                    const id = v.path.slice('noi.gov.roles.'.length)
                     const reading = cedar?.readings[i]
                     const words = reading && 'form' in reading ? plain(roleSentence(reading.form as RoleForm)) : 'Written in Cedar by hand: see the role.'
                     // How many hold it, for those who may view who holds what (owners).
-                    const count = view ? (held?.[m.identity.path] ?? 0) : undefined
+                    const count = view ? (held?.[v.path] ?? 0) : undefined
                     return (
                       <Line
-                        key={m.identity.path}
-                        name={m.identity.name}
+                        key={v.path}
+                        name={v.name}
                         text={words}
                         caption={count === undefined ? undefined : count ? `held by ${plural(count, 'account')}` : 'held by no one'}
                         end={<a className={chip} href={`${at.gov}/roles#${id}`}>See role</a>}

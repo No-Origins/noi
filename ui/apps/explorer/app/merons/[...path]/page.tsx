@@ -4,7 +4,7 @@ import { index, snapshot } from '../../../lib/mero'
 import { tree } from '../../../lib/tree'
 import { MeronScreen } from '../MeronScreen'
 
-type Props = { params: Promise<{ path: string[] }>; searchParams: Promise<{ change?: string; new?: string }> }
+type Props = { params: Promise<{ path: string[] }>; searchParams: Promise<{ change?: string }> }
 
 const pathOf = (segments: string[]) => segments.map(decodeURIComponent).join('.')
 
@@ -17,5 +17,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function MeronPage({ params, searchParams }: Props) {
   const [{ path }, query] = await Promise.all([params, searchParams])
-  return <MeronScreen path={pathOf(path)} change={query.change !== undefined} fresh={query.new !== undefined} />
+  return <MeronScreen path={pathOf(path)} change={query.change !== undefined} />
 }

@@ -2,7 +2,7 @@
 // sizes come from Mero (content), while everything around them uses Eidos roles.
 import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
-import { Badge, Card } from '@noi/eio-react'
+import { Badge, Button, Card } from '@noi/eio-react'
 import { describeCheck, roleContrast, styleChecks, type TypeMinimums } from '../../lib/checks'
 import { hex, reads, resolve } from '../../lib/color'
 import { checkParams, covers, hrefOf, invariantsFor, type Index, type Meron, type Snapshot } from '../../lib/mero'
@@ -11,6 +11,7 @@ import { AllPass, CheckList, cx, Facts, MeronChip, Section } from './parts'
 import { MotionSample } from './MotionSample'
 import { PreviewMark } from './PreviewMark'
 import { CedarWords } from './CedarWords'
+import { origins } from '../../lib/where'
 import styles from './merons.module.css'
 
 const title = (s: string) => s[0].toUpperCase() + s.slice(1)
@@ -429,8 +430,20 @@ export function SpeedView({ m }: { m: Meron }) {
 
 const SYSTEM_NAME: Record<string, string> = { mero: 'Mero', governance: 'Governance' }
 
+/** Roles and rules live in Governance since the build order's step 3: a role or rule meron is Mero's
+ * record of one from before the move, retired with a note once the move is approved. */
+async function Moved({ m }: { m: Meron }) {
+  const at = await origins()
+  return (
+    <p className={cx(styles.lead, 'eio-type-style-body')}>
+      Roles and rules live in Governance now, with every revision; this is Mero’s record of {m.classification.subtype === 'role' ? 'this role' : 'this rule'} from before they moved.{' '}
+      <Button href={`${at.gov}/roles`}>See it in Governance</Button>
+    </p>
+  )
+}
+
 /** A role grants one system's actions, with blanks for who and where; a rule holds for everyone. */
-export function CedarView({ s, m }: { s: Snapshot; m: Meron }) {
+export function CedarView({ m }: { s?: Snapshot; m: Meron }) {
   const cedar = m.spec.cedar as string
   const role = m.classification.subtype === 'role'
   const forbid = /(^|\n)\s*forbid\s*\(/.test(cedar)
@@ -445,7 +458,8 @@ export function CedarView({ s, m }: { s: Snapshot; m: Meron }) {
     : [['Effect', forbid ? 'Forbid' : 'Permit', forbid ? 'Forbid always wins over any permit' : 'Allows, unless a forbid says no']]
   return (
     <>
-      <CedarWords s={s} m={m} />
+      <Moved m={m} />
+      <CedarWords m={m} />
       <Facts items={facts} />
       <pre className={cx(styles.cedar, 'eio-type-style-mono')} aria-label={`${m.identity.name} in Cedar`}>{cedar}</pre>
     </>

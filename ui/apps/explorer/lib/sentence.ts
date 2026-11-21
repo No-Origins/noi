@@ -1,5 +1,5 @@
-// Roles and rules in words (agreed 8 Nov). Mero reads a rule's Cedar into five parts and writes
-// it back; this file only puts those parts into a sentence, for the editor, the rule's page and
+// Roles and rules in words (agreed 8 Nov). Governance reads a rule's Cedar into five parts and
+// writes it back (Mero did, until step 3); this file only puts those parts into a sentence, for the editor, the rule's page and
 // Review. It never reads or writes Cedar itself.
 
 export type Effect = 'forbid' | 'permit'
@@ -13,7 +13,7 @@ export interface RuleForm { effect: Effect; who: Who; doing: Doing[]; where: Whe
 export type RoleForm = Doing
 /** Either form. */
 export type AnyReadingForm = RuleForm | RoleForm
-/** What Mero read: the form, or why the Cedar is written by hand. */
+/** What Governance read: the form, or why the Cedar is written by hand. */
 export type Reading<F> = { form: F } | { by_hand: string }
 
 /** The words for each verb: what it lets you do, and the same as "it's …" for an exception. */

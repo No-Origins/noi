@@ -6,10 +6,8 @@
 // The front desk shows this folder for /@handle on the base name; a folder can't start with @.
 import { notFound } from 'next/navigation'
 import { Badge, Card } from '@noi/eio-react'
-import { rolesIn } from '../../../lib/cedar'
 import { when } from '../../../lib/changes'
-import { accountOf, person, profile, signedIn, type AccountView, type Held, type Person } from '../../../lib/governance'
-import { govSnapshot, type Snapshot } from '../../../lib/mero'
+import { accountOf, person, profile, roleNames, signedIn, type AccountView, type Held, type Person } from '../../../lib/governance'
 import { origins } from '../../../lib/where'
 import { EndSignIns, GrantForm, RoleLines } from '../../gov/Forms'
 import { Line } from '../../gov/Line'
@@ -48,15 +46,8 @@ export default async function Profile({ params }: { params: Promise<{ handle: st
   // Your own roles show on your own profile (agreed 9 Nov), owner or not.
   const mine = yours && !full ? await profile() : undefined
   const roles: Held[] | undefined = full?.roles ?? (mine?.ok ? mine.data.roles : undefined)
-  let s: Snapshot | undefined
-  if (roles) {
-    try {
-      s = await govSnapshot()
-    } catch {
-      // Refused, or Mero down: the profile shows roles by their ID.
-    }
-  }
-  const known = s ? rolesIn(s) : []
+  // The roles' own names, from Governance, which keeps them (step 3); without them, by their ID.
+  const known = roles ? await roleNames() : []
   const names = Object.fromEntries(known.map(r => [r.id, r.name]))
   const offered = known.map(r => ({ path: `noi.gov.roles.${r.id}`, name: r.name }))
   const agent = shown.kind === 'agent'

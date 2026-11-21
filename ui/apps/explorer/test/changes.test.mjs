@@ -66,3 +66,25 @@ test('changes read as on the home; a copy that moved nothing says so', () => {
   assert.equal(recordWords(e('copy', { by: null, changed: [] })).text, 'Mero’s roles and rules were copied; nothing changed.')
   assert.equal(recordWords(e('copy', { by: null, changed: ['noi.gov.roles.observer@5'] }), roles).text, 'Observer (revision 5) changed in Mero.')
 })
+
+test('roles and rules kept by Governance read as what was done to which (step 3)', () => {
+  assert.equal(
+    changeWords(c('approve', { detail: { path: 'noi.gov.roles.proposer', revision: 5, state: 'active' } }), roles),
+    'hiddenstack approved Proposer (revision 5).',
+  )
+  assert.equal(
+    changeWords(c('approve', { detail: { path: 'noi.gov.roles.observer', revision: 6, state: 'retired' } }), roles),
+    'hiddenstack approved Observer (revision 6), retiring it.',
+  )
+  assert.equal(
+    changeWords(c('move', { by: null, detail: { roles: 4, rules: 2 } })),
+    'Roles and rules moved in from Mero, with every revision: 4 roles and 2 rules.',
+  )
+  const e = (kind, more = {}) => ({ ...c(kind), who: null, action: null, places: ['noi.gov.rules.fresh-touch'], allowed: true, reason: '', ...more })
+  assert.equal(recordWords(e('propose')).text, 'hiddenstack proposed a change to the rule fresh-touch.')
+  assert.equal(recordWords(e('reject')).text, 'hiddenstack rejected a change to the rule fresh-touch.')
+  const refused = recordWords(e('approve', { allowed: false, reason: 'no one could change roles and rules after this' }))
+  assert.equal(refused.text, 'hiddenstack could not approve a change to the rule fresh-touch.')
+  assert.match(refused.why, /no one could change/)
+  assert.match(recordWords(e('recover', { by: 'hiddenstack', places: ['noi.gov'], detail: { handle: 'hiddenstack' } })).text, /back within hiddenstack’s reach/)
+})

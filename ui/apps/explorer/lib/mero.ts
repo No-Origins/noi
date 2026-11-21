@@ -5,6 +5,7 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { errorOf, notAnswering, READ_MS, WRITE_MS } from './backend'
+import { govWaiting } from './governance'
 
 const MERO_URL = process.env.MERO_URL ?? 'http://127.0.0.1:8787'
 
@@ -128,6 +129,8 @@ export type Change =
   | { operation: 'rename'; uid: string; expected_revision: number; path: string }
   | { operation: 'deprecate'; uid: string; expected_revision: number }
   | { operation: 'reinstate'; uid: string; expected_revision: number; reason: string }
+  /** Retired for good, with a note saying why or where it went (step 3). */
+  | { operation: 'retire'; uid: string; expected_revision: number; reason: string }
 
 export interface NewMeron {
   path: string
@@ -180,20 +183,17 @@ export const review = cache(async (): Promise<ReviewState> => read<ReviewState>(
 export const nextBatch = (batches: Batch[]): Batch | undefined =>
   batches.filter(b => b.proposals.some(p => p.state === 'waiting')).at(-1) ?? batches[0]
 
-/** Only the roles and rules, under noi.gov (9 Nov, step 6): what Governance's pages need, without
- * the whole registry. Read once per request. */
-export const govSnapshot = cache(async (): Promise<Snapshot> => read<Snapshot>('/api/registry?under=noi.gov'))
-
-/** How many proposals wait for a decision: Review's badge, as Mero counts it, without every batch
- * (9 Nov, step 6). Undefined when Mero won't or can't say: signed out, Review is closed. */
+/** How many proposals wait for a decision in Review: Mero's, counted without every batch (9 Nov,
+ * step 6), and Governance's (one Review page, step 3). Undefined when neither will or can say:
+ * signed out, Review is closed. */
 export async function waitingCount(): Promise<number | undefined> {
   // Signed out, Review is closed: don't ask, so a visitor's page view leaves nothing behind (10 Nov).
   if (!(await carriesSignIn())) return undefined
-  try {
-    return (await read<{ waiting: number }>('/api/review/waiting')).waiting
-  } catch {
-    return undefined
-  }
+  const [mero, gov] = await Promise.all([
+    read<{ waiting: number }>('/api/review/waiting').then(r => r.waiting, () => undefined),
+    govWaiting(),
+  ])
+  return mero === undefined && gov === undefined ? undefined : (mero ?? 0) + (gov ?? 0)
 }
 
 /** Sends a write to Mero. Returns its answer, or the error Mero gave in words. */
