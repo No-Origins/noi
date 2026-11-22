@@ -1,0 +1,16 @@
+{
+  "path": "noi.eio.size.thumb",
+  "name": "Toggle thumb",
+  "classification": {
+    "type": "token",
+    "subtype": "size"
+  },
+  "semantics": {
+    "definition": "The round part of a toggle that slides from one side to the other.",
+    "responsibility": "Keep the thumb clear of its track: 4 px from the edge all round in a 20 px track. A radio's 8 px dot is too slight for the part that moves; a tick's 16 px crowds the track."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "px": 12
+  }
+}

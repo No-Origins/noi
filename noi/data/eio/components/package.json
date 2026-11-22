@@ -35,6 +35,7 @@
       "noi.eio.components.swatch",
       "noi.eio.components.tabs",
       "noi.eio.components.text-area",
+      "noi.eio.components.toggle",
       "noi.eio.components.tree-row"
     ],
     "files": [
@@ -48,11 +49,11 @@
       },
       {
         "path": "src/index.ts",
-        "sha256": "e60a93e5025a4f49eefba6d5a210b100f767d43534fb1eb929074319819102e0"
+        "sha256": "f303538963add8b4243f7b974a621cebbd6c43d01ed120dd7eb09958582a22dd"
       },
       {
         "path": "test/links.test.mjs",
-        "sha256": "9236f3868e8db3a175fac64469b2983c2ab9e865f41c82029b66c8699896b338"
+        "sha256": "ffbb0169a6a30ac4d51efdac836100d55c6dd2e275e46ee9f590666b587516ce"
       },
       {
         "path": "test/rules.test.mjs",
@@ -64,11 +65,11 @@
       },
       {
         "path": "test/words.check.tsx",
-        "sha256": "c63d755efb60e2543b412efee73f4880141a0548d519e912b8c977541f34c261"
+        "sha256": "55ad8c7bb779de26e5ab7ab13473d14802174245495df323e42b1ecbfbe8dc74"
       },
       {
         "path": "test/words.test.mjs",
-        "sha256": "7a169bbaa1795ec6ed3ab13e68073cfd513032ebbf5aef570d1a5504e6be112f"
+        "sha256": "cbac32cad469823e92775a02dd0e5ba06d52170b191e6992e21d661af17f2bba"
       },
       {
         "path": "tsconfig.json",

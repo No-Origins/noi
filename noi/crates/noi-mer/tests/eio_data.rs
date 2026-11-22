@@ -170,8 +170,8 @@ fn eio_spacing_and_sizes_pass_their_invariants() {
     let sizes = data("size");
     assert_eq!(
         sizes.len(),
-        10,
-        "three control heights, the touch target, three icons, the dot, two content widths"
+        11,
+        "three control heights, the touch target, three icons, the dot, the toggle's thumb, two content widths"
     );
     for s in &sizes {
         s.validate().unwrap();

@@ -182,11 +182,11 @@ fn eio_components_pass_their_invariant() {
     }
     let n = |p: &str, part| count.get(&(p.to_string(), part)).copied().unwrap_or(0);
     // Today's components (decision 7): the 17 in @noi/eio-react (the icon set is one), the Chip (Links
-    // Drawn by Eidos, agreed 18 Nov) and the Sidebar (its own batch, 18 Nov), the box Checkbox and
-    // Radio share, where a link leads (Button's and Chip's, its own part since each component got a
-    // folder, 18 Nov), and the package's own files; in @noi/eio-3d, its 9 elements, the 2 parts they
-    // share and the package's own files.
-    assert_eq!(n("@noi/eio-react", "components"), 19);
+    // Drawn by Eidos, agreed 18 Nov), the Sidebar (its own batch, 18 Nov) and the Toggle (agreed 22
+    // Nov), the box Checkbox and Radio share, where a link leads (Button's and Chip's, its own part
+    // since each component got a folder, 18 Nov), and the package's own files; in @noi/eio-3d, its 9
+    // elements, the 2 parts they share and the package's own files.
+    assert_eq!(n("@noi/eio-react", "components"), 20);
     assert_eq!(n("@noi/eio-react", "shared parts"), 2);
     assert_eq!(n("@noi/eio-react", "the package's own"), 1);
     assert_eq!(n("@noi/eio-3d", "components"), 9);

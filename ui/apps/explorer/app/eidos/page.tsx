@@ -3,7 +3,7 @@
 import { type ReactNode, useState } from 'react'
 import {
   Badge, Button, Card, Checkbox, Choices, Count, Disclosure, Field, Icon, type IconName, MenuIcon, Radio, Select, Sidebar, Swatch, Tab,
-  Tabs, TextArea, TreeRow,
+  Tabs, TextArea, Toggle, TreeRow,
 } from '@noi/eio-react'
 import { tokens } from '@noi/eio-tokens'
 import styles from './gallery.module.css'
@@ -26,6 +26,8 @@ function Gallery({ theme }: { theme: 'light' | 'dark' }) {
   const [touch, setTouch] = useState(true)
   const [owner, setOwner] = useState(false)
   const [verbs, setVerbs] = useState(['propose'])
+  const [markers, setMarkers] = useState(false)
+  const [numbers, setNumbers] = useState(true)
   const [who, setWho] = useState('role')
   const [role, setRole] = useState('maintainer')
   const [impact, setImpact] = useState('non-breaking')
@@ -62,6 +64,13 @@ function Gallery({ theme }: { theme: 'light' | 'dark' }) {
           <Checkbox tile detail="Suggest changes" checked={verbs.includes('propose')} onChange={e => flip('propose', e.target.checked)}>propose</Checkbox>
           <Checkbox tile detail="Approve or send back" checked={verbs.includes('review')} onChange={e => flip('review', e.target.checked)}>review</Checkbox>
           <Checkbox tile detail="Read" checked disabled readOnly>view</Checkbox>
+        </div>
+      </Part>
+      <Part name="Toggle">
+        <div className={styles.row}>
+          <Toggle checked={markers} onChange={e => setMarkers(e.target.checked)}>Markers</Toggle>
+          <Toggle checked={numbers} onChange={e => setNumbers(e.target.checked)}>Numbers</Toggle>
+          <Toggle checked disabled readOnly>Passkeys</Toggle>
         </div>
       </Part>
       <Part name="Radio and Choices">
