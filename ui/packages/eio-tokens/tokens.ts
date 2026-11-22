@@ -214,6 +214,7 @@ export const tokens = {
     "target": {
       "minimum": 44
     },
+    "thumb": 12,
     "width": {
       "page": 1200,
       "reading": 560

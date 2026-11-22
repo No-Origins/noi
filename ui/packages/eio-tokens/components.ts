@@ -105,6 +105,10 @@ export type TextAreaInteraction = 'disabled' | 'focus'
 /** body: body words · mono: mono words, for Cedar and JSON */
 export type TextAreaWords = 'body' | 'mono'
 
+// noi.eio.components.toggle
+/** checked: on: lime, with its thumb at the far side · disabled: locked · focus: focused, with the focus ring */
+export type ToggleInteraction = 'checked' | 'disabled' | 'focus'
+
 // noi.eio.components.tree-row
 /** closed: holds others, closed: its arrow points right · leaf: a leaf: holds nothing · open: holds others, open: its arrow points down */
 export type TreeRowHolds = 'closed' | 'leaf' | 'open'
@@ -225,6 +229,9 @@ export const states = {
   'noi.eio.components.text-area': {
     interaction: ['disabled', 'focus'],
     words: ['body', 'mono'],
+  },
+  'noi.eio.components.toggle': {
+    interaction: ['checked', 'disabled', 'focus'],
   },
   'noi.eio.components.tree-row': {
     holds: ['closed', 'leaf', 'open'],

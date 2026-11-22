@@ -4,6 +4,7 @@
 // 2 · The Chip: a link to one thing, with its small picture, its name (required) and a note. Given
 //     another site's address, it keeps the outside sign: the arrow, and a new tab.
 // Where an address leads is read the way a browser reads it, and the components are drawn for real.
+// The Toggle (agreed 22 Nov 2026) is drawn here too: a real checkbox told to be a switch.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -49,7 +50,7 @@ test('an address that only looks inside is outside: where it leads is read as a 
 // The components drawn for real: TypeScript turns the package into JavaScript beside its own React (in
 // node_modules/.cache), each style file stands in as its class names, and draw() calls the components
 // down to the tags a browser is given.
-let built, Button, Chip, Icon
+let built, Button, Chip, Icon, Toggle
 before(async () => {
   mkdirSync(join(PKG, 'node_modules/.cache'), { recursive: true })
   built = mkdtempSync(join(PKG, 'node_modules/.cache/links-test-'))
@@ -64,6 +65,7 @@ before(async () => {
   ;({ Button } = await import(pathToFileURL(join(built, 'src/Button/Button.js'))))
   ;({ Chip } = await import(pathToFileURL(join(built, 'src/Chip/Chip.js'))))
   ;({ Icon } = await import(pathToFileURL(join(built, 'src/Icon/Icon.js'))))
+  ;({ Toggle } = await import(pathToFileURL(join(built, 'src/Toggle/Toggle.js'))))
 })
 after(() => built && rmSync(built, { recursive: true, force: true }))
 
@@ -175,4 +177,16 @@ test('Chip given another site’s address: the arrow after its name, in a new ta
     assert.equal(svgs(d)[0].props['aria-label'], 'opens in a new tab')
     assert.equal(d.children.at(-1), svgs(d)[0], 'after its name')
   }
+})
+
+test('Toggle: a real checkbox told to be a switch, in one label with its words', () => {
+  const d = one(h(Toggle, { checked: true, disabled: true, readOnly: true, children: 'Markers' }))
+  assert.equal(d.tag, 'label')
+  assert.equal(text(d), 'Markers')
+  const inputs = (function find(x) { return typeof x === 'string' ? [] : x.tag === 'input' ? [x] : x.children.flatMap(find) })(d)
+  assert.equal(inputs.length, 1)
+  assert.equal(inputs[0].props.type, 'checkbox')
+  assert.equal(inputs[0].props.role, 'switch')
+  assert.equal(inputs[0].props.checked, true, 'what it is given reaches the input')
+  assert.equal(inputs[0].props.disabled, true)
 })

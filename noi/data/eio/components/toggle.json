@@ -1,0 +1,56 @@
+{
+  "path": "noi.eio.components.toggle",
+  "name": "Toggle",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A real switch Eidos draws, with its words: on is lime with its thumb at the far side, locked looks locked.",
+    "responsibility": "Be the one toggle every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-react",
+    "part": "component",
+    "job": "Turn one thing on or off at once, with its words; clicking the words flips it too.",
+    "states": {
+      "interaction": {
+        "checked": "on: lime, with its thumb at the far side",
+        "disabled": "locked",
+        "focus": "focused, with the focus ring"
+      }
+    },
+    "reads": [
+      "noi.eio.border.width.default",
+      "noi.eio.border.width.focus",
+      "noi.eio.color.action.on-primary",
+      "noi.eio.color.action.primary",
+      "noi.eio.color.border.default",
+      "noi.eio.color.border.input",
+      "noi.eio.color.focus.ring",
+      "noi.eio.color.surface.page",
+      "noi.eio.color.text.faint",
+      "noi.eio.color.text.muted",
+      "noi.eio.motion.duration.ms100",
+      "noi.eio.motion.easing.standard",
+      "noi.eio.radius.pill",
+      "noi.eio.size.control.default",
+      "noi.eio.size.icon.default",
+      "noi.eio.size.target.minimum",
+      "noi.eio.size.thumb",
+      "noi.eio.space.gap.inline",
+      "noi.eio.type.style.body"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/Toggle/Toggle.module.css",
+        "sha256": "f07a7bb42d2c788de4b55f791dd0bbd8b3a03d68a8601443fa3651f64bafeef1"
+      },
+      {
+        "path": "src/Toggle/Toggle.tsx",
+        "sha256": "6a507ab582b0ada4bf3cd0bab98f1ca9098149a51a02a1b4823278155e9469fb"
+      }
+    ]
+  }
+}

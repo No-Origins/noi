@@ -18,4 +18,5 @@ export { Sidebar, type SidebarGroup, type SidebarProps } from './Sidebar/Sidebar
 export { Swatch, type SwatchProps } from './Swatch/Swatch'
 export { Tab, Tabs, type TabProps } from './Tabs/Tabs'
 export { TextArea, type TextAreaProps } from './TextArea/TextArea'
+export { Toggle, type ToggleProps } from './Toggle/Toggle'
 export { TreeRow, type TreeRowProps } from './TreeRow/TreeRow'
