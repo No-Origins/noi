@@ -1,0 +1,38 @@
+{
+  "path": "noi.eio.components.world.base-platform",
+  "name": "Base platform",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The base of the world: 21 base tiles across and 600 m long, a tile on every section and an astroid wherever four tiles meet. Things that stand by themselves are placed on it. Your words, 23 Nov.",
+    "responsibility": "Be the one base platform every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Be the ground of the world, on which other elements are placed.",
+    "states": {
+      "measure": {
+        "width": "how far it runs along x: 21 tiles",
+        "length": "how far it runs along y"
+      }
+    },
+    "reads": [
+      "noi.eio.world.base-platform.tiles-across",
+      "noi.eio.world.base-platform.tiles-long"
+    ],
+    "uses": [
+      "noi.eio.components.world.astroid",
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/base-platform/base-platform.ts",
+        "sha256": "b988984ff2f3406ecbcf8c43fe7fe84bf2085b5b084279c0d5841299a18b866c"
+      }
+    ]
+  }
+}

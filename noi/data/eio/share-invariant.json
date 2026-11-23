@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.inv.share",
+  "name": "Share invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos share must meet.",
+    "responsibility": "Say how much of another value something is in the 3D world: the drone's ring is 0.84 of its body's radius, and a border grows by 0.5 of the base's growth."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "share"
+    },
+    "schema": {
+      "title": "Eidos share",
+      "type": "object",
+      "required": [
+        "share"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "share": {
+          "description": "How much of another value something is in the 3D world, a plain number to the ten-thousandth: 0 (none of it) to 10 (ten times it); 1 is all of it. Which value it is a share of is said in its definition.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "multipleOf": 0.0001
+        }
+      }
+    }
+  }
+}

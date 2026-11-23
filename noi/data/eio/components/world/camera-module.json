@@ -1,0 +1,37 @@
+{
+  "path": "noi.eio.components.world.camera-module",
+  "name": "Camera module",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A square base with rounded corners, four sockets underneath for the drone’s studs and small lights on its sides, a round plate, a short neck, and a wide head that looks to the front with two lenses side by side, each with a thin lime ring. Matte black, its glass glossy black. One can look through it.",
+    "responsibility": "Be the one camera module every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "View the world from a drone; let one look through it.",
+    "states": {
+      "state": {
+        "resting": "its head still, looking to the front",
+        "viewing": "its head turning slowly from side to side, looking round"
+      }
+    },
+    "reads": [
+      "noi.eio.color.action.primary",
+      "noi.eio.color.world.land"
+    ],
+    "uses": [
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/camera-module/camera-module.ts",
+        "sha256": "68b52582c081a85987fc73dee6d9695f8aa31038e2ecc5f1684f9e1bb736f3d8"
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "path": "noi.eio.world.drone.scale",
+  "name": "Drone, scale",
+  "classification": {
+    "type": "token",
+    "subtype": "steps"
+  },
+  "semantics": {
+    "definition": "The sizes the drone comes in, each as a share of its Base size: Small 0.5, Base 1, Medium 1.5, Large 2. Its studs stay one size: a larger drone carries more of them. Your word (23 Nov): \"for drone, small, default, medium, large can be 0.5, 1, 1.5, and 2\", and Base as the 1 step's name.",
+    "responsibility": "Let one drone be chosen in four sizes."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "steps": [
+      {
+        "name": "Small",
+        "share": 0.5
+      },
+      {
+        "name": "Base",
+        "share": 1
+      },
+      {
+        "name": "Medium",
+        "share": 1.5
+      },
+      {
+        "name": "Large",
+        "share": 2
+      }
+    ]
+  }
+}

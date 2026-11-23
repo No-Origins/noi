@@ -1,0 +1,60 @@
+{
+  "path": "noi.eio.world.stage.width-and-breadth",
+  "name": "Stage, width and breadth",
+  "classification": {
+    "type": "token",
+    "subtype": "steps"
+  },
+  "semantics": {
+    "definition": "How far the stage may run along x (its width) and along y (its breadth), each chosen by itself, in whole tiles: 1 tile to 10 tiles. Your word: \"Sizes are steps of 10m\" (a tile); that 10 tiles is the widest is a guess, not agreed.",
+    "responsibility": "Let a stage be chosen a whole number of tiles wide and long."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "steps": [
+      {
+        "name": "1 tile",
+        "count": 1
+      },
+      {
+        "name": "2 tiles",
+        "count": 2
+      },
+      {
+        "name": "3 tiles",
+        "count": 3
+      },
+      {
+        "name": "4 tiles",
+        "count": 4
+      },
+      {
+        "name": "5 tiles",
+        "count": 5
+      },
+      {
+        "name": "6 tiles",
+        "count": 6
+      },
+      {
+        "name": "7 tiles",
+        "count": 7
+      },
+      {
+        "name": "8 tiles",
+        "count": 8
+      },
+      {
+        "name": "9 tiles",
+        "count": 9
+      },
+      {
+        "name": "10 tiles",
+        "count": 10
+      }
+    ]
+  }
+}

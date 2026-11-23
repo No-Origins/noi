@@ -5,7 +5,7 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The Fairy Bot, a character of the old No Origins project, made with Meshy.ai: its model, its look and its wings, as small copies.",
+    "definition": "The Fairy Bot, a character of the old No Origins project, made with Meshy.ai: its model, its look and its wings, as small copies, and the element of the 3D world they make, drawn by the world’s three.js as tall as a character is, its wings on its upper back. It stands plainly, legs straight and arms down, or walks or runs on its place, its wings fluttering.",
     "responsibility": "Be the one the fairy bot every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
@@ -14,13 +14,21 @@
     "part": "component",
     "job": "Be a person in the 3D world.",
     "states": {
+      "state": {
+        "standing": "standing plainly on its place, legs straight, arms down at its sides",
+        "walking": "walking on the spot, with the walk its model carries",
+        "running": "running on the spot, with the run its model carries"
+      },
       "clips": {
         "walking": "walking",
         "running": "running"
       }
     },
     "reads": [],
-    "uses": [],
+    "uses": [
+      "noi.eio.components.world.character-drawing",
+      "noi.eio.components.world.drawing"
+    ],
     "files": [
       {
         "path": "assets/characters/fairy-bot/fairy-bot.glb",
@@ -33,6 +41,10 @@
       {
         "path": "assets/characters/fairy-bot/wings.glb",
         "sha256": "717913bcf39131f0767f44107ab476113c363d0e7f735fac703200573392c9de"
+      },
+      {
+        "path": "src/fairy-bot/fairy-bot.ts",
+        "sha256": "c6a0e3bf79630083db13e339fd17dcaee20804de631f8efa0058e3d92e196caa"
       }
     ]
   }

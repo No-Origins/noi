@@ -1,0 +1,186 @@
+/* The gallery of the world's elements (21 Nov): a page of Studio like the others. It places Eidos's parts and
+   draws no control; every value is a token. */
+.page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-group);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-inline);
+}
+
+.muted {
+  color: var(--eio-color-text-muted);
+}
+
+/* As many elements side by side as fit. */
+.elements {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--eio-size-control-large) * 7)), 1fr));
+  gap: var(--eio-space-gap-stack);
+}
+
+.element {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--eio-space-gap-stack);
+  cursor: pointer;
+}
+
+.words {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--eio-space-gap-inline) / 2);
+  min-width: 0;
+}
+
+/* An element's still picture, on the surface the 3D view has too; or, when a character's files cannot be loaded,
+   why not, in its middle. */
+.picture {
+  position: relative;
+  align-self: stretch;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-surface-raised);
+  overflow: hidden;
+}
+
+.shot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The canvas the still pictures are taken on: laid out, so it has a size, and never shown. */
+.studio {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--eio-size-control-large) * 10);
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  visibility: hidden;
+  pointer-events: none;
+  background: var(--eio-color-surface-raised);
+}
+
+/* What holds the viewer: it is there only to give the viewer Eidos's dark roles, and takes no room itself. */
+.viewer {
+  display: contents;
+}
+
+/* The viewer fills the window (the user, 23 Nov: "Let it take full width and height"): it takes all the
+   height the drawer has, the bar at the left and the 3D view all the rest of the width. */
+.layout {
+  flex: 1 1 auto;
+  display: flex;
+  gap: var(--eio-space-gap-pane);
+}
+
+/* The bar beside the view: a third of the width, and never wider than a third of a page, so its cards keep
+   a width that reads well and the view gets what is left. */
+.beside {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: calc(var(--eio-size-width-page) / 3);
+}
+
+/* The rest of the window: the 3D view, with the bar above it where the window has one pane. */
+.main {
+  flex: 2 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+
+/* One colour to try, in an element's card: the colour as it is now, its name, and the choice. Every row is as
+   wide as the card, and its choice takes the same share of it, so the choices stand in one column. */
+.colour {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: auto 1fr 2fr;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+
+/* One setting to try, in an element's card: its name, and the choice. Every row is as wide as the card and
+   halved the same way, so the choices stand in one column. */
+.setting {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: var(--eio-space-gap-inline);
+}
+
+/* The viewer's bar: the way out, a card for each element in the view, one under another. */
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eio-space-gap-stack);
+}
+
+/* The 3D view takes all the room the window has left: all the width beside the bar, and the window's height.
+   Where the window has one pane the cards stand above it and leave little: there it keeps a least height, and
+   the viewer scrolls.
+   IT STAYS IN SIGHT. A long card makes the viewer taller than the window, and Eidos's Drawer then scrolls as a
+   whole. So the view is never taller than the window less the Drawer's own margins above and below (half a
+   group's gap, and a whole one), and it holds at the top while the cards scroll past it. */
+.view {
+  position: sticky;
+  top: calc(var(--eio-space-gap-group) / 2);
+  flex: 1 1 auto;
+  min-height: calc(var(--eio-size-control-large) * 10);
+  max-height: calc(100dvh - var(--eio-space-gap-group) * 1.5);
+  border-radius: var(--eio-radius-card);
+  background: var(--eio-color-surface-raised);
+  overflow: hidden;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.cannot {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--eio-space-inset-card);
+  color: var(--eio-color-text-muted);
+  text-align: center;
+}
+
+/* A small side view of the whole strip while riding, with where the eye is (issue 130). */
+.side {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sideLine {
+  fill: none;
+  stroke: var(--eio-color-text-muted);
+  stroke-width: var(--eio-border-width-focus);
+  vector-effect: non-scaling-stroke;
+}
+
+.sideHere {
+  fill: var(--eio-color-action-primary);
+}

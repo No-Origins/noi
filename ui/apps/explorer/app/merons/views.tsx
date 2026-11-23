@@ -24,7 +24,7 @@ const PLURAL: Record<string, string> = {
   color: 'palette colors', 'color-role': 'color roles', 'font-family': 'fonts', 'font-size': 'font sizes',
   'text-style': 'text styles', space: 'spacing steps', 'space-role': 'spacing roles', size: 'sizes',
   radius: 'corners', 'border-width': 'border widths', window: 'windows', invariant: 'invariants', system: 'systems',
-  length: 'lengths', time: 'times', speed: 'speeds',
+  length: 'lengths', time: 'times', speed: 'speeds', share: 'shares', angle: 'angles', count: 'counts', steps: 'sets of steps',
   component: 'components', 'shared-part': 'shared parts', package: 'for a package’s own files',
 }
 const kindOf = (m: Meron) =>
@@ -81,7 +81,7 @@ export function KindView({ s, idx, nodes, m }: { s: Snapshot; idx: Index; nodes:
   if (m.classification.type === 'system') return <ChildCards idx={idx} nodes={nodes} parent={m.identity.path} />
   if (m.classification.type === 'invariant') return <InvariantView s={s} idx={idx} m={m} />
   if (m.classification.type === 'rule' && typeof m.spec?.cedar === 'string') return <CedarView s={s} m={m} />
-  if (m.classification.type === 'component') return <ComponentView s={s} idx={idx} nodes={nodes} m={m} />
+  if (m.classification.type === 'component') return <ComponentView s={s} idx={idx} m={m} />
   switch (m.classification.subtype) {
     case 'color': return <ColorView m={m} />
     case 'color-role': return <ColorRoleView s={s} idx={idx} m={m} />
@@ -397,7 +397,7 @@ export function LengthView({ m }: { m: Meron }) {
         <i className={cx(styles.bar, styles.barPerson)} style={{ width: `${(PERSON_M / most) * 100}%` }} aria-hidden />
       </div>
       <Facts items={[
-        ['Length', `${plain(metres)} m`, 'Lime: this length. Grey: a person 6 feet tall, 1.8 m'],
+        ['Length', `${metres.toLocaleString('en-GB', { maximumFractionDigits: 3 })} m`, 'Lime: this length. Grey: a person 6 feet tall, 1.8 m'],
         ['Beside a person', times >= 1 ? `${plain(times)} times as long` : `${plain(times * 100)}% as long`, 'One tile of the world is one metre'],
       ]} />
     </>
@@ -536,14 +536,8 @@ const PART: Record<ComponentSpec['part'], [string, string]> = {
   package: ['Package files', 'the files that belong to no one component'],
 }
 
-// Where a 3D element of @noi/eio-3d is drawn: the page of its values in the 3D world.
-const DRAWN: Record<string, string> = {
-  arch: 'arch', land: 'land', pool: 'pool', steps: 'steps', gateway: 'gateway',
-  clay: 'character', mannequin: 'character', 'fairy-bot': 'character', 'character-drawing': 'character',
-}
-
 /** A component's meron: its contract and the fingerprints of its files. The code is in git. */
-export function ComponentView({ s, idx, nodes, m }: { s: Snapshot; idx: Index; nodes: TreeNode[]; m: Meron }) {
+export function ComponentView({ s, idx, m }: { s: Snapshot; idx: Index; m: Meron }) {
   const c = m.spec as ComponentSpec
   const usedBy = s.merons.filter(x => x.classification.type === 'component' && (x.spec?.uses ?? []).includes(m.identity.path))
   // The values it reads, by kind: colour roles, spacing roles, text styles…
@@ -553,10 +547,6 @@ export function ComponentView({ s, idx, nodes, m }: { s: Snapshot; idx: Index; n
     const kind = v?.classification.subtype ?? 'missing'
     groups.set(kind, [...(groups.get(kind) ?? []), p])
   }
-  const seg = m.identity.path.split('.').pop()!
-  const drawn = m.identity.path.startsWith('noi.eio.components.world.') && DRAWN[seg]
-    ? nodes.find(n => n.path === `noi.eio.world.${DRAWN[seg]}`)
-    : undefined
   const chip = (p: string) => {
     const x = idx.byPath.get(p)
     return x
@@ -576,11 +566,6 @@ export function ComponentView({ s, idx, nodes, m }: { s: Snapshot; idx: Index; n
       />
       <Section title="What it is for">
         <p className="eio-type-style-body">{c.job}</p>
-        {drawn && (
-          <p className={cx(styles.muted, 'eio-type-style-body')}>
-            See it drawn on <Link className={styles.inline} href={hrefOf(drawn.path)}>{drawn.name}</Link>, in the 3D world.
-          </p>
-        )}
       </Section>
       {Array.isArray(c.states) && c.states.length > 0 && (
         <Section title={`States it shows · ${c.states.length}`}>

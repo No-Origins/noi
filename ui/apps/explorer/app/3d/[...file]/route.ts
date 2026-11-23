@@ -1,5 +1,7 @@
-// The 3D world's character files, served from @noi/eio-3d's assets (17 Nov): each character's model and its
-// look. Only those files: names of small letters, figures and dashes, ending .glb or .jpg, inside the folder.
+// The 3D world's character files, served from @noi/eio-3d's assets (17 Nov): each character's model, its look and
+// the Fairy Bot's wings, loaded when a character is first shown (world.ts, ASSETS), on any of the app's names (the
+// front desk lets /3d through, proxy.ts). Only those files: names of small letters, figures and dashes, ending
+// .glb or .jpg, inside the folder.
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 

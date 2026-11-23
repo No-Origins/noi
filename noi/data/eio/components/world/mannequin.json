@@ -5,7 +5,7 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The Mannequin, a character of the old No Origins project, made with Meshy.ai: its model and its look, as small copies.",
+    "definition": "The Mannequin, a character of the old No Origins project, made with Meshy.ai: its model and its look, as small copies, and the element of the 3D world they make, drawn by the world’s three.js as tall as a character is. It stands plainly, legs straight and arms down, or walks or runs on its place.",
     "responsibility": "Be the one the mannequin every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
@@ -14,13 +14,21 @@
     "part": "component",
     "job": "Be a person in the 3D world.",
     "states": {
+      "state": {
+        "standing": "standing plainly on its place, legs straight, arms down at its sides",
+        "walking": "walking on the spot, with the walk its model carries",
+        "running": "running on the spot, with the run its model carries"
+      },
       "clips": {
         "walking": "walking",
         "running": "running"
       }
     },
     "reads": [],
-    "uses": [],
+    "uses": [
+      "noi.eio.components.world.character-drawing",
+      "noi.eio.components.world.drawing"
+    ],
     "files": [
       {
         "path": "assets/characters/mannequin/mannequin.glb",
@@ -29,6 +37,10 @@
       {
         "path": "assets/characters/mannequin/mannequin.jpg",
         "sha256": "eee5ba3c9868376c39bd5db91f24c9397fd56192517bfa5a1e6f1e0967aa5e3f"
+      },
+      {
+        "path": "src/mannequin/mannequin.ts",
+        "sha256": "9601581874003836adae6d0445ceb7c6d93a6ecfde728379e247874dc2475cdc"
       }
     ]
   }

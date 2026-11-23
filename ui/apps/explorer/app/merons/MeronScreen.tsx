@@ -7,9 +7,8 @@ import { ChangeForm } from './ChangeForm'
 import { cedarKind } from '../../lib/cedar'
 import { mayHere } from '../../lib/governance'
 import { ChildCards, KindView } from './views'
-import { Stage3D } from '@noi/eio-3d'
+import { ElementOnPage } from './ElementOnPage'
 import { Button } from '@noi/eio-react'
-import { worldScene } from '../../lib/world'
 import styles from './merons.module.css'
 
 /** `path` is a meron or group path; without one, the root. `change` opens the Change form. Roles and
@@ -40,7 +39,6 @@ function GroupView({ idx, nodes, node, parent }: { idx: Index; nodes: TreeNode[]
       <p className={cx(styles.lead, 'eio-type-style-body')}>
         {node.count} merons{parent ? ` in ${parent.name}` : ''}. A group is a part of the path, not a meron of its own.
       </p>
-      <WorldModel idx={idx} path={node.path} />
       <ChildCards idx={idx} nodes={nodes} parent={node.path} />
     </article>
   )
@@ -58,7 +56,7 @@ function MeronView({ s, idx, nodes, m, writable }: { s: Snapshot; idx: Index; no
         <p className="eio-type-style-body">{m.semantics.definition}</p>
         {m.semantics.responsibility && <p className={cx(styles.muted, 'eio-type-style-body')}>{m.semantics.responsibility}</p>}
       </div>
-      <WorldModel idx={idx} path={m.identity.path} />
+      {m.classification.type === 'component' && m.identity.path.startsWith(WORLD) && <ElementOnPage id={m.identity.path.slice(WORLD.length)} />}
       <KindView s={s} idx={idx} nodes={nodes} m={m} />
       <Connections s={s} idx={idx} m={m} />
       <Record idx={idx} m={m} />
@@ -66,12 +64,8 @@ function MeronView({ s, idx, nodes, m, writable }: { s: Snapshot; idx: Index; no
   )
 }
 
-/** An element of the 3D world, drawn from what Mero holds (17 Nov): whole on its group's page, with one
- * measure marked on each of its numbers' pages. Nothing for other pages. */
-function WorldModel({ idx, path }: { idx: Index; path: string }) {
-  const model = worldScene(idx, path)
-  return model ? <Stage3D scene={model.scene} label={model.label} /> : null
-}
+/** Where the 3D world's components are in Mero: an element's page shows it in 3D (ElementOnPage). */
+const WORLD = 'noi.eio.components.world.'
 
 function ChangeView({ m }: { m: Meron }) {
   return (

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.tile.size",
+  "name": "Tile, size",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far one tile of the world runs along x and along y: the world's grid unit. Everything laid on the land is laid in tiles, a base tile covers one, and a stage is a whole number of them wide. Your word: \"one tile is for 10 meters into 10 meters section\".",
+    "responsibility": "Be the one grid unit the whole world is laid out in."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "m": 10
+  }
+}

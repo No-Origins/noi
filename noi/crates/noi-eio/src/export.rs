@@ -86,6 +86,51 @@ fn px(path: &str, spec: &Value) -> Result<f64, String> {
         .ok_or_else(|| format!("{path} has no px value"))
 }
 
+/// A set of steps as the token files give it: the steps in their order, each `{ name, <unit>: n }`.
+/// Refused when it has no steps, when a step has no name or no number, when its steps are in more
+/// than one unit, when two steps share a name, or when they do not rise from the least to the most.
+fn steps(path: &str, spec: &Value) -> Result<Value, String> {
+    let list = spec["steps"]
+        .as_array()
+        .filter(|l| !l.is_empty())
+        .ok_or_else(|| format!("{path} has no steps"))?;
+    let mut unit: Option<&str> = None;
+    let mut names = BTreeSet::new();
+    let mut last: Option<f64> = None;
+    let mut out = vec![];
+    for step in list {
+        let name = step["name"]
+            .as_str()
+            .filter(|n| !n.is_empty())
+            .ok_or_else(|| format!("{path} has a step with no name"))?;
+        let field = ["share", "m", "count"]
+            .into_iter()
+            .find(|f| step.get(*f).is_some())
+            .ok_or_else(|| format!("{path}: the step {name} has no share, m or count"))?;
+        if unit.is_some_and(|u| u != field) {
+            return Err(format!("{path}: its steps are in more than one unit"));
+        }
+        unit = Some(field);
+        let v = step[field]
+            .as_f64()
+            .ok_or_else(|| format!("{path}: the step {name} has no number"))?;
+        if !names.insert(name) {
+            return Err(format!("{path}: two steps are named {name}"));
+        }
+        if last.is_some_and(|l| v <= l) {
+            return Err(format!(
+                "{path}: its steps must rise from the least to the most, and {name} does not"
+            ));
+        }
+        last = Some(v);
+        let mut one = Map::new();
+        one.insert("name".into(), json!(name));
+        one.insert(field.into(), num(v));
+        out.push(Value::Object(one));
+    }
+    Ok(Value::Array(out))
+}
+
 /// Puts `value` into `tree` at the meron's path segments after `noi.eio`.
 fn insert(tree: &mut Map<String, Value>, path: &str, value: Value) {
     let mut parts: Vec<&str> = key(path).split('.').collect();
@@ -105,8 +150,8 @@ fn insert(tree: &mut Map<String, Value>, path: &str, value: Value) {
 /// Roles become CSS variables in both themes; palette colors are only in the typed object, so
 /// components cannot reach past a role to a palette color. Window classes become media queries that
 /// switch the `--eio-window-*` variables. Motion durations and curves become variables, and every
-/// duration drops to 0 when the system asks for reduced motion. The 3D world's lengths, times and
-/// speeds are only in the typed object and the JSON.
+/// duration drops to 0 when the system asks for reduced motion. The 3D world's lengths, times,
+/// speeds, shares, angles, counts and sets of steps are only in the typed object and the JSON.
 pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     let mut sources: Vec<&TokenSource> = sources.iter().collect();
     sources.sort_by_key(|s| s.path);
@@ -282,19 +327,28 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
                 );
             }
             // The 3D world's values (17 Nov): a length in metres, a time in seconds, a speed in
-            // metres a second. Code that draws in 3D reads them, CSS never does, so they go into
-            // tokens.ts and tokens.json only.
-            "length" | "time" | "speed" => {
+            // metres a second; since 23 Nov also a share of another value, an angle in degrees and
+            // a count. Code that draws in 3D reads them, CSS never does, so they go into tokens.ts
+            // and tokens.json only.
+            "length" | "time" | "speed" | "share" | "angle" | "count" => {
                 let field = match s.subtype {
                     "length" => "m",
                     "time" => "s",
-                    _ => "m_per_s",
+                    "speed" => "m_per_s",
+                    "share" => "share",
+                    "angle" => "deg",
+                    _ => "count",
                 };
                 let v = spec[field]
                     .as_f64()
                     .ok_or_else(|| format!("{path} has no {field} value"))?;
                 insert(&mut tree, path, num(v));
             }
+            // A set of steps (23 Nov): one record holding the named steps one may choose among,
+            // each with a share, a length in metres or a count, all in one unit. Like the world's
+            // single numbers it goes into tokens.ts and tokens.json only, as a list of the steps in
+            // their order, each its name and its number under its unit's field.
+            "steps" => insert(&mut tree, path, steps(path, spec)?),
             // The system meron and its invariants are not tokens.
             _ => {}
         }
@@ -771,6 +825,134 @@ mod tests {
         }])
         .err()
         .is_some_and(|e| e.contains("has no m value")));
+    }
+
+    #[test]
+    fn world_shares_angles_counts_and_fine_lengths_are_typed_values_only() {
+        // 23 Nov: a share, an angle and a count, and lengths to the millimetre, 0 m too.
+        let (ring, turn, studs) = (
+            json!({"share":0.2125}),
+            json!({"deg":-155}),
+            json!({"count":4}),
+        );
+        let (proud, cut) = (json!({"m":0.002}), json!({"m":0}));
+        fn source<'a>(path: &'a str, subtype: &'a str, spec: &'a Value) -> TokenSource<'a> {
+            TokenSource {
+                path,
+                subtype,
+                spec,
+                deprecated: false,
+            }
+        }
+        let sources = [
+            source("noi.eio.world.drone.ring-outer", "share", &ring),
+            source("noi.eio.world.wave-platform.run-3-turn", "angle", &turn),
+            source("noi.eio.world.stud-grid.count", "count", &studs),
+            source(
+                "noi.eio.world.camera-module.lens-ring-proud",
+                "length",
+                &proud,
+            ),
+            source("noi.eio.world.wave-platform.runway", "length", &cut),
+        ];
+        let files = export_tokens(&sources).unwrap();
+        assert!(
+            !files.css.contains("world"),
+            "no CSS for the 3D world's values"
+        );
+        let tree: Value = serde_json::from_str(&files.json).unwrap();
+        assert_eq!(tree["world"]["drone"]["ring-outer"], 0.2125);
+        assert_eq!(tree["world"]["wave-platform"]["run-3-turn"], -155);
+        assert_eq!(tree["world"]["stud-grid"]["count"], 4);
+        assert_eq!(tree["world"]["camera-module"]["lens-ring-proud"], 0.002);
+        assert_eq!(tree["world"]["wave-platform"]["runway"], 0);
+        assert!(files.ts.contains("\"count\": 4"));
+        for (subtype, field, wrong) in [
+            ("share", "share", json!({"m":0.84})),
+            ("angle", "deg", json!({"rad":0.26})),
+            ("count", "count", json!({"n":4})),
+        ] {
+            assert!(
+                export_tokens(&[source("noi.eio.world.x.y", subtype, &wrong)])
+                    .err()
+                    .is_some_and(|e| e.contains(&format!("has no {field} value"))),
+                "{subtype}"
+            );
+        }
+    }
+
+    #[test]
+    fn world_steps_are_one_typed_list_each() {
+        // 23 Nov, the user's decision: an element's scale is one record of named steps, and so are
+        // the heights a stage's base may have.
+        let scale = json!({"steps":[
+            {"name":"Small","share":0.5},{"name":"Base","share":1},
+            {"name":"Medium","share":1.5},{"name":"Large","share":2}
+        ]});
+        let heights =
+            json!({"steps":[{"name":"2 m","m":2},{"name":"4 m","m":4},{"name":"10 m","m":10}]});
+        let tiles = json!({"steps":[{"name":"1 tile","count":1},{"name":"2 tiles","count":2}]});
+        fn source<'a>(path: &'a str, spec: &'a Value) -> TokenSource<'a> {
+            TokenSource {
+                path,
+                subtype: "steps",
+                spec,
+                deprecated: false,
+            }
+        }
+        let files = export_tokens(&[
+            source("noi.eio.world.drone.scale", &scale),
+            source("noi.eio.world.stage.base-height", &heights),
+            source("noi.eio.world.stage.width-and-breadth", &tiles),
+        ])
+        .unwrap();
+        assert!(!files.css.contains("world"), "no CSS for steps");
+        let tree: Value = serde_json::from_str(&files.json).unwrap();
+        assert_eq!(
+            tree["world"]["drone"]["scale"],
+            json!([
+                {"name":"Small","share":0.5},{"name":"Base","share":1},
+                {"name":"Medium","share":1.5},{"name":"Large","share":2}
+            ])
+        );
+        assert_eq!(
+            tree["world"]["stage"]["base-height"][2],
+            json!({"name":"10 m","m":10})
+        );
+        assert_eq!(
+            tree["world"]["stage"]["width-and-breadth"][1],
+            json!({"name":"2 tiles","count":2})
+        );
+        assert!(files.ts.contains("\"name\": \"Medium\""));
+        // Refused: no steps, a step without a name or a number, two units, a name twice, steps
+        // that do not rise.
+        for (wrong, says) in [
+            (json!({"steps":[]}), "has no steps"),
+            (json!({"steps":[{"share":1}]}), "a step with no name"),
+            (
+                json!({"steps":[{"name":"Base"}]}),
+                "has no share, m or count",
+            ),
+            (
+                json!({"steps":[{"name":"a","share":1},{"name":"b","m":2}]}),
+                "more than one unit",
+            ),
+            (
+                json!({"steps":[{"name":"a","share":1},{"name":"a","share":2}]}),
+                "two steps are named a",
+            ),
+            (
+                json!({"steps":[{"name":"a","share":2},{"name":"b","share":1}]}),
+                "must rise",
+            ),
+        ] {
+            assert!(
+                export_tokens(&[source("noi.eio.world.x.y", &wrong)])
+                    .err()
+                    .is_some_and(|e| e.contains(says)),
+                "{wrong}"
+            );
+        }
     }
 
     #[test]

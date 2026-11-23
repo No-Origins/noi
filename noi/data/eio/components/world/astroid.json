@@ -1,0 +1,40 @@
+{
+  "path": "noi.eio.components.world.astroid",
+  "name": "Astroid",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The shape four base tiles leave open where they meet two by two: four points and four sides curved inward, each a tile’s rounded corner, as thick as a tile, matte in Eidos’s secondary colour. Active, it glows in that colour, with a soft light on the tiles round it. Your words, 21 and 23 Nov.",
+    "responsibility": "Be the one astroid every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Fill the middle where four base tiles meet, lying matte or glowing; be the drone’s body.",
+    "states": {
+      "state": {
+        "default": "lying matte, in the secondary colour",
+        "active": "glowing in its own colour, a soft light of that colour on the tiles round it"
+      },
+      "measure": {
+        "radius": "how far its four points reach from its middle: the base tile’s corner radius",
+        "thickness": "how thick it is: the base tile’s thickness"
+      }
+    },
+    "reads": [
+      "noi.eio.color.action.secondary"
+    ],
+    "uses": [
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/astroid/astroid.ts",
+        "sha256": "2ff10759ae51deeb1e0479ad2ed68bf69a0777025eb30a404d77a7d4d98e1191"
+      }
+    ]
+  }
+}

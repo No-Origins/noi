@@ -1,0 +1,38 @@
+{
+  "path": "noi.eio.components.world.mobius-platform",
+  "name": "Base platform, Möbius strip",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The base platform laid into a Möbius strip as wide as it, curving all the way round and twisting to come back turned over, every tile square, tiles and astroids on both faces. A trial: nothing is set on it yet.",
+    "responsibility": "Be the one Möbius strip every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Try the base platform as a loop with one side only.",
+    "states": {
+      "measure": {
+        "length": "how long it is all the way round",
+        "width": "how wide: the base platform’s"
+      }
+    },
+    "reads": [
+      "noi.eio.world.mobius-platform.tiles-round"
+    ],
+    "uses": [
+      "noi.eio.components.world.astroid",
+      "noi.eio.components.world.base-platform",
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/mobius-platform/mobius-platform.ts",
+        "sha256": "3d20421943515eef488084b71496e5198d47daa514332907d2a224b064f2d860"
+      }
+    ]
+  }
+}

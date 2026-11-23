@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stud.pitch",
+  "name": "Stud, pitch",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "From one stud's middle to the next, along x or along y: the one size of stud in the whole world. A bigger element carries more studs, not bigger ones, so a piece with sockets fits any element with studs, at any scale. Your word (23 Nov): \"studs should have universally one single size\", and the pitch of 0.3 m in your decision.",
+    "responsibility": "Let every piece with sockets fit every element with studs."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "m": 0.3
+  }
+}

@@ -5,32 +5,69 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The drawing code every element of the 3D world shares: the programs that run on the graphics card, with the one rule for the edge of the world; the helpers that hand shapes to it; and the sums for the eye.",
+    "definition": "The code every element of the new 3D world shares: what an element can be, held as data; its outline and the ground it covers; the one grid of studs; the strips bent into a Möbius loop or curled as a wave; the light; and three.js making an element from its data, with its surfaces, its states and its glow. Every number and colour it draws with is Eidos’s.",
     "responsibility": "Hold what several Eidos components share, once. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
   "spec": {
     "package": "@noi/eio-3d",
     "part": "shared-part",
-    "job": "Draw every element of the 3D world the same way.",
+    "job": "Draw every element of the 3D world the same way, from its data, with three.js.",
     "states": {},
     "reads": [
-      "noi.eio.world.circles.dash",
-      "noi.eio.world.ripples.behind"
+      "noi.eio.color.action.primary",
+      "noi.eio.color.action.secondary",
+      "noi.eio.color.border.default",
+      "noi.eio.color.text.danger",
+      "noi.eio.color.text.success",
+      "noi.eio.color.text.warning",
+      "noi.eio.color.world.land",
+      "noi.eio.color.world.light",
+      "noi.eio.color.world.room",
+      "noi.eio.color.world.step-edge",
+      "noi.eio.color.world.wall",
+      "noi.eio.color.world.water",
+      "noi.eio.world.states.change",
+      "noi.eio.world.stud.pitch",
+      "noi.eio.world.tile.size"
     ],
     "uses": [],
     "files": [
       {
-        "path": "src/drawing/gl.ts",
-        "sha256": "937ba66368eb11f594d8e25ef60d0507b0d67926227d48e158725279958d33ad"
+        "path": "src/drawing/bend.ts",
+        "sha256": "d48b8bd02316bee7d299d58a27de6f8be3badcb7de4924ee61e161dfedf819c4"
       },
       {
-        "path": "src/drawing/glsl.ts",
-        "sha256": "b5316d57fa9af0e0997435900cc14755dfa3a7aa546d9395fcdfe756b40054f3"
+        "path": "src/drawing/eidos.ts",
+        "sha256": "0c21f0c48e5e640d729a11408458ce794b8f93780342b261c4a6bf3e8b14dd8c"
       },
       {
-        "path": "src/drawing/math.ts",
-        "sha256": "31d9704cdcb4092d289725ce924934aa3068c04177ae26c34eca26effee16dcd"
+        "path": "src/drawing/element.ts",
+        "sha256": "0ed7b517584669a50770096a0a0920a7675056ad3b68f94816229af9cecab39d"
+      },
+      {
+        "path": "src/drawing/light.ts",
+        "sha256": "247698275c52081a8014c82cf3edd48d8cf7c58452c0e336c5b5d9bfb4e0f6c1"
+      },
+      {
+        "path": "src/drawing/make.ts",
+        "sha256": "fe10eb154eb28774ae75a912b033327b7f4cb605d96f4921cf8bdf84ab0cfc34"
+      },
+      {
+        "path": "src/drawing/outline.ts",
+        "sha256": "09b3782a7da8ab35207cf80c32ccafae4cd630d282cfb57a09531c8a00f78f67"
+      },
+      {
+        "path": "src/drawing/space.ts",
+        "sha256": "7eadcc261a6413f927fbb2ffcc088148188d608c0bd37c12e757945bcb8a1a1f"
+      },
+      {
+        "path": "src/drawing/studs.ts",
+        "sha256": "9b617aa98522bd69afcc32ad486f4983309adc09f8168dc04c8104ba52c6b3f4"
+      },
+      {
+        "path": "src/drawing/wave.ts",
+        "sha256": "823b592b5778dc5df4532715d1a2468377c9e8906243625ef4f1c2adc4d6d177"
       }
     ]
   }

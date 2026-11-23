@@ -1,0 +1,42 @@
+{
+  "path": "noi.eio.components.world.drone",
+  "name": "Drone",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "Our astroid as its body, a round ring lying in each of its four curved sides with one round join to the body, a fan that turns in each ring, and on its body studs other pieces are set on. Red, with matte black rings and glossy black fans. It comes in four sizes, Small, Base, Medium and Large; its studs stay one size, and a larger drone carries more of them.",
+    "responsibility": "Be the one drone every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Fly round the world and hover, carrying what is set on its studs.",
+    "states": {
+      "state": {
+        "landed": "standing on its place, its fans still",
+        "hovering": "hanging over its place, rising and sinking a little, its fans turning",
+        "flying": "flying round its place, leaning into its way, its fans turning faster"
+      },
+      "setting": {
+        "scale": "how large it is, as a share of its Base size: Small 0.5, Base 1, Medium 1.5 or Large 2; its studs stay one size and grow in number"
+      }
+    },
+    "reads": [
+      "noi.eio.color.text.danger",
+      "noi.eio.world.drone.base-size",
+      "noi.eio.world.drone.scale"
+    ],
+    "uses": [
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/drone/drone.ts",
+        "sha256": "252de8e5345fee3cfb2b2325100bdcad6243af4caf91029358c8262afee47af6"
+      }
+    ]
+  }
+}

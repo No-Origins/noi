@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname localhost --port 3000",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/backend.test.mjs test/styles.test.mjs test/passkey.test.mjs test/session.test.mjs test/hosts.test.mjs test/sentence.test.mjs test/changes.test.mjs test/lists.test.mjs",
+    "test": "node --test test/backend.test.mjs test/styles.test.mjs test/passkey.test.mjs test/session.test.mjs test/hosts.test.mjs test/sentence.test.mjs test/changes.test.mjs test/lists.test.mjs test/world.test.mjs",
     "test:fit": "node --test test/fit.test.mjs"
   },
   "dependencies": {
@@ -17,12 +17,14 @@
     "next": "16.4.5",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/three": "0.187.0",
     "typescript": "7.0.2"
   }
 }

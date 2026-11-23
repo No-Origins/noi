@@ -1,0 +1,25 @@
+{
+  "path": "noi.eio.color.palette.world-room",
+  "name": "World room",
+  "classification": {
+    "type": "token",
+    "subtype": "color"
+  },
+  "semantics": {
+    "definition": "A colour only the 3D world uses, for the dark of the room glossy things mirror: a grey at OKLCH lightness 0.115, darker than any of Eidos's own. Taken as it is from the world's drawing code (23 Nov). A guess, not agreed.",
+    "responsibility": "Provide this colour for the 3D world's colour roles to use."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "family": "world",
+    "value": {
+      "colorSpace": "oklch",
+      "components": [
+        0.115,
+        0,
+        0
+      ],
+      "hex": "#050505"
+    }
+  }
+}

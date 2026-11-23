@@ -1,7 +1,7 @@
 // Component States (agreed 18 Nov 2026), decision 4, for the 3D elements: every option Mero holds (a
-// measure, a motion) is read through a table typed from the file Mero writes; each character's model
-// has the clips Mero lists; what happens to the stage has a rule in its style file. Comments are taken
-// out first: only what the code does counts.
+// measure, a motion, a state, a setting, a colour) is read through a table typed from the file Mero writes;
+// each character's model has the clips Mero lists; what happens to an element has a rule in its style file.
+// Comments are taken out first: only what the code does counts.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -39,7 +39,8 @@ const typesOf = group => {
 }
 
 test('Mero holds states for the 3D elements', () => {
-  assert.ok(ours.length >= 9, `found ${ours.length}`)
+  // the character drawing and the three characters (17 Nov), and the new world's eight elements (23 Nov)
+  assert.ok(ours.length >= 12, `found ${ours.length}`)
 })
 
 test('no table is forced into shape: a cast would let it leave keys out', () => {
@@ -73,32 +74,17 @@ for (const [path, groups] of ours) {
         // The code may take Mero's type under a shorter name of its own (… as Motion).
         const alias = code.match(new RegExp(`\\b${type}\\s+as\\s+(\\w+)`))?.[1]
         const named = `(?:${type}${alias ? `|${alias}` : ''})`
-        // The table, and something that looks an option up in it (TABLE[key] or TABLE.key): in its own
-        // file, or anywhere in the package if it is exported.
+        // The table, and something that reads it: looks an option up in it (TABLE[key] or TABLE.key), or
+        // goes through all of it in its order (Object.entries(TABLE)): in its own file, or anywhere in the
+        // package if it is exported.
         const tables = Object.entries(sources).flatMap(([file, src]) =>
           [...src.matchAll(new RegExp(`(\\bexport\\s+)?\\b(?:const|let|var)\\s+(\\w+)\\s*:\\s*Record<${named},`, 'g'))]
             .map(([, exported, table]) => ({ file, table, exported: Boolean(exported) })))
         assert.ok(tables.length > 0, `no table Record<${type}, …> in the code`)
         for (const { file, table, exported } of tables) {
-          assert.match(exported ? code : sources[file], new RegExp(`\\b${table}(?:\\[|\\.\\w)`), `${file}: ${table} is never read`)
+          assert.match(exported ? code : sources[file], new RegExp(`\\b${table}(?:\\[|\\.\\w)|\\bObject\\.(?:entries|keys|values)\\(${table}\\)`), `${file}: ${table} is never read`)
         }
       })
     }
   }
 }
-
-// What a page asks the stage to show: in each scene (an interface with its element), a field named for a
-// group Mero holds takes one of Mero's types for that group, never a string of its own.
-test('a scene’s measure and motion take Mero’s types', () => {
-  const scenes = [...code.matchAll(/\binterface\s+(\w+)[^{]*\{([\s\S]*?)\n\}/g)].filter(([, , body]) => /^\s*element:\s*'/m.test(body))
-  assert.ok(scenes.length >= 6, `found ${scenes.length} scenes`)
-  const groups = new Set(ours.flatMap(([, gs]) => Object.keys(gs)))
-  for (const [, scene, body] of scenes) {
-    for (const group of groups) {
-      const member = body.match(new RegExp(`^\\s*(?:readonly\\s+)?${group}\\??:\\s*([^\\n]+)$`, 'm'))
-      if (!member) continue
-      const named = member[1].match(/\b[A-Z]\w*\b/g) ?? []
-      assert.ok(named.some(t => typesOf(group).includes(t)), `${scene}.${group} is ${member[1].trim()}, not one of Mero’s types`)
-    }
-  }
-})

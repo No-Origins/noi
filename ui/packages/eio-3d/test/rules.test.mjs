@@ -1,29 +1,33 @@
-// The rules of the 3D world and of Eidos, as tests on @noi/eio-3d (17 Nov 2026).
-// From the user's own rules (the world's notes) and Eidos's component rules:
+// The rules of @noi/eio-3d, as tests (17 Nov 2026; the first world's own rules went with it on 23 Nov, and the new
+// world's elements came in the same day).
 // 1 · Colours come only from Eidos: no colour of its own anywhere in the package.
-// 2 · Sizes come only from Eidos: none of the world's numbers is written in the code.
-// 3 · Solid things have no edge lines: no face of the arch or its block asks for one.
-// 4 · One rule for the edge of the world: it is written once, and the painter of solid things uses it.
-// 5 · The arch is the user's side-view sketch: upright back, top reaching toward the pool, nothing at the ground.
-// 6 · The styles use Eidos's tokens and roles only, as eio-react's do.
+// 2 · An element's own numbers are its own, named in its own folder; only the shared measures (the tile, the stud)
+//     and an element's registered size or steps come from Eidos (23 Nov 2026, the user's decision on issue 131;
+//     until then "none of the new world's numbers is written in the code of its elements").
+// 3 · three.js draws every element (23 Nov 2026; until then "three.js draws the characters and nothing else",
+//     decision 7 of 17 Nov, which the user's "three.js for everything" of 21 Nov replaced): the package writes
+//     no drawing code of its own, and an element takes three.js from the world it is drawn into.
+// 4 · Everything of an element goes into the world's xyz, in the user's x, y, z; nothing is put in three.js's
+//     own order.
+// The characters (elements since 23 Nov) keep these rules too: small copies with their clips and the joints
+// standing uses; every measure as long as its number.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { archMeasure, archShape, blockShape } from '../src/arch/arch.ts'
-import { FRAG_S, EDGE } from '../src/drawing/glsl.ts'
-import { FLOATS } from '../src/drawing/gl.ts'
 
 const SRC = fileURLToPath(new URL('../src/', import.meta.url))
 const files = (dir = SRC) => readdirSync(dir).flatMap(f => statSync(join(dir, f)).isDirectory() ? files(join(dir, f)) : [join(dir, f)])
 // Each file by its name: every name in the package is its own, wherever its folder is.
 const source = Object.fromEntries(files().map(f => [basename(f), readFileSync(f, 'utf8')]))
 assert.equal(Object.keys(source).length, files().length, 'two files of the package share a name')
-const TOKENS = readFileSync(new URL('../../eio-tokens/tokens.css', import.meta.url), 'utf8')
-const defined = new Set([...TOKENS.matchAll(/^\s*(--eio-[a-z0-9-]+):/gm)].map(m => m[1]))
-// The arch as Mero holds it today (17 Nov); any arch will do for the shape's rules.
-const ARCH = { height: 56, width: 40, thickness: 4, reach: 41.44, distance: 112 }
+/** Code without its comments (a // after a colon or a backslash is part of an address or a pattern). */
+const uncommented = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1')
+/** The new world's files: the shared drawing, the elements and the character drawing (the characters joined on
+ * 23 Nov). All but the characters' measures (character-measures.ts): their words and the lines a page may draw
+ * beside a character are still the first world's (y up), kept as they were till a page shows them again. */
+const world = Object.entries(source).filter(([file]) => file !== 'character-measures.ts')
 
 test('1 · no colour of its own: colours come from Eidos', () => {
   for (const [file, text] of Object.entries(source)) {
@@ -31,224 +35,122 @@ test('1 · no colour of its own: colours come from Eidos', () => {
     assert.doesNotMatch(text, /\b0x[0-9a-f]{6}\b/i, `${file} writes a colour`)
     assert.doesNotMatch(text, /\b(rgba?|hsla?|oklch)\(/i, `${file} writes a colour`)
   }
+  // and every colour an element names is a role of Eidos, read by its path
+  // (eidos.ts is the one place a role's path becomes the variable the page gives its colour by)
+  for (const [file, text] of world.filter(([f]) => f !== 'eidos.ts')) assert.doesNotMatch(uncommented(text), /['"`]--eio-color-/, `${file} names a colour's variable by hand, not a role by its path`)
 })
 
-test('2 · none of the world\'s numbers is written in the code: they come from Eidos', () => {
-  const WORLD = ['56', '112', '41.44', '0.74', '128', '48', '0.35', '9.6', '1.6']
-  for (const [file, text] of Object.entries(source)) {
-    if (file === 'glsl.ts') continue // the card's own sums: light, grain noise, fog shares
-    const code = text.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
-    for (const n of WORLD) assert.doesNotMatch(code, new RegExp(`(?<![\\w.])${n.replace('.', '\\.')}(?![\\w.])`), `${file} writes ${n}`)
-  }
-})
+// ——— 2 · what Eidos holds, and what an element keeps as its own (23 Nov, issue 131) ———
+// THE USER'S DECISION (23 Nov 2026), after 165 numbers had been put to Mero one record each: "if we keep having
+// individual values registered each time, then the registry just becomes bloated with numbers rather than creating
+// reusable values"; "there is no point in saving individual part sizes of drone, right?"; "the stage might need
+// individual steps with width, height, and length, but a drone will have a scale"; "studs should have universally
+// one single size". So an element's part sizes, proportions, offsets and movements are its own numbers, named in
+// its own folder and approved with its fingerprint; Eidos holds only what fits elements together or is the world's
+// own (the tile, the stud, the one change of state), an element's registered size, and its steps.
+import { tokens } from '../../eio-tokens/tokens.ts'
 
-test('3 · solid things have no edge lines', () => {
-  for (const [name, data] of [['the arch', archShape(ARCH)], ['its block', blockShape(ARCH, 176)]]) {
-    assert.ok(data.length > 0 && data.length % FLOATS === 0, name)
-    for (let i = 0; i < data.length; i += FLOATS) {
-      assert.deepEqual([...data.slice(i + 10, i + 14)], [0, 0, 0, 0], `${name}: a face asks for an edge line`)
-    }
-  }
-  assert.match(source['stage.ts'], /uEdges, 0\)/, 'the stage draws solid things with no edges')
-})
-
-test('4 · one rule for the edge of the world, written once and used', () => {
-  const where = Object.entries(source).filter(([, t]) => /float\s+goneAt\s*\(/.test(t)).map(([f]) => f)
-  assert.deepEqual(where, ['glsl.ts'], 'goneAt is written once, in glsl.ts')
-  assert.ok(FRAG_S.includes(EDGE), 'the painter of solid things carries the edge rule')
-  assert.match(FRAG_S, /goneAt\(vWorld\.xz\)/, 'and asks it, by place')
-})
-
-test('5 · the arch is the user\'s side-view sketch', () => {
-  const d = archShape(ARCH)
-  const corners = []
-  for (let i = 0; i < d.length; i += FLOATS) corners.push([d[i], d[i + 1], d[i + 2]])
-  const ys = corners.map(c => c[1]), zs = corners.map(c => c[2]), xs = corners.map(c => c[0])
-  assert.equal(Math.max(...ys), ARCH.height, 'as tall as its height')
-  assert.equal(Math.min(...ys), 0, 'standing on its floor')
-  assert.equal(Math.max(...xs) - Math.min(...xs), ARCH.width, 'as wide as its width')
-  assert.equal(Math.max(...zs), ARCH.distance, 'its upright back at its distance from the pool')
-  // (The card keeps a corner to about six digits: 70.56 is held as 70.5599976.)
-  assert.ok(Math.abs(Math.min(...zs) - (ARCH.distance - ARCH.reach)) < 1e-4, 'its top reaches toward the pool by its reach')
-  // At the ground the front meets the back: the triangle comes to nothing there.
-  for (const c of corners.filter(c => c[1] === 0)) assert.equal(c[2], ARCH.distance)
-})
-
-test('5 · each measure lies on the arch it measures', () => {
-  const near = (a, b) => Math.abs(a - b) < 1e-9
-  const len = m => Math.hypot(m.to[0] - m.from[0], m.to[1] - m.from[1], m.to[2] - m.from[2])
-  for (const k of ['height', 'width', 'thickness', 'reach', 'distance']) assert.ok(near(len(archMeasure(ARCH, k)), ARCH[k]), k)
-  assert.ok(archMeasure(ARCH, 'distance').to[2] < 0, 'the arch stands at -z in the world, facing the pool at the origin')
-})
-
-for (const [file, text] of Object.entries(source).filter(([f]) => f.endsWith('.module.css'))) {
-  const css = text.replace(/\/\*[\s\S]*?\*\//g, '')
-  const values = [...css.matchAll(/:\s*([^;{}]+);/g)].map(m => m[1])
-  test(`6 · ${file}: lengths and colours only from Eidos`, () => {
-    for (const v of values) {
-      for (const [n] of v.matchAll(/-?\d*\.?\d+(px|rem|em|vh|vw|pt)\b/g)) assert.ok(parseFloat(n) === 0, `raw length ${n} in "${v}"`)
-      assert.doesNotMatch(v, /\b(white|black|grey|gray|lime)\b/i, `named colour in "${v}"`)
-    }
-    for (const [, name] of css.matchAll(/var\((--eio-[a-z0-9-]+)/g)) {
-      assert.ok(defined.has(name), `${name} is not in @noi/eio-tokens`)
-      assert.doesNotMatch(name, /^--eio-color-palette-/, 'roles, never palette colours')
-    }
-    assert.doesNotMatch(css, /@media[^{]*\b(width|min-width|max-width)\b/, 'no window widths of its own')
-  })
+/** Where each of the world's groups in Eidos may be read: the shared measures by the element that stands for them
+ * and the shared drawing (which every element uses, and which may not use an element); an element's own size and
+ * steps in its own folder only. */
+const READ_IN = {
+  tile: ['base-tile', 'drawing'], // the world's grid unit: the base tile is one tile; the drawing lays strips in tiles
+  stud: ['drawing'], // the one size of stud (drawing/studs.ts), whatever an element carries
+  states: ['drawing'], // the world's one change of state
+  character: ['character-drawing'],
+  drone: ['drone'],
+  stage: ['stage'],
+  'base-platform': ['base-platform'],
+  'mobius-platform': ['mobius-platform'],
 }
+const folderOf = file => files().find(f => basename(f) === file)?.slice(SRC.length).split('/')[0]
+const PATH = /\bnoi\.eio\.world\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)\b/g
 
-// ——— the land, its circles and its edge (17 Nov) ———
-import { circlesInRow, firstRow, landMeasure, landValue } from '../src/land/land.ts'
-import { FRAG } from '../src/drawing/glsl.ts'
-// The land as Mero holds it today (17 Nov).
-const LAND = { radius: 128, band: 48, grain: 0.35, circleRadius: 4, place: 10, dash: 1, line: 0.14, poolRadius: 20, wallWidth: 1 }
-
-test('4 · the ground painter carries the one edge rule and asks it, by place', () => {
-  assert.ok(FRAG.includes(EDGE), 'the ground painter carries the edge rule')
-  assert.match(FRAG, /float gone = goneAt\(p\);/)
+test('2 · Eidos holds the shared measures and each element\'s size and steps, and each is read where it belongs', () => {
+  const read = new Set()
+  for (const [file, text] of world) {
+    for (const [path, group] of uncommented(text).matchAll(PATH)) {
+      read.add(path)
+      assert.ok(READ_IN[group], `${file} reads ${path}: Eidos holds no group ${group} for the world`)
+      assert.ok(READ_IN[group].includes(folderOf(file)), `${file} reads ${path}, which belongs to ${READ_IN[group].join(' and ')}`)
+    }
+  }
+  // every value Eidos holds for the world is read by the package: a record nothing reads is not kept
+  const held = Object.entries(tokens.world).flatMap(([group, values]) => Object.keys(values).map(name => `noi${'.'}eio.world.${group}.${name}`))
+  for (const path of held) assert.ok(read.has(path), `Eidos holds ${path}, but no element reads it`)
+  for (const group of Object.keys(READ_IN)) assert.ok(group in tokens.world, `the rule names ${group}, which Eidos does not hold`)
 })
 
-test('the land has no grid lines (the user, 17 Nov)', () => {
-  const main = FRAG.slice(FRAG.indexOf('void main(){'))
-  assert.doesNotMatch(main, /\blines\(/, 'the ground painter draws no grid lines')
-  assert.match(main, /field\(p, cell\)/, 'it draws the circles')
-})
-
-test('the circles\' sizes come from Eidos, not from the painter', () => {
-  assert.doesNotMatch(source['glsl.ts'], /float width = 0\.14/, 'the line is Eidos\'s circles.line')
-  assert.match(source['glsl.ts'], /uCircle\.y/, 'the line comes in from Eidos')
-  assert.match(source['glsl.ts'], /rad\/max\(uCircle\.x/, 'the dashes come in from Eidos')
-})
-
-test('the circles keep their space, and none lies on the pool or its wall', () => {
-  assert.ok(firstRow(LAND) - LAND.place / 2 > LAND.poolRadius + LAND.wallWidth, 'the first row clears the wall')
-  for (let row = 0; row < 10; row++) {
-    const { R, n } = circlesInRow(LAND, row)
-    assert.ok(2 * Math.PI * R / n >= LAND.place - 1e-9, `row ${row}: circles at least a place apart`)
-    assert.ok(LAND.circleRadius < LAND.place / 2, 'a circle is smaller than its place: space between (the user, 17 Nov)')
+test('2 · the stud\'s pitch, and an element\'s registered size, are never written as a number', () => {
+  // The stud's pitch fits pieces together: a number of its size written in an element's code would drift from it
+  // (the shared drawing, which reads it, has tuning of its own that may equal it by chance, a light's share of 0.3
+  // for one). The tile's size is read only where it belongs (above): as a number, 10 is too common to refuse (a
+  // wing's lean of 10 degrees). An element's own registered size (the drone's Base size, a platform's tiles) is
+  // not written in its own folder either. Plain numbers (none, a half, one to four) and the code's own precision
+  // (to the tenth or the thousandth) are not counted.
+  const plain = new Set([0, 0.5, 1, 2, 3, 4])
+  const everywhere = [tokens.world.stud.pitch].filter(n => !plain.has(n))
+  const own = Object.fromEntries(Object.entries(READ_IN).map(([group, where]) => [group, where.length === 1 && group !== 'stud' && group !== 'states'
+    ? Object.values(tokens.world[group]).filter(n => typeof n === 'number' && !plain.has(n)) : []]))
+  const precision = /\* 10\) \/ 10|\* 1000\) \/ 1000/
+  for (const [file, text] of world) {
+    const folder = folderOf(file)
+    const refused = new Set([...(folder === 'drawing' ? [] : everywhere), ...Object.entries(own).filter(([group]) => READ_IN[group][0] === folder).flatMap(([, ns]) => ns)])
+    const lines = uncommented(text).replace(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "''").split('\n').filter(line => !precision.test(line))
+    for (const line of lines) {
+      for (const [literal] of line.matchAll(/(?<![\w.])\d+(?:\.\d+)?(?:e-?\d+)?(?![\w.])/g)) {
+        assert.ok(!refused.has(Number(literal)), `${file} writes ${literal}, a measure Eidos holds: "${line.trim()}"`)
+      }
+    }
   }
 })
 
-test('each of the land\'s measures is as long as its number', () => {
-  const len = m => Math.hypot(m.to[0] - m.from[0], m.to[1] - m.from[1], m.to[2] - m.from[2])
-  for (const k of ['radius', 'band', 'grain', 'circle-radius', 'place', 'line']) {
-    assert.ok(Math.abs(len(landMeasure(LAND, k)) - landValue(LAND, k)) < 1e-9, k)
+test('2 · an element\'s steps are read as one record of named steps', () => {
+  // A scale or the sizes one may choose are one record of named steps in Eidos (the kind "steps", 23 Nov), not a
+  // record a number: the drone's scale, the stage's width and breadth and the heights of its base.
+  const sets = Object.entries(tokens.world).flatMap(([group, values]) => Object.entries(values).filter(([, v]) => Array.isArray(v)).map(([name]) => `${group}.${name}`))
+  assert.deepEqual(sets.sort(), ['drone.scale', 'stage.base-height', 'stage.width-and-breadth'])
+  assert.deepEqual(tokens.world.drone.scale.map(s => [s.name, s.share]), [['Small', 0.5], ['Base', 1], ['Medium', 1.5], ['Large', 2]], 'the user\'s four steps, "Base" the 1 step')
+  for (const [file, text] of world) {
+    for (const [, path] of uncommented(text).matchAll(/\bsteps\('noi\.eio\.world\.([a-z0-9.-]+)'\)/g)) assert.ok(sets.includes(path), `${file} reads ${path} as steps`)
   }
-  // a dash is drawn as the chord of its arc: within a few per cent of its length
-  assert.ok(Math.abs(len(landMeasure(LAND, 'dash')) - LAND.dash) / LAND.dash < 0.05, 'dash')
 })
 
-// ——— the pool and its wall (17 Nov) ———
-import { poolMeasure, poolValue, wallShape } from '../src/pool/pool.ts'
-const WALL = { poolRadius: 20, height: 0.6, width: 1 }
-
-test('3 · the wall is one block with no edge lines, standing on the water\'s edge', () => {
-  const d = wallShape(WALL)
-  let lo = Infinity, hi = 0, top = 0
-  for (let i = 0; i < d.length; i += FLOATS) {
-    assert.deepEqual([...d.slice(i + 10, i + 14)], [0, 0, 0, 0], 'a face of the wall asks for an edge line')
-    const r = Math.hypot(d[i], d[i + 2]); lo = Math.min(lo, r); hi = Math.max(hi, r); top = Math.max(top, d[i + 1])
+// ——— 3 · three.js draws every element (23 Nov; decision 7 replaced) ———
+test('3 · three.js draws every element: the package writes no drawing code of its own', () => {
+  for (const [file, text] of Object.entries(source)) {
+    const code = uncommented(text)
+    assert.doesNotMatch(code, /getContext\(/, `${file} asks a canvas for a drawing context of its own`)
+    assert.doesNotMatch(code, /\bgl\.(draw|bind|use|create|buffer|vertex)[A-Z]/, `${file} draws by hand`)
+    assert.doesNotMatch(code, /\b(vertexShader|fragmentShader|gl_Position|gl_FragColor)\b/, `${file} writes a program for the graphics card by hand`)
   }
-  assert.ok(Math.abs(lo - WALL.poolRadius) < 1e-4, 'its inner side is the water\'s edge')
-  assert.ok(Math.abs(hi - (WALL.poolRadius + WALL.width)) < 1e-4, 'as wide as its width')
-  assert.ok(Math.abs(top - WALL.height) < 1e-6, 'as high as its height: 2 feet (agreed 17 Nov)')
+  // An element's drawing takes three.js from the world it is drawn into, so no page carries three.js before the
+  // world opens: its files import three.js's types only. The one thing of three.js the package asks for itself is
+  // the loader for model files, which three.js keeps outside its core: the character drawing asks for it when a
+  // character is first drawn, and it draws with the world's own three.js (one core for both).
+  const loads = Object.entries(source).flatMap(([f, t]) => [...uncommented(t).matchAll(/^\s*import\s+(?!type\b)[^\n]*from\s+'(three[^']*)'|\bawait import\('(three[^']*)'\)/gm)].map(m => `${f} ${m[1] ?? m[2]}`))
+  assert.deepEqual(loads, ['characters.ts three/examples/jsm/loaders/GLTFLoader.js'], 'only the loader for model files, and only when a character is drawn')
+  assert.match(uncommented(source['characters.ts']), /const THREE = world\.three/, 'a character is drawn with the world\'s three.js')
+  assert.match(uncommented(source['make.ts']), /const THREE = world\.three/, 'an element is made with the world\'s three.js')
+  assert.match(uncommented(source['light.ts']), /const THREE = world\.three/, 'and lit with it')
+  for (const name of ['make.ts', 'space.ts']) assert.match(uncommented(source[name]), /from 'three\/webgpu'|import\('three\/webgpu'\)/, `${name}: the world is drawn by three.js's newer renderer, with WebGPU where the browser has it`)
 })
 
-test('the water is the ground painter\'s, and it mirrors and moves', () => {
-  assert.match(FRAG, /uniform sampler2D uRefl;/, 'it shows the mirror picture')
-  assert.match(FRAG, /t\*1\.3\)/, 'its waves move with time')
-  assert.match(source['stage.ts'], /draw\(seconds = 0\)/, 'without a time, the stage draws the water still')
-  assert.match(source['Stage3D.tsx'], /prefers-reduced-motion: reduce/, 'reduced motion keeps the water still')
-})
-
-test('each of the pool\'s measures is as long as its number', () => {
-  const len = m => Math.hypot(m.to[0] - m.from[0], m.to[1] - m.from[1], m.to[2] - m.from[2])
-  for (const k of ['pool-radius', 'wall-height', 'wall-width']) assert.ok(Math.abs(len(poolMeasure(WALL, k)) - poolValue(WALL, k)) < 1e-9, k)
-})
-
-// ——— the steps (17 Nov) ———
-import { stepCount, stepsList, stepsMeasure, stepsShape, stepsValue } from '../src/steps/steps.ts'
-const STEPS = { start: 32, depth: 1.6, height: 0.3, top: 9.6, reach: 176 }
-
-test('the steps rise one height at a time to the top step, which runs out to where nothing is left', () => {
-  assert.equal(stepCount(STEPS), 32, 'the count is the top step\'s height over one step\'s')
-  const list = stepsList(STEPS)
-  assert.equal(list.length, 32)
-  assert.equal(list[0][0], STEPS.start, 'the first step begins where the steps begin')
-  list.forEach(([r0, r1, h], i) => {
-    assert.ok(Math.abs(h - STEPS.height * (i + 1)) < 1e-9, `step ${i + 1} is one height above the one below`)
-    if (i < list.length - 1) assert.ok(Math.abs(r1 - r0 - STEPS.depth) < 1e-9, `step ${i + 1} is one depth deep`)
-  })
-  assert.ok(Math.abs(list.at(-1)[2] - STEPS.top) < 1e-9, 'the top step is at its height')
-  assert.equal(list.at(-1)[1], STEPS.reach, 'the top step runs out to where nothing of the land is left')
-})
-
-test('the steps are plain black: only each lip, the top step\'s back and the ends ask for a line', () => {
-  const d = stepsShape(STEPS)
-  for (let i = 0; i < d.length; i += FLOATS) {
-    const up = d[i + 4] === 1, flags = [...d.slice(i + 10, i + 14)]
-    if (up) assert.equal(flags[2], 1, 'what you step on has its lip line')
-    assert.equal(flags[0] + flags[1], 0, 'no line runs across the steps')
+// ——— 4 · everything goes into xyz (21 Nov, issue 117) ———
+test('4 · everything of an element goes into the world\'s xyz: nothing is put in three.js\'s own order', () => {
+  for (const [file, text] of world) {
+    const code = uncommented(text)
+    assert.doesNotMatch(code, /\bscene\.(add|attach)\(/, `${file} puts a thing straight into the scene, not into xyz`)
+    assert.doesNotMatch(code, /\bcamera\.(position|quaternion|up|fov)\b/, `${file} moves the eye: the page that shows the world does`)
+    assert.doesNotMatch(code, /\.lookAt\(/, `${file} aims a thing in three.js's order`)
+    assert.doesNotMatch(code, /function (toThree|fromThree)\b/, `${file} has a crossing of its own`)
   }
-  assert.match(FRAG_S, /bool left = uSteps\.z > 0\.5 \? !\(c\.y < -rad && R - rad >= uSteps\.y\)/,
-    'on the steps a circle is drawn only on the top step: the narrow steps carry none (the user, 17 Nov)')
-})
-
-test('each of the steps\' measures is as long as its number', () => {
-  const len = m => Math.hypot(m.to[0] - m.from[0], m.to[1] - m.from[1], m.to[2] - m.from[2])
-  for (const k of ['start', 'depth', 'height', 'top']) assert.ok(Math.abs(len(stepsMeasure(STEPS, k)) - stepsValue(STEPS, k)) < 1e-9, k)
-  assert.ok(stepsMeasure(STEPS, 'start').to[2] < 0, 'the steps rise behind the pool, toward -z, where the arches stand')
-})
-
-// ——— the gateway and its lime ripples (17 Nov) ———
-import { gatewayShape, opening, rippleFronts, rippleSpacing } from '../src/gateway/gateway.ts'
-const RIPPLES = { gap: 1, speed: 150, tail: 16, behind: 40, ahead: 200 }
-
-test('the gateway carries on from its arch\'s opening: as wide, as tall, from its door, no lines', () => {
-  const d = gatewayShape(ARCH, 160), o = opening(ARCH)
-  const xs = [], ys = [], zs = []
-  for (let i = 0; i < d.length; i += FLOATS) {
-    xs.push(d[i]); ys.push(d[i + 1]); zs.push(d[i + 2])
-    assert.deepEqual([...d.slice(i + 10, i + 14)], [0, 0, 0, 0], 'a face of the gateway asks for an edge line')
-  }
-  assert.ok(Math.abs(Math.max(...xs) - Math.min(...xs) - o.width) < 1e-4, 'as wide as the opening: the arch less its two posts')
-  assert.ok(Math.abs(Math.max(...ys) - o.height) < 1e-4, 'as tall as the opening: the arch less its beam')
-  assert.equal(Math.min(...zs), ARCH.distance, 'it begins at the arch\'s door, its upright back')
-  assert.ok(Math.abs(Math.max(...zs) - (ARCH.distance + 160)) < 1e-4, 'as deep as asked')
-})
-
-test('a gateway is not on the land: it dissolves by depth, not by the edge of the world', () => {
-  assert.match(FRAG_S, /float gone = uDeep > 0\.5 \? 0\.0 : goneAt\(vWorld\.xz\);/)
-  assert.match(FRAG_S, /float thin = clamp\(depth\/max\(uDeep, 1\.0\), 0\.0, 1\.0\);/, 'whole at the door, nothing left at its depth')
-})
-
-test('the lime ripples: one passes the character every gap; where they start comes from Eidos', () => {
-  assert.equal(rippleSpacing(RIPPLES), 150, 'at 150 m/s past him, one every second is 150 metres apart')
-  assert.doesNotMatch(source['glsl.ts'], /smoothstep\(-40\.0, -28\.0, r\)/, 'the 40 metres behind him is Eidos\'s ripples.behind')
-  assert.match(source['glsl.ts'], /smoothstep\(-uWaveBehind, -uWaveBehind \+ 12\.0, r\)/)
-  for (const run of [0, 37.5, 75, 149]) {
-    const fronts = rippleFronts(RIPPLES, run)
-    assert.ok(fronts.every(f => f > -RIPPLES.behind - 150 && f <= RIPPLES.ahead), 'only between behind and ahead')
-    fronts.slice(1).forEach((f, i) => assert.ok(Math.abs(f - fronts[i] - 150) < 1e-9, 'one spacing apart'))
-  }
-  // they run ahead: a moment later every front is further on
-  assert.ok(rippleFronts(RIPPLES, 10)[0] > rippleFronts(RIPPLES, 0)[0])
-})
-
-// ——— the arches follow Mero (decision 12) ———
-import { archPlaces } from '../src/arch/arch.ts'
-
-test('one arch for each system Mero holds: five at the world\'s places, a sixth with nothing new', () => {
-  const five = ['noi.mer', 'noi.inv', 'noi.gov', 'noi.eio', 'noi.hyp']
-  assert.deepEqual(archPlaces(five).map(p => p.degrees), [-72, -36, 0, 36, 72], 'five stand where the world has them')
-  const six = archPlaces([...five, 'noi.new'])
-  assert.equal(six.length, 6, 'a sixth system gets an arch')
-  assert.ok(six.every(p => Math.abs(p.degrees) <= 72), 'all on the half circle')
-  assert.deepEqual(archPlaces(['a', 'b', 'c']).map(p => p.degrees), [-36, 0, 36], 'fewer keep the gap, centred')
+  assert.match(uncommented(source['light.ts']), /world\.xyz\.add\(sky, sun\)/, 'the light is put into xyz, where the sun is said in the user\'s x, y, z')
+  assert.match(uncommented(source['make.ts']), /turned\.quaternion\.copy\(world\.xyz\.quaternion\)/, 'and the mirrored room is turned as xyz is')
 })
 
 // ——— the characters (17 Nov) ———
-import { characterLine, CHARACTER_MEASURES } from '../src/character-drawing/character-measures.ts'
+import { characterLine, CHARACTER_MEASURES, measureWords } from '../src/character-drawing/character-measures.ts'
 const ASSETS = fileURLToPath(new URL('../assets/characters/', import.meta.url))
 const glbJson = f => { const b = readFileSync(f); assert.equal(b.readUInt32LE(0), 0x46546c67, `${f} is a .glb`); return JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString()) }
 
@@ -266,16 +168,13 @@ test('three characters, small copies: no pictures packed in, their clips, the sa
   }
   assert.ok(statSync(join(ASSETS, 'fairy-bot', 'wings.glb')).size < 4e6, 'the Fairy Bot\'s wings')
   // Standing is no clip (the user, 17 Nov: not the resting idle with a bent leg, "just standing"): the pose the rig
-  // was made in, legs straight, arms turned down to the sides.
-  assert.doesNotMatch(source['characters.ts'].replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, ''), /Idle_?\d/, 'no idle clip is asked for')
-  assert.match(source['characters.ts'], /if \(motion === 'stand'\) \{ this\.stand\(c\); continue \}/, 'standing plays no clip')
-  assert.match(source['characters.ts'], /sk\.skeleton\.pose\(\)/, 'standing starts from the pose the rig was made in')
-  assert.match(source['characters.ts'], /new THREE\.Vector3\(side \* STANDING\.out, -1, 0\)/, 'and turns each arm down to the side')
-})
-
-test('three.js draws the characters and nothing else (decision 7)', () => {
-  const users = Object.entries(source).filter(([, t]) => /from 'three'|import\('three'\)|import\('three\//.test(t)).map(([f]) => f)
-  assert.deepEqual(users, ['characters.ts'], 'only the characters ask for three.js')
+  // was made in, legs straight, arms turned down to the sides; a walk or a run fades back to it.
+  const drawing = uncommented(source['characters.ts'])
+  assert.doesNotMatch(drawing, /Idle_?\d/, 'no idle clip is asked for')
+  assert.match(drawing, /const CLIPS: Record<Motion, string \| null> = \{ stand: null, walk: 'Walking', run: 'Running' \}/, 'standing plays no clip')
+  assert.match(drawing, /for \(const sk of skinned\) sk\.skeleton\.pose\(\)/, 'standing starts from the pose the rig was made in')
+  assert.match(drawing, /new THREE\.Vector3\(side \* ARMS\.out, -1, 0\)\.transformDirection\(holder\.matrixWorld\)/, 'and turns each arm down to its own side, as it stands in the world')
+  assert.match(drawing, /loaded\.playing\?\.fadeOut\(how\.change\)/, 'a clip fades back to the pose it started from')
 })
 
 test('each character measure: a length is a line as long as its number; a speed or a time is words', () => {
@@ -287,4 +186,6 @@ test('each character measure: a length is a line as long as its number; a speed 
     if (m.unit === 'm') { assert.ok(line && Math.abs(len(line) - V[k]) < 1e-9, k); if (m.group === 'eye') assert.ok(line.to[2] < 0, `${k}: the eye is behind him`) }
     else assert.equal(line, null, `${k} is a ${m.unit === 's' ? 'time' : 'speed'}: words, no line`)
   }
+  assert.equal(measureWords(V, 'walk'), 'Walk · 1.4 m/s', 'its words: name, number and unit')
+  assert.equal(measureWords(V, 'height'), 'Character height · 1.8 m')
 })

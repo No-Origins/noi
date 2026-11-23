@@ -5,7 +5,7 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The files of @noi/eio-3d that belong to no one element: the export list, the settings, the type for style files, the tests of its rules and states, and the tool that made the characters’ small copies.",
+    "definition": "The files of @noi/eio-3d that belong to no one element: the export list with the list of the world's elements, the settings, the tests of its rules, its states and its elements, and the tool that made the characters’ small copies.",
     "responsibility": "Hold the files of the package that belong to no one component, so that every file of it belongs to exactly one meron. It changes only through a proposal you approve."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
@@ -14,37 +14,48 @@
     "part": "package",
     "job": "Make the 3D elements one package that apps can use, and test it.",
     "states": {},
-    "reads": [],
+    "reads": [
+      "noi.eio.world.character.height"
+    ],
     "uses": [
-      "noi.eio.components.world.arch",
+      "noi.eio.components.world.astroid",
+      "noi.eio.components.world.base-platform",
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.camera-module",
       "noi.eio.components.world.character-drawing",
+      "noi.eio.components.world.clay",
       "noi.eio.components.world.drawing",
-      "noi.eio.components.world.gateway",
-      "noi.eio.components.world.land",
-      "noi.eio.components.world.pool",
+      "noi.eio.components.world.drone",
+      "noi.eio.components.world.fairy-bot",
+      "noi.eio.components.world.mannequin",
+      "noi.eio.components.world.mobius-platform",
       "noi.eio.components.world.stage",
-      "noi.eio.components.world.steps"
+      "noi.eio.components.world.wave-platform"
     ],
     "files": [
       {
         "path": "package.json",
-        "sha256": "8ca6daaf114001803bc0e5bb5e7f46b2b1d647d1f8f1e8a23deec6cc82274c26"
-      },
-      {
-        "path": "src/css.d.ts",
-        "sha256": "7a2f87015ef7f1aeedbae628457ec9ead7f059addab8cd14865bcbe482edb643"
+        "sha256": "3e46b9ed3df4e95f3b453beee9837fde73cb920354ea8e83df1ea1aa62d0fa2c"
       },
       {
         "path": "src/index.ts",
-        "sha256": "a5624c3a88d711763aea1dd7db9ba52b20f2dffe916d50d585d723ebffa60633"
+        "sha256": "876e15cbb741162a160722caa4301a69f97a8c283c5a89582d76991e87f9a0c1"
+      },
+      {
+        "path": "test/elements.test.mjs",
+        "sha256": "fadb5fc645f38ceb338492a37877456525e34599ecd994297193c46f15d306e4"
       },
       {
         "path": "test/rules.test.mjs",
-        "sha256": "3201714469a5a50b95f952027aea5978ee045e9410c595c54f3e80a05f474196"
+        "sha256": "10c4c82393e2a09efa277ee1d7437901496ed11ab312a44a178361f72ec6c14b"
       },
       {
         "path": "test/states.test.mjs",
-        "sha256": "59ae3f1d4f5f8d35c589cb3003edbcabf84afeecb3cebd77a9e94f83e151155d"
+        "sha256": "81f4d52d4aea2a73ecc8e1513d2506b4b807bc7b6ae4cf609595365985594a15"
+      },
+      {
+        "path": "test/wave-platform.test.mjs",
+        "sha256": "d4ded237ed16dcceba5506ceb4a301a214ed5338bf2c677b4bfb00caa4c6f7de"
       },
       {
         "path": "tools/trim-character.mjs",

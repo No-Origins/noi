@@ -117,9 +117,23 @@ export type TreeRowInteraction = 'focus' | 'hover'
 /** other: not chosen · selected: chosen */
 export type TreeRowState = 'other' | 'selected'
 
-// noi.eio.components.world.arch
-/** distance: how far its back stands from the pool’s middle · height: how tall · reach: how far its top reaches toward the pool · thickness: how thick its posts and beam are · width: how wide */
-export type ArchMeasure = 'distance' | 'height' | 'reach' | 'thickness' | 'width'
+// noi.eio.components.world.astroid
+/** radius: how far its four points reach from its middle: the base tile’s corner radius · thickness: how thick it is: the base tile’s thickness */
+export type AstroidMeasure = 'radius' | 'thickness'
+/** active: glowing in its own colour, a soft light of that colour on the tiles round it · default: lying matte, in the secondary colour */
+export type AstroidState = 'active' | 'default'
+
+// noi.eio.components.world.base-platform
+/** length: how far it runs along y · width: how far it runs along x: 21 tiles */
+export type BasePlatformMeasure = 'length' | 'width'
+
+// noi.eio.components.world.base-tile
+/** border-width: how wide its border is · breadth: how far it runs along y · corner-radius: how far its corners are rounded · thickness: how thick it is · width: how far it runs along x */
+export type BaseTileMeasure = 'border-width' | 'breadth' | 'corner-radius' | 'thickness' | 'width'
+
+// noi.eio.components.world.camera-module
+/** resting: its head still, looking to the front · viewing: its head turning slowly from side to side, looking round */
+export type CameraModuleState = 'resting' | 'viewing'
 
 // noi.eio.components.world.character-drawing
 /** catchUp: Eye catch-up time · ceiling: Flight ceiling · chase: Eye in fast flight · dark: Going dark · eyeGateway: Eye in a gateway · eyeJump: Eye in the jump · fly: Fly · height: Character height · hover: Hover height · jump: Jump height · jumpHeight: Flight jump height · jumpTime: Flight jump time · leastIn: Least time in a gateway · onFoot: Eye on foot · rise: Rise and sink · run: Run · stepUp: Highest step without a jump · topSpeed: Flight top speed · walk: Walk */
@@ -130,34 +144,42 @@ export type CharacterDrawingMotion = 'run' | 'stand' | 'walk'
 // noi.eio.components.world.clay
 /** running: running · walking: walking */
 export type ClayClips = 'running' | 'walking'
+/** running: running on the spot, with the run his model carries · standing: standing plainly on his place, legs straight, arms down at his sides · walking: walking on the spot, with the walk his model carries */
+export type ClayState = 'running' | 'standing' | 'walking'
+
+// noi.eio.components.world.drone
+/** scale: how large it is, as a share of its Base size: Small 0.5, Base 1, Medium 1.5 or Large 2; its studs stay one size and grow in number */
+export type DroneSetting = 'scale'
+/** flying: flying round its place, leaning into its way, its fans turning faster · hovering: hanging over its place, rising and sinking a little, its fans turning · landed: standing on its place, its fans still */
+export type DroneState = 'flying' | 'hovering' | 'landed'
 
 // noi.eio.components.world.fairy-bot
 /** running: running · walking: walking */
 export type FairyBotClips = 'running' | 'walking'
-
-// noi.eio.components.world.gateway
-/** ahead: how far ahead they run · behind: how far behind the character ripples start · depth: how deep the gateway goes · gap: the time between lime ripples · speed: how fast a ripple runs · tail: a ripple’s tail */
-export type GatewayMeasure = 'ahead' | 'behind' | 'depth' | 'gap' | 'speed' | 'tail'
-
-// noi.eio.components.world.land
-/** band: how far past the edge nothing is left · circle-radius: a circle’s radius · dash: a dash of a circle’s line · grain: one grain of the dust · line: a circle’s line · place: the place each circle has · radius: the land’s radius */
-export type LandMeasure = 'band' | 'circle-radius' | 'dash' | 'grain' | 'line' | 'place' | 'radius'
+/** running: running on the spot, with the run its model carries · standing: standing plainly on its place, legs straight, arms down at its sides · walking: walking on the spot, with the walk its model carries */
+export type FairyBotState = 'running' | 'standing' | 'walking'
 
 // noi.eio.components.world.mannequin
 /** running: running · walking: walking */
 export type MannequinClips = 'running' | 'walking'
+/** running: running on the spot, with the run its model carries · standing: standing plainly on its place, legs straight, arms down at its sides · walking: walking on the spot, with the walk its model carries */
+export type MannequinState = 'running' | 'standing' | 'walking'
 
-// noi.eio.components.world.pool
-/** pool-radius: the pool’s radius · wall-height: the wall’s height · wall-width: the wall’s width */
-export type PoolMeasure = 'pool-radius' | 'wall-height' | 'wall-width'
+// noi.eio.components.world.mobius-platform
+/** length: how long it is all the way round · width: how wide: the base platform’s */
+export type MobiusPlatformMeasure = 'length' | 'width'
 
 // noi.eio.components.world.stage
-/** drag: turned: dragged, scrolled or pinched closer · focus: focused, with the focus ring */
-export type StageInteraction = 'drag' | 'focus'
+/** light: the one colour all its lit parts give off: lime to begin with */
+export type StageColour = 'light'
+/** breadth: how far it runs along y: 10 m to 100 m, in steps of 10 m · height: how tall its base is: 2, 4, 6, 8 or 10 m · width: how far it runs along x: 10 m to 100 m, in steps of 10 m */
+export type StageSetting = 'breadth' | 'height' | 'width'
+/** active: glowing: its borders fully, its top and its sides half as brightly · default: standing dark, in the base tile’s style */
+export type StageState = 'active' | 'default'
 
-// noi.eio.components.world.steps
-/** depth: a step’s depth · height: a step’s height · start: where the steps begin · top: the top step’s height */
-export type StepsMeasure = 'depth' | 'height' | 'start' | 'top'
+// noi.eio.components.world.wave-platform
+/** ease: over how many metres each change of curve is eased in · end: how long it runs flat after its last curve: none · run-1-long: how long run 1 is: the wave starts to rise · run-1-turn: how far run 1 turns · run-10-long: how long run 10 is: up its near side · run-10-turn: how far run 10 turns · run-11-long: how long run 11 is: curving out under its top · run-11-turn: how far run 11 turns · run-12-long: how long run 12 is: rising out past its far side · run-12-turn: how far run 12 turns · run-13-long: how long run 13 is: levelling off, higher than the start · run-13-turn: how far run 13 turns · run-2-long: how long run 2 is: rising · run-2-turn: how far run 2 turns · run-3-long: how long run 3 is: over the top of the wave · run-3-turn: how far run 3 turns · run-4-long: how long run 4 is: down the wave, leaning back a little · run-4-turn: how far run 4 turns · run-5-long: how long run 5 is: round the bottom of the wave · run-5-turn: how far run 5 turns · run-6-long: how long run 6 is: rising toward the twist · run-6-turn: how far run 6 turns · run-7-long: how long run 7 is: over the top of the twist · run-7-turn: how far run 7 turns · run-8-long: how long run 8 is: down its far side · run-8-turn: how far run 8 turns · run-9-long: how long run 9 is: round its bottom · run-9-turn: how far run 9 turns · runway: how long it runs flat before it rises: none · slant: how far aslant it is laid, so the twist passes beside itself · width: how wide: the base platform’s, 21 tiles */
+export type WavePlatformMeasure = 'ease' | 'end' | 'run-1-long' | 'run-1-turn' | 'run-10-long' | 'run-10-turn' | 'run-11-long' | 'run-11-turn' | 'run-12-long' | 'run-12-turn' | 'run-13-long' | 'run-13-turn' | 'run-2-long' | 'run-2-turn' | 'run-3-long' | 'run-3-turn' | 'run-4-long' | 'run-4-turn' | 'run-5-long' | 'run-5-turn' | 'run-6-long' | 'run-6-turn' | 'run-7-long' | 'run-7-turn' | 'run-8-long' | 'run-8-turn' | 'run-9-long' | 'run-9-turn' | 'runway' | 'slant' | 'width'
 
 /** Every component's states by key: each group and its keys. */
 export const states = {
@@ -238,8 +260,18 @@ export const states = {
     interaction: ['focus', 'hover'],
     state: ['other', 'selected'],
   },
-  'noi.eio.components.world.arch': {
-    measure: ['distance', 'height', 'reach', 'thickness', 'width'],
+  'noi.eio.components.world.astroid': {
+    measure: ['radius', 'thickness'],
+    state: ['active', 'default'],
+  },
+  'noi.eio.components.world.base-platform': {
+    measure: ['length', 'width'],
+  },
+  'noi.eio.components.world.base-tile': {
+    measure: ['border-width', 'breadth', 'corner-radius', 'thickness', 'width'],
+  },
+  'noi.eio.components.world.camera-module': {
+    state: ['resting', 'viewing'],
   },
   'noi.eio.components.world.character-drawing': {
     measure: ['catchUp', 'ceiling', 'chase', 'dark', 'eyeGateway', 'eyeJump', 'fly', 'height', 'hover', 'jump', 'jumpHeight', 'jumpTime', 'leastIn', 'onFoot', 'rise', 'run', 'stepUp', 'topSpeed', 'walk'],
@@ -247,26 +279,29 @@ export const states = {
   },
   'noi.eio.components.world.clay': {
     clips: ['running', 'walking'],
+    state: ['running', 'standing', 'walking'],
+  },
+  'noi.eio.components.world.drone': {
+    setting: ['scale'],
+    state: ['flying', 'hovering', 'landed'],
   },
   'noi.eio.components.world.fairy-bot': {
     clips: ['running', 'walking'],
-  },
-  'noi.eio.components.world.gateway': {
-    measure: ['ahead', 'behind', 'depth', 'gap', 'speed', 'tail'],
-  },
-  'noi.eio.components.world.land': {
-    measure: ['band', 'circle-radius', 'dash', 'grain', 'line', 'place', 'radius'],
+    state: ['running', 'standing', 'walking'],
   },
   'noi.eio.components.world.mannequin': {
     clips: ['running', 'walking'],
+    state: ['running', 'standing', 'walking'],
   },
-  'noi.eio.components.world.pool': {
-    measure: ['pool-radius', 'wall-height', 'wall-width'],
+  'noi.eio.components.world.mobius-platform': {
+    measure: ['length', 'width'],
   },
   'noi.eio.components.world.stage': {
-    interaction: ['drag', 'focus'],
+    colour: ['light'],
+    setting: ['breadth', 'height', 'width'],
+    state: ['active', 'default'],
   },
-  'noi.eio.components.world.steps': {
-    measure: ['depth', 'height', 'start', 'top'],
+  'noi.eio.components.world.wave-platform': {
+    measure: ['ease', 'end', 'run-1-long', 'run-1-turn', 'run-10-long', 'run-10-turn', 'run-11-long', 'run-11-turn', 'run-12-long', 'run-12-turn', 'run-13-long', 'run-13-turn', 'run-2-long', 'run-2-turn', 'run-3-long', 'run-3-turn', 'run-4-long', 'run-4-turn', 'run-5-long', 'run-5-turn', 'run-6-long', 'run-6-turn', 'run-7-long', 'run-7-turn', 'run-8-long', 'run-8-turn', 'run-9-long', 'run-9-turn', 'runway', 'slant', 'width'],
   },
 } as const

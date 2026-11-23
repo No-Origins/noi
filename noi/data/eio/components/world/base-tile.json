@@ -1,0 +1,41 @@
+{
+  "path": "noi.eio.components.world.base-tile",
+  "name": "Base tile",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "One tile for one 10 m by 10 m section of the land, its corners rounded by 1 m, matte black, with a border 0.1 m wide in Eidos’s border colour. Your words, 21 Nov.",
+    "responsibility": "Be the one base tile every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Cover one section of the land; be what the platforms, the drone’s colours and the stage are made from.",
+    "states": {
+      "measure": {
+        "width": "how far it runs along x",
+        "breadth": "how far it runs along y",
+        "thickness": "how thick it is",
+        "corner-radius": "how far its corners are rounded",
+        "border-width": "how wide its border is"
+      }
+    },
+    "reads": [
+      "noi.eio.color.border.default",
+      "noi.eio.color.world.land",
+      "noi.eio.world.tile.size",
+      "noi.eio.world.tile.thickness"
+    ],
+    "uses": [
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/base-tile/base-tile.ts",
+        "sha256": "ae01e594d0ce30664c0fae4dcc30b9912fb8e9daf659d53e273d25180bf9c919"
+      }
+    ]
+  }
+}
