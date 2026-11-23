@@ -43,28 +43,7 @@
     },
     "reads": [
       "noi.eio.color.world.light",
-      "noi.eio.world.character.arms-out",
-      "noi.eio.world.character.depth",
-      "noi.eio.world.character.height",
-      "noi.eio.world.character.step-up",
-      "noi.eio.world.character.width",
-      "noi.eio.world.eye.chase",
-      "noi.eio.world.eye.gateway",
-      "noi.eio.world.eye.jump",
-      "noi.eio.world.eye.on-foot",
-      "noi.eio.world.flight.catch-up",
-      "noi.eio.world.flight.dark",
-      "noi.eio.world.flight.jump-height",
-      "noi.eio.world.flight.jump-time",
-      "noi.eio.world.flight.least-in",
-      "noi.eio.world.flight.top-speed",
-      "noi.eio.world.movement.ceiling",
-      "noi.eio.world.movement.fly",
-      "noi.eio.world.movement.hover",
-      "noi.eio.world.movement.jump",
-      "noi.eio.world.movement.rise",
-      "noi.eio.world.movement.run",
-      "noi.eio.world.movement.walk"
+      "noi.eio.world.character.height"
     ],
     "uses": [
       "noi.eio.components.world.drawing"
@@ -72,11 +51,11 @@
     "files": [
       {
         "path": "src/character-drawing/character-measures.ts",
-        "sha256": "03f4ad5cd80de2e8ae7d766068285018a70b298e665693375634461af83c2892"
+        "sha256": "0eb4a13db7286dec1c35d8b1e3442f24426734a3a741691e87ea7f1257f396e3"
       },
       {
         "path": "src/character-drawing/characters.ts",
-        "sha256": "06fb17d762ffb8a35345faa070f60c66966510128be539da71752da9f1974a79"
+        "sha256": "3d3bd943a7a394c77eb2fbde9be2984adc23c4de365d0ca956948838e43f5488"
       }
     ]
   }

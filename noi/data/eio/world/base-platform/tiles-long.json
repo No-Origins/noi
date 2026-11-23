@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.base-platform.tiles-long",
+  "name": "Base platform, tiles long",
+  "classification": {
+    "type": "token",
+    "subtype": "count"
+  },
+  "semantics": {
+    "definition": "How many tiles the base platform runs along y: 60, so y runs to 600 m. Your word: \"maybe we can make y up to 600\".",
+    "responsibility": "Size the base platform and the land, in tiles."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "count": 60
+  }
+}

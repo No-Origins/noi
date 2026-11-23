@@ -5,8 +5,9 @@
 //
 // Nothing here knows three.js, but for the code a thing drawn from files comes with (Model), which is handed in
 // with its data and named here by its type only. Like every thing, an element stands on its place by the middle of its base: its
-// outline is drawn round 0, 0, and it rises from z 0. Every number of an element is a value of Eidos, and every
-// colour a role of Eidos by its token's name (eidos.ts).
+// outline is drawn round 0, 0, and it rises from z 0. Every colour is a role of Eidos by its token's name
+// (eidos.ts). Since 23 Nov 2026 (issue 131) an element's own numbers are its own, named in its folder; only the
+// tile, the stud, its registered size and its steps are Eidos's.
 //
 // What an element can be grew with the user's words, each written where it is used below: a slab, the astroid
 // (21 Nov); a ring and a thing made of pieces, studs, states (22 Nov); frosted glass, a piece's border, borders
@@ -16,7 +17,7 @@
 // removed at the user's word on 22 Nov and are no longer here.
 import type { CharacterDrawingMotion } from '@noi/eio-tokens/components'
 import type { Bend } from './bend.ts'
-import { role, value } from './eidos.ts'
+import { role } from './eidos.ts'
 import type { Drawn, DrawnHow } from './make.ts'
 import type { Frame, Size, ThreeWorld, Xyz } from './space.ts'
 
@@ -209,6 +210,9 @@ export interface WorldElement {
   /** The same element in another size, when its size can be chosen (a setting `size`): so wide along x, so long
    * along y, and so tall. Which of its parts is that tall is the element's own to say (of the stage: its base). */
   readonly sized?: (to: Size) => WorldElement
+  /** The same element at another step of its scale, when it has one (a setting `scale`): so many times its Base
+   * size. What grows with it, and what stays one size (the drone's studs), is the element's own to say. */
+  readonly scaled?: (factor: number) => WorldElement
 }
 
 /** A COLOUR OF AN ELEMENT THAT ONE MAY TRY OUT (23 Nov 2026, issue 127). The user, of the stage: "I actually love
@@ -257,7 +261,9 @@ export function coloursIn(e: WorldElement, state: ElementState | null | undefine
  * the stage. Only controls we need are colour, width, breadth and height. The height is only for base. Sizes are
  * steps of 10m." So what a setting sets now is a size: how far the element runs along x (its width), along y
  * (its breadth), or how tall it is (z). Each is in a group, has a name in words, offers steps to choose among,
- * and has the value the element is made with. Choosing one makes the element again in that size (`sized`). */
+ * and has the value the element is made with. Choosing one makes the element again in that size (`sized`).
+ * A setting may instead set a step of the element's scale (23 Nov 2026, the drone): its steps are shares of the
+ * element's Base size, and choosing one makes the element again at that step (`scaled`). */
 export interface ElementSetting {
   /** What code calls it. */
   readonly id: string
@@ -265,18 +271,30 @@ export interface ElementSetting {
   readonly group: string
   /** What it is called in words. */
   readonly name: string
-  readonly sets: { readonly what: 'size'; readonly along: 'x' | 'y' | 'z' }
+  readonly sets: { readonly what: 'size'; readonly along: 'x' | 'y' | 'z' } | { readonly what: 'scale' }
   /** What one may choose: each a name in words and the number it stands for. */
   readonly steps: ReadonlyArray<{ readonly name: string; readonly value: number }>
   /** The number the element is made with: one of the steps. */
   readonly value: number
 }
 
-/** The size an element is made in when some of its sizes are chosen: `chosen` by x, y and z, and for the rest
- * the numbers its own settings say it is made with. Null when its size cannot be chosen. */
-export function sizedBy(e: WorldElement, chosen: Partial<Size>): WorldElement | null {
+/** What a choice of sizes is: a size along x, y or z, or a step of a scale (`scale`, so many times the Base size). */
+export type Chosen = Partial<Size> & { readonly scale?: number }
+
+/** What a setting is chosen under: the way it sizes the element along (x, y or z), or `scale`. */
+export function chosenAs(setting: ElementSetting): keyof Chosen {
+  return setting.sets.what === 'scale' ? 'scale' : setting.sets.along
+}
+
+/** The element made in the sizes chosen: `chosen` by x, y and z, or by a step of its scale, and for the rest the
+ * numbers its own settings say it is made with. Null when its size cannot be chosen. A SCALE (23 Nov 2026, issue
+ * 131): the user decided that the drone is sized by a scale, "small, default, medium, large can be 0.5, 1, 1.5, and
+ * 2", while the stage is sized along each way in steps; so an element may be made at a step of its scale. */
+export function sizedBy(e: WorldElement, chosen: Chosen): WorldElement | null {
+  const made = (as: keyof Chosen) => e.settings?.find(s => chosenAs(s) === as)?.value
+  if (e.scaled) return e.scaled(chosen.scale ?? made('scale') ?? 1)
   if (!e.sized) return null
-  const own = (along: 'x' | 'y' | 'z') => chosen[along] ?? e.settings?.find(s => s.sets.along === along)?.value ?? e.size[along]
+  const own = (along: 'x' | 'y' | 'z') => chosen[along] ?? made(along) ?? e.size[along]
   return e.sized({ x: own('x'), y: own('y'), z: own('z') })
 }
 
@@ -388,10 +406,14 @@ function standsAlone(piece: WorldElement, ground: WorldElement): boolean {
 }
 
 /** Where a piece with sockets goes on a thing with studs: the place for the middle of the piece's base, in the
- * thing's own x, y and z, at which every socket of the piece is over a stud of the thing. Null when there is no
- * such place: the two must be on one grid (the same pitch and the same size of stud), and the piece's sockets
- * as deep as the studs are tall.
- * And where a thing goes on ground: the place the ground's data says, for a thing that stands by itself. */
+ * thing's own x, y and z. The two must be on one grid (the same pitch and the same size of stud), and the piece's
+ * sockets as deep as the studs are tall. ONE SIZE OF STUD (23 Nov 2026, issue 131): a larger element carries more
+ * studs, not larger ones, so as with the toy's bricks a piece goes on wherever its sockets take studs: every stud
+ * under its base goes into a socket, and at least one does. Of those places it takes the one that holds the most
+ * studs, and of those the one nearest the middle; so the camera module (four sockets) stands on the middle of a
+ * drone with sixteen studs, and on the one stud of the smallest drone.
+ * And where a thing goes on ground: the place the ground's data says, for a thing that stands by itself. Null when
+ * there is no such place. */
 export function fitsOn(piece: WorldElement, onto: WorldElement): Xyz | null {
   if (onto.ground) {
     if (!standsAlone(piece, onto)) return null
@@ -404,15 +426,25 @@ export function fitsOn(piece: WorldElement, onto: WorldElement): Xyz | null {
     return { x: x + on(piece.size.x), y: y + on(piece.size.y), z }
   }
   const [sockets, studs] = [piece.sockets, onto.studs]
-  const first = sockets?.at[0]
-  if (!sockets || !studs || !first) return null
+  if (!sockets || !studs || sockets.at.length === 0) return null
   const same = (a: number, b: number) => Math.abs(a - b) < 1e-9
   if (!same(sockets.pitch, studs.pitch) || !same(sockets.radius, studs.radius) || sockets.height < studs.height - 1e-9) return null
+  // the square the sockets take under the piece, half a pitch round the outer sockets
+  const [xs, ys] = [sockets.at.map(s => s.x), sockets.at.map(s => s.y)]
+  const half = sockets.pitch / 2
+  const under = { x: [Math.min(...xs) - half, Math.max(...xs) + half], y: [Math.min(...ys) - half, Math.max(...ys) + half] } as const
+  let best: { move: Xyz; held: number; off: number } | null = null
   for (const stud of studs.at) {
-    const move = { x: stud.x - first.x, y: stud.y - first.y, z: stud.z - first.z }
-    if (sockets.at.every(s => studs.at.some(t => same(t.x, s.x + move.x) && same(t.y, s.y + move.y) && same(t.z, s.z + move.z)))) return move
+    for (const socket of sockets.at) {
+      const move = { x: stud.x - socket.x, y: stud.y - socket.y, z: stud.z - socket.z }
+      // the studs under the piece's base, at this place; each must go into a socket
+      const covered = studs.at.filter(t => same(t.z, move.z) && t.x - move.x > under.x[0] && t.x - move.x < under.x[1] && t.y - move.y > under.y[0] && t.y - move.y < under.y[1])
+      if (!covered.every(t => sockets.at.some(s => same(s.x + move.x, t.x) && same(s.y + move.y, t.y)))) continue
+      const off = Math.hypot(move.x, move.y)
+      if (!best || covered.length > best.held || (covered.length === best.held && off < best.off - 1e-9)) best = { move, held: covered.length, off }
+    }
   }
-  return null
+  return best ? { x: best.move.x === 0 ? 0 : best.move.x, y: best.move.y === 0 ? 0 : best.move.y, z: best.move.z } : null
 }
 
 /** A length in words: to the millimetre at the finest, with no long tail. */
@@ -468,16 +500,20 @@ export function inWords(e: WorldElement): string {
 /** Which way the eye first stands from an element (firstSight). (Till 22 Nov 2026: x 0.42. The user had x turned
  * round, place.ts in the Explorer; the eye stays where it was.) */
 const TOWARD = { x: -0.42, y: -0.72, z: 0.55 } as const
+/** How the eye first frames an element: it sees at most this many degrees from the bottom of its picture to the
+ * top, and stands this many times as far back as the element's farthest corner needs. */
+const FIRST_SIGHT = { widestAngle: 50, margin: 1.15 } as const
 
 /** Where the eye stands to see the whole of an element, and what it looks at: a pick of mine, so that the
  * gallery's picture and the first sight in the 3D view are the same for every element. It stands toward low y
  * and a little toward low x, above, far enough for the element's farthest corner to be in sight, with a margin.
- * Which way it stands from the element (`TOWARD`) is a way, which no kind of value in Eidos holds: it is this
- * file's own. Where it stands is said to the tenth of a metre. */
-export function firstSight(e: WorldElement, widestAngle = value('noi.eio.world.first-sight.widest-angle')): { from: Xyz; at: Xyz } {
+ * Which way it stands from the element (`TOWARD`), how wide the eye sees at the widest (`FIRST_SIGHT`) and the
+ * margin round the element are this file's own (the drawing's tuning, not registered). Where it stands is said to
+ * the tenth of a metre. */
+export function firstSight(e: WorldElement, widestAngle: number = FIRST_SIGHT.widestAngle): { from: Xyz; at: Xyz } {
   const at = { x: 0, y: 0, z: e.size.z / 2 }
   const reach = Math.hypot(e.size.x, e.size.y, e.size.z) / 2
-  const far = (reach / Math.sin((widestAngle / 2) * (Math.PI / 180))) * value('noi.eio.world.first-sight.margin')
+  const far = (reach / Math.sin((widestAngle / 2) * (Math.PI / 180))) * FIRST_SIGHT.margin
   const long = Math.hypot(TOWARD.x, TOWARD.y, TOWARD.z)
   const round = (n: number) => Math.round(n * 10) / 10
   return {

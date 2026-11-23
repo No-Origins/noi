@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.drone.base-size",
+  "name": "Drone, Base size",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far the drone runs across, along x and along y, at its Base step (rings included): every part of it is a share of this, and each step of its scale is a share of it. A guess, not agreed: it is the size the drone was made in, 3.68 m (whether to round it to 4 m is open).",
+    "responsibility": "Size the drone, and with it every step of its scale."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 3.68
+  }
+}

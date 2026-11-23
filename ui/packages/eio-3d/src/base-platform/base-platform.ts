@@ -10,17 +10,19 @@
 // a time, as on the drone; that what can be placed is whatever stands by itself (so not the camera module,
 // which goes on studs, and not the tiles and astroids the platform is laid from).
 // Like every element it stands by the middle of its base, so its middle is x 0, y 0. On the land the same
-// platform is counted from the middle of its beginning's side; the land reads the same two values.
+// platform is counted from the middle of its beginning's side; the land reads the same two measures.
+// IN TILES (23 Nov 2026, issue 131): the user decided a platform is sized on the grid, so its size is held as a
+// count of tiles (noi.eio.world.base-platform), and its measures in metres are worked out from the tile.
 import type { BasePlatformMeasure } from '@noi/eio-tokens/components'
 import { ASTROID } from '../astroid/astroid.ts'
 import { BASE_TILE } from '../base-tile/base-tile.ts'
 import { value } from '../drawing/eidos.ts'
 import type { Laid, WorldElement } from '../drawing/element.ts'
 
-/** Each measure of the base platform, as Eidos holds it, in metres. */
+/** Each measure of the base platform, in metres: as many tiles across and along as Eidos holds. */
 export const BASE_PLATFORM_MEASURES: Record<BasePlatformMeasure, number> = {
-  width: value('noi.eio.world.base-platform.width'),
-  length: value('noi.eio.world.base-platform.length'),
+  width: value('noi.eio.world.base-platform.tiles-across') * BASE_TILE.size.x,
+  length: value('noi.eio.world.base-platform.tiles-long') * BASE_TILE.size.y,
 }
 
 const things: Array<{ element: WorldElement; at: { x: number; y: number } }> = (() => {

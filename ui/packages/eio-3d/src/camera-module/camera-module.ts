@@ -23,54 +23,63 @@
 // THROUGH THE CAMERA (23 Nov 2026). The user: "Also add Camera view, I mean, through the camera." FROM THE USER'S
 // WORDS: one can look through it. MY PICKS: the eye is mid-way between the two lenses, just before their fronts, so
 // nothing of the camera is in its own way; it turns with the head; how wide it sees.
-// Every number is Eidos's (noi.eio.world.camera-module), and so is every colour.
+// ONE SIZE (23 Nov 2026, issue 131). The user decided that an element's part sizes are not registered ("there is no
+// point in saving individual part sizes"), that the studs have one size everywhere, and that a larger drone carries
+// more of them. So every number below is this element's own; its four sockets keep the stud's pitch (Eidos's, by
+// drawing/studs.ts), and it goes on a drone of any size: on the middle of a larger one, on the one stud of the
+// smallest. Whether the camera module itself comes in sizes is not decided: it has one.
+// Every colour is Eidos's.
 import type { CameraModuleState } from '@noi/eio-tokens/components'
 import { BASE_TILE } from '../base-tile/base-tile.ts'
-import { role, value } from '../drawing/eidos.ts'
+import { role } from '../drawing/eidos.ts'
 import type { ElementState, Piece, Pieces, Studs, Surface, WorldElement } from '../drawing/element.ts'
-import { STUD_GRID, STUDS_A_SIDE, squareOfStuds } from '../drawing/studs.ts'
+import { STUD_GRID, squareOfStuds } from '../drawing/studs.ts'
+
+/** How many sockets a side of its base has: two, so four in all, as on the toy's two-by-two brick, the drone's
+ * four studs at its Base size. */
+const SOCKETS_A_SIDE = 2
 
 const v = {
-  base: { side: STUDS_A_SIDE * STUD_GRID.pitch, corner: value('noi.eio.world.camera-module.base-corner') * STUD_GRID.pitch, tall: value('noi.eio.world.camera-module.base-height') },
-  plate: { radius: value('noi.eio.world.camera-module.plate-radius') * STUD_GRID.pitch, tall: value('noi.eio.world.camera-module.plate-height') },
-  neck: { radius: value('noi.eio.world.camera-module.neck-radius'), tall: value('noi.eio.world.camera-module.neck-height') },
+  base: { side: SOCKETS_A_SIDE * STUD_GRID.pitch, corner: 0.2 * STUD_GRID.pitch, tall: 0.1 },
+  plate: { radius: 0.9 * STUD_GRID.pitch, tall: 0.05 },
+  neck: { radius: 0.11, tall: 0.19 },
   /** The head, seen from the front: so wide, so tall, its ends round; and so deep from front to back. */
-  head: { wide: value('noi.eio.world.camera-module.head-width'), tall: value('noi.eio.world.camera-module.head-height'), deep: value('noi.eio.world.camera-module.head-depth') },
+  head: { wide: 1, tall: 0.42, deep: 0.44 },
   /** The dark face on the head's front, standing `proud` of it. */
-  face: { wide: value('noi.eio.world.camera-module.face-width'), tall: value('noi.eio.world.camera-module.face-height'), proud: value('noi.eio.world.camera-module.face-proud') },
+  face: { wide: 0.9, tall: 0.32, proud: 0.012 },
   /** The two lenses: their middles `apart`, each a ring with glass in it. */
   lens: {
-    apart: value('noi.eio.world.camera-module.lens-apart'),
-    outer: value('noi.eio.world.camera-module.lens-outer'),
-    inner: value('noi.eio.world.camera-module.lens-inner'),
-    proud: value('noi.eio.world.camera-module.lens-proud'),
-    glassProud: value('noi.eio.world.camera-module.glass-proud'),
+    apart: 0.5,
+    outer: 0.125,
+    inner: 0.095,
+    proud: 0.05,
+    glassProud: 0.02,
   },
   /** A thin ring of light on each lens's front, round the glass: `wide` from the glass out, `proud` thick. */
-  lensRing: { wide: value('noi.eio.world.camera-module.lens-ring-width'), proud: value('noi.eio.world.camera-module.lens-ring-proud') },
+  lensRing: { wide: 0.012, proud: 0.002 },
   /** The lights on the base's sides (`each` on every side, half a pitch from one to the next), the light between
    * the lenses, and the strip along the head's top. */
   lights: {
-    each: value('noi.eio.world.camera-module.base-lights-each'),
+    each: 3,
     apart: STUD_GRID.pitch / 2,
-    wide: value('noi.eio.world.camera-module.base-light-width'),
-    tall: value('noi.eio.world.camera-module.base-light-height'),
-    proud: value('noi.eio.world.camera-module.base-light-proud'),
-    up: value('noi.eio.world.camera-module.base-light-up'),
+    wide: 0.03,
+    tall: 0.045,
+    proud: 0.012,
+    up: 0.028,
   },
-  bar: { wide: value('noi.eio.world.camera-module.bar-width'), tall: value('noi.eio.world.camera-module.bar-height'), proud: value('noi.eio.world.camera-module.bar-proud') },
+  bar: { wide: 0.07, tall: 0.014, proud: 0.004 },
   strip: {
-    long: value('noi.eio.world.camera-module.strip-length'),
-    wide: value('noi.eio.world.camera-module.strip-width'),
-    tall: value('noi.eio.world.camera-module.strip-height'),
-    forward: value('noi.eio.world.camera-module.strip-forward'),
+    long: 0.34,
+    wide: 0.02,
+    tall: 0.006,
+    forward: 0.08,
   },
 } as const
 const GLASS: Surface = { colour: role('noi.eio.color.world.land'), finish: 'glossy', says: 'glossy black' }
 const LIGHT: Surface = { colour: role('noi.eio.color.action.primary'), finish: 'lit', says: 'lit, in the primary colour' }
 /** Where the camera module takes the studs of what it is set on: a square of sockets on the studs' grid, each as
  * wide as a stud and as deep as a stud is tall, at its base. */
-const SOCKETS: Studs = squareOfStuds(0)
+const SOCKETS: Studs = squareOfStuds(SOCKETS_A_SIDE, 0)
 
 const pieces: Piece[] = (() => {
   const c = v
@@ -131,7 +140,7 @@ export const CAMERA_MODULE_STATES: Record<CameraModuleState, Omit<ElementState, 
   viewing: {
     name: 'Viewing',
     says: 'Its head turns slowly from side to side, looking round.',
-    sweep: { part: 'head', by: value('noi.eio.world.camera-module.sweep'), every: value('noi.eio.world.camera-module.sweep-every') },
+    sweep: { part: 'head', by: 40, every: 6 },
   },
 }
 
@@ -146,9 +155,9 @@ export const CAMERA_MODULE: WorldElement & { readonly shape: Pieces; readonly so
   surface: { ...BASE_TILE.surface, says: 'matte black, with glossy black glass and lights in the primary colour' },
   sockets: SOCKETS,
   lookOut: {
-    at: { x: 0, y: 0 - v.head.deep / 2 - v.face.proud - v.lens.proud - v.lensRing.proud - value('noi.eio.world.camera-module.eye-clearance'), z: v.base.tall + v.plate.tall + v.neck.tall + v.head.tall / 2 },
+    at: { x: 0, y: 0 - v.head.deep / 2 - v.face.proud - v.lens.proud - v.lensRing.proud - 0.01, z: v.base.tall + v.plate.tall + v.neck.tall + v.head.tall / 2 },
     part: 'head',
-    sees: value('noi.eio.world.camera-module.sees'),
+    sees: 60,
   },
   states: Object.entries(CAMERA_MODULE_STATES).map(([id, state]) => ({ id, ...state })),
 }

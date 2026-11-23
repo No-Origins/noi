@@ -5,18 +5,29 @@
 // size to be 0.1 meters." So the outermost part of a tile, all the way round and through its whole thickness, is
 // its border; the tile stays as large. MY PICKS, not the user's word: the border's colour (Eidos's own border
 // colour, as on Eidos's cards; they gave its size only), and that it is matte like the rest.
-// Its measures are Eidos's (noi.eio.world.base-tile), each by the key Mero holds for it.
+// THE TILE IS THE WORLD'S (23 Nov 2026, issue 131). The user decided which numbers are registered: "there is no
+// point in saving individual part sizes", and the tile is the world's grid unit. So the tile's size and thickness
+// are Eidos's (noi.eio.world.tile), read here and taken from BASE_TILE by everything else; the tile's corner
+// radius and border width are this element's own, named below (both the user's words of 21 Nov).
+// Its measures are given by the key Mero holds for each.
 import type { BaseTileMeasure } from '@noi/eio-tokens/components'
 import { role, value } from '../drawing/eidos.ts'
 import type { Border, Slab, WorldElement } from '../drawing/element.ts'
 
-/** Each measure of the base tile, as Eidos holds it, in metres. */
+/** The tile, the world's grid unit: how far it runs along x and along y, and how thick it is (Eidos's). */
+const TILE = { size: value('noi.eio.world.tile.size'), thickness: value('noi.eio.world.tile.thickness') } as const
+/** How round the tile's corners are, and how wide its border is, in metres: the user's "1 meter border radius"
+ * and "keep the border size to be 0.1 meters". */
+const CORNER_RADIUS = 1
+const BORDER_WIDTH = 0.1
+
+/** Each measure of the base tile, in metres. */
 export const BASE_TILE_MEASURES: Record<BaseTileMeasure, number> = {
-  width: value('noi.eio.world.base-tile.width'),
-  breadth: value('noi.eio.world.base-tile.breadth'),
-  thickness: value('noi.eio.world.base-tile.thickness'),
-  'corner-radius': value('noi.eio.world.base-tile.corner-radius'),
-  'border-width': value('noi.eio.world.base-tile.border-width'),
+  width: TILE.size,
+  breadth: TILE.size,
+  thickness: TILE.thickness,
+  'corner-radius': CORNER_RADIUS,
+  'border-width': BORDER_WIDTH,
 }
 
 /** The base tile: one tile for one section of the land. */

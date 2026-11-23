@@ -30,23 +30,8 @@
     "reads": [
       "noi.eio.color.action.primary",
       "noi.eio.color.world.wall",
-      "noi.eio.world.stage.active-border-bright",
-      "noi.eio.world.stage.active-glass-bright",
-      "noi.eio.world.stage.active-sides-bright",
-      "noi.eio.world.stage.active-top-bright",
       "noi.eio.world.stage.base-height",
-      "noi.eio.world.stage.block-shine",
-      "noi.eio.world.stage.border-grows",
-      "noi.eio.world.stage.gap-grows",
-      "noi.eio.world.stage.glass-frost",
-      "noi.eio.world.stage.glass-gap",
-      "noi.eio.world.stage.glass-grows",
-      "noi.eio.world.stage.glass-hides",
-      "noi.eio.world.stage.glass-thickness",
-      "noi.eio.world.stage.post-width",
-      "noi.eio.world.stage.size-step",
-      "noi.eio.world.stage.tallest-base",
-      "noi.eio.world.stage.widest"
+      "noi.eio.world.stage.width-and-breadth"
     ],
     "uses": [
       "noi.eio.components.world.base-tile",
@@ -55,7 +40,7 @@
     "files": [
       {
         "path": "src/stage/stage.ts",
-        "sha256": "7cdae720802da0a8c38d90d6a9a842048113deaf41ecaaa589bc0a33b1574d71"
+        "sha256": "bf1906ce7716bc8618b0400017beea076f712696eaea8f33b177967979adb902"
       }
     ]
   }

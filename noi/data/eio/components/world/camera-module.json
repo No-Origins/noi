@@ -21,42 +21,7 @@
     },
     "reads": [
       "noi.eio.color.action.primary",
-      "noi.eio.color.world.land",
-      "noi.eio.world.camera-module.bar-height",
-      "noi.eio.world.camera-module.bar-proud",
-      "noi.eio.world.camera-module.bar-width",
-      "noi.eio.world.camera-module.base-corner",
-      "noi.eio.world.camera-module.base-height",
-      "noi.eio.world.camera-module.base-light-height",
-      "noi.eio.world.camera-module.base-light-proud",
-      "noi.eio.world.camera-module.base-light-up",
-      "noi.eio.world.camera-module.base-light-width",
-      "noi.eio.world.camera-module.base-lights-each",
-      "noi.eio.world.camera-module.eye-clearance",
-      "noi.eio.world.camera-module.face-height",
-      "noi.eio.world.camera-module.face-proud",
-      "noi.eio.world.camera-module.face-width",
-      "noi.eio.world.camera-module.glass-proud",
-      "noi.eio.world.camera-module.head-depth",
-      "noi.eio.world.camera-module.head-height",
-      "noi.eio.world.camera-module.head-width",
-      "noi.eio.world.camera-module.lens-apart",
-      "noi.eio.world.camera-module.lens-inner",
-      "noi.eio.world.camera-module.lens-outer",
-      "noi.eio.world.camera-module.lens-proud",
-      "noi.eio.world.camera-module.lens-ring-proud",
-      "noi.eio.world.camera-module.lens-ring-width",
-      "noi.eio.world.camera-module.neck-height",
-      "noi.eio.world.camera-module.neck-radius",
-      "noi.eio.world.camera-module.plate-height",
-      "noi.eio.world.camera-module.plate-radius",
-      "noi.eio.world.camera-module.sees",
-      "noi.eio.world.camera-module.strip-forward",
-      "noi.eio.world.camera-module.strip-height",
-      "noi.eio.world.camera-module.strip-length",
-      "noi.eio.world.camera-module.strip-width",
-      "noi.eio.world.camera-module.sweep",
-      "noi.eio.world.camera-module.sweep-every"
+      "noi.eio.color.world.land"
     ],
     "uses": [
       "noi.eio.components.world.base-tile",
@@ -65,7 +30,7 @@
     "files": [
       {
         "path": "src/camera-module/camera-module.ts",
-        "sha256": "0407d3e28431ab533f3850a3b72c47f80643b46a573447c4f9551effdf549ac8"
+        "sha256": "68b52582c081a85987fc73dee6d9695f8aa31038e2ecc5f1684f9e1bb736f3d8"
       }
     ]
   }

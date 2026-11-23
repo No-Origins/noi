@@ -48,10 +48,10 @@ export interface Wave {
 
 const deg = Math.PI / 180
 
-/** A base tile's breadth and width: the strip is laid in whole rows of tiles, and its reach is found at their
- * corners. */
-const ROW = () => value('noi.eio.world.base-tile.breadth')
-const COLUMN = () => value('noi.eio.world.base-tile.width')
+/** A tile's breadth and width, the world's tile (square): the strip is laid in whole rows of tiles, and its
+ * reach is found at their corners. */
+const ROW = () => value('noi.eio.world.tile.size')
+const COLUMN = () => value('noi.eio.world.tile.size')
 
 /** The length of the strip along its middle (whole rows of tiles). */
 export function lengthOf(wave: Wave): number {

@@ -20,18 +20,18 @@
       }
     },
     "reads": [
-      "noi.eio.world.base-platform.width",
-      "noi.eio.world.mobius-platform.length"
+      "noi.eio.world.mobius-platform.tiles-round"
     ],
     "uses": [
       "noi.eio.components.world.astroid",
+      "noi.eio.components.world.base-platform",
       "noi.eio.components.world.base-tile",
       "noi.eio.components.world.drawing"
     ],
     "files": [
       {
         "path": "src/mobius-platform/mobius-platform.ts",
-        "sha256": "517e53c65b661bfc3ea0e501c06e04f1277e98c9447bedccaca7e3e20742efaa"
+        "sha256": "3d20421943515eef488084b71496e5198d47daa514332907d2a224b064f2d860"
       }
     ]
   }

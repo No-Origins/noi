@@ -253,9 +253,10 @@ test('the astroid has a default state and an active one, in which it glows all o
   assert.equal(active.glow.colour, ASTROID.surface.colour, 'it glows in its own colour, the secondary')
   assert.deepEqual(active.glow.borders, [], 'it has no border to light: all of it is lit')
   const whole = active.glow.whole
-  assert.equal(whole.bright, value('noi.eio.world.astroid.active-bright'))
+  // its own numbers since 23 Nov (issue 131): the glow the user saw and said "Glow is right" of
+  assert.equal(whole.bright, 1.5)
   assert.ok(whole.bright > 1, 'it gives off more than the colour itself')
-  assert.deepEqual(whole.round, { across: value('noi.eio.world.astroid.active-light-across'), above: value('noi.eio.world.astroid.active-light-above'), bright: value('noi.eio.world.astroid.active-light-bright') })
+  assert.deepEqual(whole.round, { across: 9, above: 0.05, bright: 0.5 })
   assert.ok(whole.round.across > ASTROID.size.x && whole.round.across < BASE_TILE.size.x, 'the light round it reaches beyond it, and not as far as the next astroid\'s')
   assert.ok(whole.round.above > 0, 'and lies over the tiles\' tops, never in them')
   // a made thing acts that out, alone or laid many times
@@ -299,11 +300,12 @@ test('the drone is our astroid with a round ring in each of its four curved side
   assert.equal(DRONE.shape.kind, 'pieces')
   const pieces = DRONE.shape.pieces
   const r = ASTROID.shape.radius
-  // "use our astroid primitive": the body is the astroid itself, not a copy of its numbers
+  // "use our astroid primitive": the body is the astroid's shape; at its Base size as large and as thick as the
+  // astroid between four tiles (since 23 Nov, issue 131, it is sized from the drone's own Base size)
   const bodies = pieces.filter(p => p.shape.kind === 'astroid' && !p.spin)
   assert.equal(bodies.length, 1)
-  assert.equal(bodies[0].shape, ASTROID.shape, 'the body is our astroid primitive itself')
-  assert.equal(bodies[0].size, ASTROID.size, 'as large and as thick')
+  assert.deepEqual(bodies[0].shape, ASTROID.shape, 'the body is our astroid primitive')
+  assert.deepEqual(bodies[0].size, ASTROID.size, 'as large and as thick, at its Base size')
   assert.deepEqual(bodies[0].at, { x: 0, y: 0 }, 'in the middle')
   // a round ring lying in each of the four curved sides: each side is a quarter of a circle, and the ring's
   // middle is that circle's middle
@@ -410,6 +412,47 @@ test('the drone is our astroid with a round ring in each of its four curved side
 // Can you build the camera module element?" The picture: on the drone's body a round foot with small lights
 // round it, a short neck, and a wide head with round ends that looks to the front, its dark face holding two
 // lenses side by side. Every size, the number of lights and their colour are a session's picks.
+// THE DRONE'S SCALE (23 Nov 2026, issue 131). The user: "a drone will have a scale"; "for drone, small, default,
+// medium, large can be 0.5, 1, 1.5, and 2"; "Base" is the 1 step's name; "studs should have universally one single
+// size", and a larger drone carries more of them ("I also would like to go with A"). How many studs fit each step
+// is worked out from the room the user's four take at Base; one stud at Small is a session's pick.
+test('the drone comes in four sizes, Small, Base, Medium and Large; its studs keep one size and grow in number', () => {
+  const [scale] = DRONE.settings
+  assert.deepEqual([scale.id, scale.group, scale.name, scale.sets], ['scale', 'Size', 'Scale', { what: 'scale' }], 'offered as the stage\'s sizes are')
+  assert.deepEqual(scale.steps, [{ name: 'Small', value: 0.5 }, { name: 'Base', value: 1 }, { name: 'Medium', value: 1.5 }, { name: 'Large', value: 2 }])
+  assert.equal(scale.value, 1, 'it is made at Base')
+  assert.equal(sizedBy(DRONE, {}).size.x, DRONE.size.x, 'at Base it is the drone as it is')
+  const body = d => d.shape.pieces.find(p => p.name === 'body')
+  for (const [step, factor, side] of [['Small', 0.5, 1], ['Base', 1, 2], ['Medium', 1.5, 3], ['Large', 2, 4]]) {
+    const d = sizedBy(DRONE, { scale: factor })
+    assert.equal(d.settings[0].value, factor, `${step}: it says which step it is at`)
+    for (const along of ['x', 'y']) assert.ok(Math.abs(d.size[along] - factor * DRONE.size[along]) < 1e-9, `${step}: ${factor} times as large`)
+    assert.ok(Math.abs(body(d).size.z - factor * body(DRONE).size.z) < 1e-9, `${step}: its body ${factor} times as thick`)
+    // the studs: one size at every step, as many a side as fit
+    assert.deepEqual([d.studs.pitch, d.studs.radius, d.studs.height], [DRONE.studs.pitch, DRONE.studs.radius, DRONE.studs.height], `${step}: the studs are one size`)
+    assert.equal(d.studs.at.length, side * side, `${step}: ${side} by ${side} studs`)
+    assert.equal(d.shape.pieces.filter(p => p.name.startsWith('stud')).length, side * side)
+    for (const peg of d.shape.pieces.filter(p => p.name.startsWith('stud'))) for (const p of pieceOutline(peg)) assert.ok(covers(body(d).shape.radius === ASTROID.shape.radius ? ASTROID : { ...ASTROID, shape: body(d).shape, size: body(d).size }, p.x, p.y), `${step}: ${peg.name} is over the body`)
+    assert.ok(Math.abs(d.studs.at.reduce((a, t) => a + t.x, 0)) < 1e-9 && Math.abs(d.studs.at.reduce((a, t) => a + t.y, 0)) < 1e-9, `${step}: centred on its middle`)
+    // how it moves grows with it; how often does not
+    const flying = d.states.find(s => s.id === 'flying'), base = DRONE.states.find(s => s.id === 'flying')
+    assert.ok(Math.abs(flying.lift - factor * base.lift) < 1e-9 && Math.abs(flying.round.radius - factor * base.round.radius) < 1e-9, `${step}: it flies as much higher and wider`)
+    assert.deepEqual([flying.round.every, flying.round.lean, flying.bob.every, flying.spin], [base.round.every, base.round.lean, base.bob.every, base.spin])
+    // the camera module goes on it at every step: on its middle when its studs allow, on its one stud at Small
+    const on = fitsOn(CAMERA_MODULE, d)
+    assert.ok(on, `${step}: the camera module fits on it`)
+    assert.equal(on.z, body(d).size.z, `${step}: on top of the body`)
+    const held = CAMERA_MODULE.sockets.at.filter(s => d.studs.at.some(t => Math.abs(t.x - s.x - on.x) < 1e-9 && Math.abs(t.y - s.y - on.y) < 1e-9))
+    assert.equal(held.length, Math.min(4, side * side), `${step}: on as many studs as it can take`)
+    if (side % 2 === 0) assert.deepEqual([on.x, on.y], [0, 0], `${step}: on the middle`)
+  }
+  // a stud under the camera's base that no socket takes would be in its way: it does not go there
+  const holey = { ...CAMERA_MODULE, sockets: { ...CAMERA_MODULE.sockets, at: CAMERA_MODULE.sockets.at.slice(0, 3) } }
+  const off = fitsOn(holey, DRONE)
+  assert.ok(off && (off.x !== 0 || off.y !== 0), 'a stud with no socket over it is in the way: not on the middle')
+  assert.equal(fitsOn(CAMERA_MODULE, DRONE.studs ? { ...DRONE, studs: { ...DRONE.studs, at: [] } } : DRONE), null, 'and with no stud to take, it goes on nothing')
+})
+
 test('the camera module is a square base with sockets, a neck, and a head that looks to the front with two lenses; it fits on the drone\'s studs', () => {
   assert.equal(CAMERA_MODULE.shape.kind, 'pieces')
   const pieces = CAMERA_MODULE.shape.pieces
@@ -734,7 +777,7 @@ test('the stage\'s width, its breadth and the height of its base can be chosen, 
     assert.ok(gapNow > gapMade && gapNow / gapMade < grownBlock.border.width / block.border.width, 'and the gap is larger by less still')
     assert.ok(gapNow < 2 * gapMade, 'the gap\'s growth is quite low: never twice what it is on the first base')
   }
-  assert.equal(sizedBy(DRONE, { x: 20 }), null, 'an element whose size cannot be chosen is not made in another')
+  assert.equal(sizedBy(CAMERA_MODULE, { x: 20 }), null, 'an element whose size cannot be chosen is not made in another')
   // on the base platform a stage covers whole tiles: an even number of tiles wide, it stands on the line between two
   const on = fitsOn(STAGE, BASE_PLATFORM)
   assert.deepEqual(fitsOn(sizedBy(STAGE, { x: 20 }), BASE_PLATFORM), { ...on, x: on.x + 5 })
@@ -899,7 +942,7 @@ test('the three characters are elements: drawn from their files as tall as a cha
   for (const one of [CLAY, MANNEQUIN, FAIRY_BOT]) {
     assert.ok(ELEMENTS.includes(one), `${one.name} is in the gallery`)
     assert.equal(one.shape.kind, 'model', `${one.name} is drawn from its files`)
-    assert.equal(one.size.z, value('noi.eio.world.character.height'), 'as tall as Eidos says a character is')
+    assert.equal(one.size.z, value('noi.eio.world.character.height'), 'as tall as Eidos says a character is: one height for all')
     assert.match(sizeWords(one), / m tall$/, 'and said to be so tall')
     // standing first, and standing is no clip: the state says to stand, and the drawing plays nothing for it
     assert.deepEqual(one.states.map(s => s.name), ['Standing', 'Walking', 'Running'])
@@ -912,8 +955,8 @@ test('the three characters are elements: drawn from their files as tall as a cha
   assert.equal(calledIn(CLAY), 'Clay', 'Clay is called by his own name')
   assert.equal(calledIn(MANNEQUIN), 'the mannequin')
   assert.equal(calledIn(DRONE), 'the drone', 'and the rest as before')
-  // the Fairy Bot has its wings, hung by Eidos's numbers
-  assert.match(code(read('fairy-bot/fairy-bot.ts')), /wings: \{\s+file: 'fairy-bot\/wings\.glb',\s+span: value\('noi\.eio\.world\.fairy-bot\.wing-span'\)/)
+  // the Fairy Bot has its wings, hung by its own numbers (the old project's)
+  assert.match(code(read('fairy-bot/fairy-bot.ts')), /wings: \{\s+file: 'fairy-bot\/wings\.glb',\s+\.\.\.WINGS,/)
   assert.doesNotMatch(code(read('clay/clay.ts')) + code(read('mannequin/mannequin.ts')), /wings:/, 'and only the Fairy Bot')
   // drawn by the world's three.js into the element's body, which is in xyz: stood up, the mirror undone, as tall as
   // Eidos says, its feet on its place and its middle over it

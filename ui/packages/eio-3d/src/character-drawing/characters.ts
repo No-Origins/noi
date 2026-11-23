@@ -1,4 +1,4 @@
-// THE CHARACTERS (noi.eio.world.character): Clay, the Mannequin and the Fairy Bot, made with Meshy.ai in the old
+// THE CHARACTERS: Clay, the Mannequin and the Fairy Bot, made with Meshy.ai in the old
 // No Origins project and brought in at the user's word (17 Nov: Clay; then "we should bring in Mannequin and
 // Fairyboat too"). On 23 Nov: "bring in the characters into elements". So each is an element of the world now, in
 // a folder of its own (clay/, mannequin/, fairy-bot/), and this is the code that draws any of them: it loads a
@@ -6,7 +6,9 @@
 // scene inside the element's body (so inside `xyz`), and plays what its state says. Till 23 Nov it was a painter of
 // its own, with its own renderer, scene, eye and lights, lent a picture by the first world's stage; that stage is
 // gone, and here the world's own three.js draws them, lit by the world's own light.
-// Their height and the room they take up come from Eidos; so does how far their arms hang out. Their files are
+// Their height comes from Eidos (noi.eio.world.character.height: one height for every character, the user's six
+// feet); the room they take up and how far their arms hang out are this drawing's own (since 23 Nov 2026, issue
+// 131, a part's numbers are not registered one by one). Their files are
 // small copies (tools/trim-character.mjs) kept in this package's assets/characters, served by the page that shows
 // them (ThreeWorld, `assets`).
 import type { CharacterDrawingMotion as Motion } from '@noi/eio-tokens/components'
@@ -44,10 +46,11 @@ export interface CharacterWings {
   readonly flapEvery: number
 }
 
-/** The room every character takes up: so wide along x, so deep along y, and as tall as a character is. */
+/** The room every character takes up: so wide along x, so deep along y (the widest and deepest of the three
+ * measured standing, hands in: 0.68 to 0.83 m, 0.40 to 0.61 m), and as tall as a character is. */
 export const CHARACTER_SIZE: Size = {
-  x: value('noi.eio.world.character.width'),
-  y: value('noi.eio.world.character.depth'),
+  x: 0.8,
+  y: 0.6,
   z: value('noi.eio.world.character.height'),
 }
 
@@ -65,7 +68,7 @@ const CLIPS: Record<Motion, string | null> = { stand: null, walk: 'Walking', run
  * as a share of straight down (0 would be against the side). And the joints that turns, by their names in every
  * rig (GLTFLoader drops the colon of mixamorig:LeftArm). */
 const ARMS = {
-  out: value('noi.eio.world.character.arms-out'),
+  out: 0.2,
   sides: [['mixamorigLeftArm', 'mixamorigLeftForeArm', 1], ['mixamorigRightArm', 'mixamorigRightForeArm', -1]] as const,
 }
 

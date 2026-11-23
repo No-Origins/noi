@@ -59,7 +59,7 @@
 // for two panes is still Eidos's to say: WhenTwoPanes and WhenOnePane.
 import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Choices, Drawer, Radio, Select, Swatch, Toggle, WhenOnePane, WhenTwoPanes } from '@noi/eio-react'
-import { COLOURS_TO_TRY, ELEMENTS, bentLength as lengthOf, calledIn, coloursIn, fitsOn, inWords, sizedBy, type ElementColour, type ElementSetting, type ElementState, type WorldElement } from '@noi/eio-3d'
+import { COLOURS_TO_TRY, ELEMENTS, bentLength as lengthOf, calledIn, chosenAs, coloursIn, fitsOn, inWords, sizedBy, type ElementColour, type ElementSetting, type ElementState, type WorldElement } from '@noi/eio-3d'
 import { picturesOf } from '../inspect'
 import { ElementView } from './ElementView'
 import { sideOf, stripOf } from '../rideAlong'
@@ -74,7 +74,7 @@ const stateOf = (element: WorldElement | null, id: string | null): ElementState 
 /** An element in the size chosen for it: its settings by their ids and the numbers chosen. The element itself
  * when none is chosen, or when its size cannot be chosen. */
 const inSize = (element: WorldElement, chosen: Record<string, number>): WorldElement =>
-  sizedBy(element, Object.fromEntries((element.settings ?? []).filter(setting => setting.id in chosen).map(setting => [setting.sets.along, chosen[setting.id]]))) ?? element
+  sizedBy(element, Object.fromEntries((element.settings ?? []).filter(setting => setting.id in chosen).map(setting => [chosenAs(setting), chosen[setting.id]]))) ?? element
 
 /** One element's own control: the states it can be in, and under them what it does in the chosen one. */
 function States({ of, chosen, choose, name }: { of: WorldElement; chosen: ElementState; choose(id: string): void; name: string }) {

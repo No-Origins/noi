@@ -1,7 +1,9 @@
 // The rules of @noi/eio-3d, as tests (17 Nov 2026; the first world's own rules went with it on 23 Nov, and the new
 // world's elements came in the same day).
 // 1 · Colours come only from Eidos: no colour of its own anywhere in the package.
-// 2 · Numbers come only from Eidos: none of the new world's numbers is written in the code of its elements.
+// 2 · An element's own numbers are its own, named in its own folder; only the shared measures (the tile, the stud)
+//     and an element's registered size or steps come from Eidos (23 Nov 2026, the user's decision on issue 131;
+//     until then "none of the new world's numbers is written in the code of its elements").
 // 3 · three.js draws every element (23 Nov 2026; until then "three.js draws the characters and nothing else",
 //     decision 7 of 17 Nov, which the user's "three.js for everything" of 21 Nov replaced): the package writes
 //     no drawing code of its own, and an element takes three.js from the world it is drawn into.
@@ -38,31 +40,79 @@ test('1 · no colour of its own: colours come from Eidos', () => {
   for (const [file, text] of world.filter(([f]) => f !== 'eidos.ts')) assert.doesNotMatch(uncommented(text), /['"`]--eio-color-/, `${file} names a colour's variable by hand, not a role by its path`)
 })
 
-// ——— 2 · the new world's numbers (23 Nov) ———
+// ——— 2 · what Eidos holds, and what an element keeps as its own (23 Nov, issue 131) ———
+// THE USER'S DECISION (23 Nov 2026), after 165 numbers had been put to Mero one record each: "if we keep having
+// individual values registered each time, then the registry just becomes bloated with numbers rather than creating
+// reusable values"; "there is no point in saving individual part sizes of drone, right?"; "the stage might need
+// individual steps with width, height, and length, but a drone will have a scale"; "studs should have universally
+// one single size". So an element's part sizes, proportions, offsets and movements are its own numbers, named in
+// its own folder and approved with its fingerprint; Eidos holds only what fits elements together or is the world's
+// own (the tile, the stud, the one change of state), an element's registered size, and its steps.
 import { tokens } from '../../eio-tokens/tokens.ts'
 
-test('2 · none of the new world\'s numbers is written in the code: they come from Eidos', () => {
-  // Every number Eidos holds for the world (the characters' too, since they joined it on 23 Nov), but none, a half,
-  // one, two, three and four: the code counts the corners of a square, halves a width, doubles a radius, with these.
-  const numbers = new Set(Object.values(tokens.world).flatMap(values => Object.values(values)))
-  for (const plain of [0, 0.5, 1, 2, 3, 4]) numbers.delete(plain)
-  // What is not a number of the world though it may equal one: a way or a place (no kind of value holds them),
-  // and the code's own precision. Each such line, by what it says.
-  const own = [
-    /const TOWARD = /, // the way the eye first stands from an element (element.ts)
-    /sunFrom: /, // the way the sun shines from (light.ts)
-    /at: \{ x: -?\d+, y: -?\d+, z: \d+ \} \}/, // where a lamp of the mirrored room is (make.ts)
-    /const LONGEST_STEP = /, // the longest step one picture moves a thing on by (make.ts)
-    /\(h \/ 6\)/, // how the Möbius strip's middle line is worked out, a metre at a time (bend.ts)
-    /\* 10\) \/ 10/, // a size or a place said to the tenth of a metre
-  ]
+/** Where each of the world's groups in Eidos may be read: the shared measures by the element that stands for them
+ * and the shared drawing (which every element uses, and which may not use an element); an element's own size and
+ * steps in its own folder only. */
+const READ_IN = {
+  tile: ['base-tile', 'drawing'], // the world's grid unit: the base tile is one tile; the drawing lays strips in tiles
+  stud: ['drawing'], // the one size of stud (drawing/studs.ts), whatever an element carries
+  states: ['drawing'], // the world's one change of state
+  character: ['character-drawing'],
+  drone: ['drone'],
+  stage: ['stage'],
+  'base-platform': ['base-platform'],
+  'mobius-platform': ['mobius-platform'],
+}
+const folderOf = file => files().find(f => basename(f) === file)?.slice(SRC.length).split('/')[0]
+const PATH = /\bnoi\.eio\.world\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)\b/g
+
+test('2 · Eidos holds the shared measures and each element\'s size and steps, and each is read where it belongs', () => {
+  const read = new Set()
   for (const [file, text] of world) {
-    const lines = uncommented(text).replace(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "''").split('\n').filter(line => !own.some(re => re.test(line)))
+    for (const [path, group] of uncommented(text).matchAll(PATH)) {
+      read.add(path)
+      assert.ok(READ_IN[group], `${file} reads ${path}: Eidos holds no group ${group} for the world`)
+      assert.ok(READ_IN[group].includes(folderOf(file)), `${file} reads ${path}, which belongs to ${READ_IN[group].join(' and ')}`)
+    }
+  }
+  // every value Eidos holds for the world is read by the package: a record nothing reads is not kept
+  const held = Object.entries(tokens.world).flatMap(([group, values]) => Object.keys(values).map(name => `noi${'.'}eio.world.${group}.${name}`))
+  for (const path of held) assert.ok(read.has(path), `Eidos holds ${path}, but no element reads it`)
+  for (const group of Object.keys(READ_IN)) assert.ok(group in tokens.world, `the rule names ${group}, which Eidos does not hold`)
+})
+
+test('2 · the stud\'s pitch, and an element\'s registered size, are never written as a number', () => {
+  // The stud's pitch fits pieces together: a number of its size written in an element's code would drift from it
+  // (the shared drawing, which reads it, has tuning of its own that may equal it by chance, a light's share of 0.3
+  // for one). The tile's size is read only where it belongs (above): as a number, 10 is too common to refuse (a
+  // wing's lean of 10 degrees). An element's own registered size (the drone's Base size, a platform's tiles) is
+  // not written in its own folder either. Plain numbers (none, a half, one to four) and the code's own precision
+  // (to the tenth or the thousandth) are not counted.
+  const plain = new Set([0, 0.5, 1, 2, 3, 4])
+  const everywhere = [tokens.world.stud.pitch].filter(n => !plain.has(n))
+  const own = Object.fromEntries(Object.entries(READ_IN).map(([group, where]) => [group, where.length === 1 && group !== 'stud' && group !== 'states'
+    ? Object.values(tokens.world[group]).filter(n => typeof n === 'number' && !plain.has(n)) : []]))
+  const precision = /\* 10\) \/ 10|\* 1000\) \/ 1000/
+  for (const [file, text] of world) {
+    const folder = folderOf(file)
+    const refused = new Set([...(folder === 'drawing' ? [] : everywhere), ...Object.entries(own).filter(([group]) => READ_IN[group][0] === folder).flatMap(([, ns]) => ns)])
+    const lines = uncommented(text).replace(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "''").split('\n').filter(line => !precision.test(line))
     for (const line of lines) {
       for (const [literal] of line.matchAll(/(?<![\w.])\d+(?:\.\d+)?(?:e-?\d+)?(?![\w.])/g)) {
-        assert.ok(!numbers.has(Number(literal)), `${file} writes ${literal}, a number Eidos holds: "${line.trim()}"`)
+        assert.ok(!refused.has(Number(literal)), `${file} writes ${literal}, a measure Eidos holds: "${line.trim()}"`)
       }
     }
+  }
+})
+
+test('2 · an element\'s steps are read as one record of named steps', () => {
+  // A scale or the sizes one may choose are one record of named steps in Eidos (the kind "steps", 23 Nov), not a
+  // record a number: the drone's scale, the stage's width and breadth and the heights of its base.
+  const sets = Object.entries(tokens.world).flatMap(([group, values]) => Object.entries(values).filter(([, v]) => Array.isArray(v)).map(([name]) => `${group}.${name}`))
+  assert.deepEqual(sets.sort(), ['drone.scale', 'stage.base-height', 'stage.width-and-breadth'])
+  assert.deepEqual(tokens.world.drone.scale.map(s => [s.name, s.share]), [['Small', 0.5], ['Base', 1], ['Medium', 1.5], ['Large', 2]], 'the user\'s four steps, "Base" the 1 step')
+  for (const [file, text] of world) {
+    for (const [, path] of uncommented(text).matchAll(/\bsteps\('noi\.eio\.world\.([a-z0-9.-]+)'\)/g)) assert.ok(sets.includes(path), `${file} reads ${path} as steps`)
   }
 })
 

@@ -48,48 +48,17 @@
         "run-13-turn": "how far run 13 turns"
       }
     },
-    "reads": [
-      "noi.eio.world.base-platform.width",
-      "noi.eio.world.wave-platform.ease",
-      "noi.eio.world.wave-platform.end",
-      "noi.eio.world.wave-platform.run-1-long",
-      "noi.eio.world.wave-platform.run-1-turn",
-      "noi.eio.world.wave-platform.run-10-long",
-      "noi.eio.world.wave-platform.run-10-turn",
-      "noi.eio.world.wave-platform.run-11-long",
-      "noi.eio.world.wave-platform.run-11-turn",
-      "noi.eio.world.wave-platform.run-12-long",
-      "noi.eio.world.wave-platform.run-12-turn",
-      "noi.eio.world.wave-platform.run-13-long",
-      "noi.eio.world.wave-platform.run-13-turn",
-      "noi.eio.world.wave-platform.run-2-long",
-      "noi.eio.world.wave-platform.run-2-turn",
-      "noi.eio.world.wave-platform.run-3-long",
-      "noi.eio.world.wave-platform.run-3-turn",
-      "noi.eio.world.wave-platform.run-4-long",
-      "noi.eio.world.wave-platform.run-4-turn",
-      "noi.eio.world.wave-platform.run-5-long",
-      "noi.eio.world.wave-platform.run-5-turn",
-      "noi.eio.world.wave-platform.run-6-long",
-      "noi.eio.world.wave-platform.run-6-turn",
-      "noi.eio.world.wave-platform.run-7-long",
-      "noi.eio.world.wave-platform.run-7-turn",
-      "noi.eio.world.wave-platform.run-8-long",
-      "noi.eio.world.wave-platform.run-8-turn",
-      "noi.eio.world.wave-platform.run-9-long",
-      "noi.eio.world.wave-platform.run-9-turn",
-      "noi.eio.world.wave-platform.runway",
-      "noi.eio.world.wave-platform.slant"
-    ],
+    "reads": [],
     "uses": [
       "noi.eio.components.world.astroid",
+      "noi.eio.components.world.base-platform",
       "noi.eio.components.world.base-tile",
       "noi.eio.components.world.drawing"
     ],
     "files": [
       {
         "path": "src/wave-platform/wave-platform.ts",
-        "sha256": "88342fcd5cccea5fec4d88bbf568bc0cba8b38cd86503b09118e3dd501179ab3"
+        "sha256": "502a915b521f413310067554dd3ac1e6f234fc609693b36c4a4b180fac5c736c"
       }
     ]
   }

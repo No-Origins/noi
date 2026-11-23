@@ -406,6 +406,40 @@ fn eio_world_shares_angles_and_counts_take_the_new_worlds_numbers() {
 }
 
 #[test]
+fn eio_world_steps_hold_a_scale_and_sizes_to_choose() {
+    // One more kind (23 Nov, the user's decision on how values are registered): a set of named
+    // steps in one record, instead of one record a number.
+    let steps = invariant("steps-invariant.json");
+    for good in [
+        json!({"steps": [
+            {"name": "Small", "share": 0.5}, {"name": "Base", "share": 1},
+            {"name": "Medium", "share": 1.5}, {"name": "Large", "share": 2}
+        ]}),
+        json!({"steps": [{"name": "2 m", "m": 2}, {"name": "10 m", "m": 10}]}),
+        json!({"steps": [{"name": "1 tile", "count": 1}, {"name": "10 tiles", "count": 10}]}),
+    ] {
+        steps.check(&good).unwrap_or_else(|e| panic!("{good}: {e}"));
+    }
+    // Refused: no steps or one, steps in two units, a step with no name or another unit, a share or
+    // a length finer than its rule, a count that is not whole, anything beside the steps.
+    for bad in [
+        json!({"steps": []}),
+        json!({"steps": [{"name": "Base", "share": 1}]}),
+        json!({"steps": [{"name": "a", "share": 1}, {"name": "b", "m": 2}]}),
+        json!({"steps": [{"share": 1}, {"share": 2}]}),
+        json!({"steps": [{"name": "", "share": 1}, {"name": "b", "share": 2}]}),
+        json!({"steps": [{"name": "a", "px": 1}, {"name": "b", "px": 2}]}),
+        json!({"steps": [{"name": "a", "share": 0.00005}, {"name": "b", "share": 1}]}),
+        json!({"steps": [{"name": "a", "m": 0.0005}, {"name": "b", "m": 1}]}),
+        json!({"steps": [{"name": "a", "count": 1.5}, {"name": "b", "count": 2}]}),
+        json!({"steps": [{"name": "a", "share": 1}, {"name": "b", "share": 2}], "unit": "x"}),
+        json!({"m": 2}),
+    ] {
+        assert!(steps.check(&bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
 fn eio_world_values_pass_their_invariants() {
     // The 3D world's values (17 Nov): colours of a new family, colour roles, the characters' numbers,
     // and (23 Nov) the new world's: its eight elements, what draws and lights them, and its land's
@@ -481,45 +515,36 @@ fn eio_world_values_pass_their_invariants() {
     ]
     .into_iter()
     .collect();
+    let steps = invariant("steps-invariant.json");
     let mut numbers = vec![];
-    // The characters' four groups (17 Nov), and the new world's fifteen (23 Nov): its elements, what
-    // draws and lights them, and its land's coordinates; the Fairy Bot's wings (23 Nov, when the
-    // characters became elements of the new world); and the astroid's (23 Nov, when it got a state in
-    // which it glows).
+    // What Eidos holds for the world since the user's decision of 23 Nov (issue 131): the tile and the
+    // stud, which fit elements together; the one change of state; each element's registered size and
+    // steps; the characters' one height. An element's part sizes are its own, in its code.
     let groups = [
+        "tile",
+        "stud",
+        "states",
         "character",
-        "movement",
-        "flight",
-        "eye",
-        "fairy-bot",
-        "astroid",
-        "stud-grid",
-        "first-sight",
-        "base-tile",
+        "drone",
+        "stage",
         "base-platform",
         "mobius-platform",
-        "wave-platform",
-        "drone",
-        "camera-module",
-        "stage",
-        "surface",
-        "states",
-        "room",
-        "light",
-        "coordinates",
-        "isometric",
     ];
     for group in groups {
         numbers.extend(data(&format!("world/{group}")));
     }
-    // The characters' 19, the new world's 152, the 9 the characters brought when they joined it (the
-    // room a character takes up, how far its arms hang out, and the six of the Fairy Bot's wings), and
-    // the 4 of the astroid's active state (23 Nov: how it glows, and the soft light round it).
-    assert_eq!(numbers.len(), 19 + 152 + 9 + 4);
+    // 2 of the tile, 1 of the stud, 1 change, the character's height, the drone's scale and Base
+    // size, the stage's two sets of steps, the platforms' 3 counts of tiles.
+    assert_eq!(numbers.len(), 2 + 1 + 1 + 1 + 2 + 2 + 3);
     for n in &numbers {
         n.validate().unwrap();
         assert!(n.path.starts_with("noi.eio.world."), "{}", n.path);
-        let kind = &kinds[n.classification.subtype.as_deref().unwrap()];
+        let subtype = n.classification.subtype.as_deref().unwrap();
+        let kind = if subtype == "steps" {
+            &steps
+        } else {
+            &kinds[subtype]
+        };
         assert!(kind.applies_to.covers(&n.classification), "{}", n.path);
         kind.check(&n.spec)
             .unwrap_or_else(|e| panic!("{}: {e}", n.path));
@@ -528,39 +553,49 @@ fn eio_world_values_pass_their_invariants() {
             assert!(n.semantics.definition.contains("guess"), "{}", n.path);
         }
     }
-    // Agreed numbers keep their agreed values.
-    let value = |path: &str| {
-        let n = numbers.iter().find(|n| n.path == path).unwrap();
-        n.spec
-            .as_object()
-            .unwrap()
-            .values()
-            .next()
-            .unwrap()
-            .as_f64()
-            .unwrap()
-    };
-    // Your word (17 Nov): one fixed height to fly to, everywhere.
-    assert_eq!(value("noi.eio.world.movement.ceiling"), 100.0);
-    // Your words for the new world (21 to 23 Nov): a tile 10 m by 10 m, its corners rounded by 1 m and
-    // its border 0.1 m; the land 21 tiles across and up to y 600; four studs as a grid; the stage's
-    // base starting at 2 m, its glass 1 m above it; sizes in steps of 10 m.
+    let spec = |path: &str| &numbers.iter().find(|n| n.path == path).unwrap().spec;
+    // Your words for the new world (21 to 23 Nov): a tile 10 m by 10 m; the stud's one size; the
+    // land 21 tiles across and up to y 600; the drone's scale; the stage's sizes in steps of a tile
+    // and its base's heights.
     for (path, agreed) in [
-        ("noi.eio.world.base-tile.width", 10.0),
-        ("noi.eio.world.base-tile.breadth", 10.0),
-        ("noi.eio.world.base-tile.corner-radius", 1.0),
-        ("noi.eio.world.base-tile.border-width", 0.1),
-        ("noi.eio.world.base-platform.width", 210.0),
-        ("noi.eio.world.base-platform.length", 600.0),
-        ("noi.eio.world.stud-grid.count", 4.0),
-        ("noi.eio.world.stage.base-height", 2.0),
-        ("noi.eio.world.stage.glass-gap", 1.0),
-        ("noi.eio.world.stage.size-step", 10.0),
+        ("noi.eio.world.tile.size", json!({"m": 10})),
+        ("noi.eio.world.stud.pitch", json!({"m": 0.3})),
+        ("noi.eio.world.character.height", json!({"m": 1.8})),
+        (
+            "noi.eio.world.base-platform.tiles-across",
+            json!({"count": 21}),
+        ),
+        (
+            "noi.eio.world.base-platform.tiles-long",
+            json!({"count": 60}),
+        ),
+        (
+            "noi.eio.world.drone.scale",
+            json!({"steps": [
+                {"name": "Small", "share": 0.5}, {"name": "Base", "share": 1},
+                {"name": "Medium", "share": 1.5}, {"name": "Large", "share": 2}
+            ]}),
+        ),
+        (
+            "noi.eio.world.stage.base-height",
+            json!({"steps": [
+                {"name": "2 m", "m": 2}, {"name": "4 m", "m": 4}, {"name": "6 m", "m": 6},
+                {"name": "8 m", "m": 8}, {"name": "10 m", "m": 10}
+            ]}),
+        ),
     ] {
-        assert_eq!(value(path), agreed, "{path}");
+        assert_eq!(spec(path), &agreed, "{path}");
         let n = numbers.iter().find(|n| n.path == path).unwrap();
         assert_eq!(n.metadata["number"], "your word", "{path}");
     }
+    assert_eq!(
+        spec("noi.eio.world.stage.width-and-breadth")["steps"]
+            .as_array()
+            .unwrap()
+            .len(),
+        10,
+        "1 tile to 10 tiles"
+    );
     // And they all export: roles as CSS variables, numbers only into the typed tree.
     let mut merons: Vec<&NewMeron> = all.iter().chain(&roles).chain(&numbers).collect();
     merons.sort_by(|a, b| a.path.cmp(&b.path));
@@ -583,10 +618,14 @@ fn eio_world_values_pass_their_invariants() {
         "no CSS for lengths, times, speeds"
     );
     let tree: Value = serde_json::from_str(&files.json).unwrap();
-    assert_eq!(tree["world"]["movement"]["walk"], 1.4);
+    assert_eq!(tree["world"]["character"]["height"], 1.8);
     assert_eq!(tree["world"].as_object().unwrap().len(), groups.len());
-    assert_eq!(tree["world"]["stud-grid"]["tall"], 0.2125);
-    assert_eq!(tree["world"]["stud-grid"]["count"], 4);
+    assert_eq!(tree["world"]["stud"]["pitch"], 0.3);
+    assert_eq!(tree["world"]["base-platform"]["tiles-across"], 21);
+    assert_eq!(
+        tree["world"]["drone"]["scale"][3],
+        json!({"name": "Large", "share": 2})
+    );
 }
 
 #[test]

@@ -5,7 +5,7 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "Our astroid as its body, a round ring lying in each of its four curved sides with one round join to the body, a fan that turns in each ring, and on its body four studs other pieces are set on. Red, with matte black rings and glossy black fans.",
+    "definition": "Our astroid as its body, a round ring lying in each of its four curved sides with one round join to the body, a fan that turns in each ring, and on its body studs other pieces are set on. Red, with matte black rings and glossy black fans. It comes in four sizes, Small, Base, Medium and Large; its studs stay one size, and a larger drone carries more of them.",
     "responsibility": "Be the one drone every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
@@ -18,39 +18,24 @@
         "landed": "standing on its place, its fans still",
         "hovering": "hanging over its place, rising and sinking a little, its fans turning",
         "flying": "flying round its place, leaning into its way, its fans turning faster"
+      },
+      "setting": {
+        "scale": "how large it is, as a share of its Base size: Small 0.5, Base 1, Medium 1.5 or Large 2; its studs stay one size and grow in number"
       }
     },
     "reads": [
       "noi.eio.color.text.danger",
-      "noi.eio.world.drone.fan-radius",
-      "noi.eio.world.drone.fan-thickness",
-      "noi.eio.world.drone.fan-turn-every",
-      "noi.eio.world.drone.flying-bob",
-      "noi.eio.world.drone.flying-bob-every",
-      "noi.eio.world.drone.flying-circle",
-      "noi.eio.world.drone.flying-circle-every",
-      "noi.eio.world.drone.flying-lean",
-      "noi.eio.world.drone.flying-lift",
-      "noi.eio.world.drone.hovering-bob",
-      "noi.eio.world.drone.hovering-bob-every",
-      "noi.eio.world.drone.hovering-lift",
-      "noi.eio.world.drone.join-reach",
-      "noi.eio.world.drone.join-width",
-      "noi.eio.world.drone.ring-inner",
-      "noi.eio.world.drone.ring-outer",
-      "noi.eio.world.drone.spin-flying",
-      "noi.eio.world.drone.spin-hovering",
-      "noi.eio.world.drone.spin-landed"
+      "noi.eio.world.drone.base-size",
+      "noi.eio.world.drone.scale"
     ],
     "uses": [
-      "noi.eio.components.world.astroid",
       "noi.eio.components.world.base-tile",
       "noi.eio.components.world.drawing"
     ],
     "files": [
       {
         "path": "src/drone/drone.ts",
-        "sha256": "6da8f712140cb461cd587d4c1dd4c59ba81c56e8e556a2301949e56e41fa2d32"
+        "sha256": "252de8e5345fee3cfb2b2325100bdcad6243af4caf91029358c8262afee47af6"
       }
     ]
   }

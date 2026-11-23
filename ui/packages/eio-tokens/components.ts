@@ -148,6 +148,8 @@ export type ClayClips = 'running' | 'walking'
 export type ClayState = 'running' | 'standing' | 'walking'
 
 // noi.eio.components.world.drone
+/** scale: how large it is, as a share of its Base size: Small 0.5, Base 1, Medium 1.5 or Large 2; its studs stay one size and grow in number */
+export type DroneSetting = 'scale'
 /** flying: flying round its place, leaning into its way, its fans turning faster · hovering: hanging over its place, rising and sinking a little, its fans turning · landed: standing on its place, its fans still */
 export type DroneState = 'flying' | 'hovering' | 'landed'
 
@@ -280,6 +282,7 @@ export const states = {
     state: ['running', 'standing', 'walking'],
   },
   'noi.eio.components.world.drone': {
+    setting: ['scale'],
     state: ['flying', 'hovering', 'landed'],
   },
   'noi.eio.components.world.fairy-bot': {

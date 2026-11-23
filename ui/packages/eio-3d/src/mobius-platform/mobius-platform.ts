@@ -14,16 +14,17 @@
 // are this element's own.
 import type { MobiusPlatformMeasure } from '@noi/eio-tokens/components'
 import { ASTROID } from '../astroid/astroid.ts'
+import { BASE_PLATFORM_MEASURES } from '../base-platform/base-platform.ts'
 import { BASE_TILE } from '../base-tile/base-tile.ts'
 import { bentSize, lengthOf, type Bend } from '../drawing/bend.ts'
 import { value } from '../drawing/eidos.ts'
 import type { Laid, WorldElement } from '../drawing/element.ts'
 
-/** Each measure of the Möbius strip, as Eidos holds it, in metres: its length round, and its width, the base
- * platform's. */
+/** Each measure of the Möbius strip, in metres: its length round, as many tiles as Eidos holds; and its width,
+ * the base platform's. */
 export const MOBIUS_PLATFORM_MEASURES: Record<MobiusPlatformMeasure, number> = {
-  length: value('noi.eio.world.mobius-platform.length'),
-  width: value('noi.eio.world.base-platform.width'),
+  length: value('noi.eio.world.mobius-platform.tiles-round') * BASE_TILE.size.y,
+  width: BASE_PLATFORM_MEASURES.width,
 }
 
 const MOBIUS_BEND: Bend = {

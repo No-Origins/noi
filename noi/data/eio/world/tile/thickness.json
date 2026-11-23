@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.tile.thickness",
+  "name": "Tile, thickness",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How thick a tile of the world is: the base tile and the astroid between four tiles are as thick, and things placed on the land stand on its top. A guess, not agreed: you gave the tile's size and border, not its thickness.",
+    "responsibility": "Give the land its thickness, so that what fits between tiles and what stands on them is as thick and as high everywhere."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.2
+  }
+}

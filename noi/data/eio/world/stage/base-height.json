@@ -1,19 +1,40 @@
 {
   "path": "noi.eio.world.stage.base-height",
-  "name": "Stage base, height",
+  "name": "Stage, height of the base",
   "classification": {
     "type": "token",
-    "subtype": "length"
+    "subtype": "steps"
   },
   "semantics": {
-    "definition": "How tall the stage's base is as it is made, the first of the heights one may choose; the border, the glass and the gap grow with the base from here. Your word: \"starting with 2\".",
-    "responsibility": "Size the stage's base."
+    "definition": "How tall the stage's base may be: 2, 4, 6, 8 or 10 m; it is made with the first. The border, the glass and the gap above the base grow with it. Your word: \"starting with 2, then 4, then 8, and then 10\", and 6 (23 Nov): \"Yeah, let's do it.\"",
+    "responsibility": "Let a stage's base be chosen in these heights."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
   "metadata": {
     "number": "your word"
   },
   "spec": {
-    "m": 2
+    "steps": [
+      {
+        "name": "2 m",
+        "m": 2
+      },
+      {
+        "name": "4 m",
+        "m": 4
+      },
+      {
+        "name": "6 m",
+        "m": 6
+      },
+      {
+        "name": "8 m",
+        "m": 8
+      },
+      {
+        "name": "10 m",
+        "m": 10
+      }
+    ]
   }
 }

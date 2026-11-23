@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.base-platform.tiles-across",
+  "name": "Base platform, tiles across",
+  "classification": {
+    "type": "token",
+    "subtype": "count"
+  },
+  "semantics": {
+    "definition": "How many tiles the base platform runs across, along x: 21, so one column runs down the middle. Your word: \"if there are only 21 tiles in a row ... one column for the center\". The land, the Möbius strip and the wave strip are as wide.",
+    "responsibility": "Size the base platform, the land and the strips laid from it, in tiles."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "count": 21
+  }
+}

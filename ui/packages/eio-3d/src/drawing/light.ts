@@ -5,10 +5,10 @@
 // screen on 21 Nov: an element looked at alone is lit more when its colour is too dark to show its faces
 // (lightFor), so the base tile's top shows as a dark grey alone and darker on the land; the astroid's top is
 // its own colour in both. The lights are put into the world's `xyz`: where the sun is, is said in the user's
-// x, y, z. Every number of the light is Eidos's (noi.eio.world.light), and so is its colour (the role
-// noi.eio.color.world.light). Where the sun is, a way, is this file's own (no kind of value holds a way), and
-// so is plain light: three.js shows a matte face in its own colour when the light it gets is pi.
-import { role, value } from './eidos.ts'
+// x, y, z. Its colour is Eidos's (the role noi.eio.color.world.light); every number of it is this file's own (the
+// drawing's tuning, which is not registered: the user's decision of 23 Nov 2026, issue 131), and so is where the
+// sun is and plain light: three.js shows a matte face in its own colour when the light it gets is pi.
+import { role } from './eidos.ts'
 import type { ThreeWorld } from './space.ts'
 
 /** The light. Where the sun is, is in the user's x, y, z. */
@@ -19,19 +19,19 @@ export const LIGHT = {
   plain: Math.PI,
   /** Of the light that reaches a face turned up: this share is soft light from all of the sky, so no face is
    * lost in the dark; the rest is the sun. */
-  skyShare: value('noi.eio.world.light.sky-share'),
+  skyShare: 0.19,
   /** The sun: one light from above, and from low y and high x. (Till 22 Nov 2026 its x had the other sign. The
    * user had x turned round; the sun stays where it was.) */
   sunFrom: { x: 6, y: -7, z: 18 },
   /** What a matte face sends back in plain light whatever its colour, as a share of full light: three.js's
    * standard surface keeps a faint grey sheen even at its roughest. Measured on the base tile, 21 Nov. */
-  sheen: value('noi.eio.world.light.sheen'),
+  sheen: 0.0093,
   /** The top of an element is never shown darker than this share of full light (a dark grey). */
-  shownAtLeast: value('noi.eio.world.light.shown-at-least'),
+  shownAtLeast: 0.0252,
   /** Where one element is looked at alone and can be turned over: a face turned straight down gets this share
    * of plain light, from straight below, so the underside can be seen. It falls on nothing that is turned up
    * or to a side, so the element looks as before from above. MY PICK, not the user's word. */
-  underShare: value('noi.eio.world.light.under-share'),
+  underShare: 0.3,
   /** The light's colour, a role of Eidos. */
   colour: role('noi.eio.color.world.light'),
 } as const

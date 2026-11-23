@@ -13,11 +13,12 @@
 // round it on what it stands on. That light is shown when the thing is laid many times too. A MATTE surface may be made to shine all the same (element.ts, `shine`): smoother,
 // and mirroring the room.
 //
-// Every number of how a surface looks (noi.eio.world.surface), of the mirrored room (noi.eio.world.room) and of
-// how long a change of state takes (noi.eio.world.states) is Eidos's, and so is every colour: an element's by its
-// data, the room's and its lamps' by their roles (noi.eio.color.world.room and the light's). Where the room's
-// lamps are, places, is this file's own; so is the longest step one picture moves a thing on by (a tenth of a
-// second, so that after a pause nothing jumps), and where a face counts as looking up (more up than not).
+// How long a change of state takes is Eidos's (noi.eio.world.states: the world's one change, which the Explorer's
+// intro reads too), and so is every colour: an element's by its data, the room's and its lamps' by their roles
+// (noi.eio.color.world.room and the light's). Every number of how a surface looks and of the mirrored room is this
+// file's own (the drawing's tuning, which is not registered: the user's decision of 23 Nov 2026, issue 131), and
+// so are where the room's lamps are, the longest step one picture moves a thing on by (a tenth of a second, so that
+// after a pause nothing jumps), and where a face counts as looking up (more up than not).
 //
 // A THING DRAWN FROM FILES (element.ts, Model; the characters, 23 Nov 2026) is drawn by the code that comes with its
 // data: the thing is made at once, that code puts what it draws into its body, and its files are loaded then,
@@ -111,7 +112,7 @@ export interface Drawn {
 
 /** What the drawing hands the code that draws a thing from its files. */
 export interface DrawnHow {
-  /** How long a thing takes to go over from one state to another, in seconds (noi.eio.world.states). */
+  /** How long a thing takes to go over from one state to another, in seconds (Eidos's, the world's one change). */
   readonly change: number
   /** This drawing's matte surface, in the element's colour, with a picture over it. */
   pictured(picture: Texture): Material
@@ -120,17 +121,17 @@ export interface DrawnHow {
 /** A glossy surface: how rough its colour itself is and its clear coat (0 is a mirror, 1 is matte), and how
  * strongly it mirrors the room. */
 const GLOSS = {
-  roughness: value('noi.eio.world.surface.gloss-roughness'),
-  coatRoughness: value('noi.eio.world.surface.gloss-coat-roughness'),
-  mirrors: value('noi.eio.world.surface.gloss-mirrors'),
+  roughness: 0.16,
+  coatRoughness: 0.04,
+  mirrors: 2.2,
 } as const
 
 /** Frosted glass: how strongly its thin edge gives off its colour (1 would be the colour itself), how thick
  * three.js takes it to be, and how much it bends the light through it. */
 const FROST = {
-  edge: value('noi.eio.world.surface.frost-edge'),
-  thickness: value('noi.eio.world.surface.frost-thickness'),
-  bends: value('noi.eio.world.surface.frost-ior'),
+  edge: 0.85,
+  thickness: 0.05,
+  bends: 1.3,
 } as const
 
 /** How long a thing takes to go over from one state to another, in seconds: rising, settling, its fans
@@ -146,14 +147,14 @@ const LONGEST_STEP = 0.1
  * toward low y and high x (where the sun is), toward low x, and behind. (Till 22 Nov 2026 each x here had the
  * other sign: the user had x turned round, and the lamps stay where they were.) */
 const ROOM = {
-  size: value('noi.eio.world.room.size'),
-  blur: value('noi.eio.world.room.blur'),
-  lampThickness: value('noi.eio.world.room.lamp-thickness'),
+  size: 40,
+  blur: 0.03,
+  lampThickness: 0.2,
   lamps: [
-    { w: value('noi.eio.world.room.lamp-1-width'), d: value('noi.eio.world.room.lamp-1-depth'), strength: value('noi.eio.world.room.lamp-1-strength'), at: { x: -2, y: -3, z: 18 } },
-    { w: value('noi.eio.world.room.lamp-2-width'), d: value('noi.eio.world.room.lamp-2-depth'), strength: value('noi.eio.world.room.lamp-2-strength'), at: { x: 14, y: -12, z: 8 } },
-    { w: value('noi.eio.world.room.lamp-3-width'), d: value('noi.eio.world.room.lamp-3-depth'), strength: value('noi.eio.world.room.lamp-3-strength'), at: { x: -17, y: -2, z: 7 } },
-    { w: value('noi.eio.world.room.lamp-4-width'), d: value('noi.eio.world.room.lamp-4-depth'), strength: value('noi.eio.world.room.lamp-4-strength'), at: { x: -3, y: 17, z: 9 } },
+    { w: 7, d: 7, strength: 3, at: { x: -2, y: -3, z: 18 } },
+    { w: 7, d: 7, strength: 2.4, at: { x: 14, y: -12, z: 8 } },
+    { w: 6, d: 6, strength: 1.8, at: { x: -17, y: -2, z: 7 } },
+    { w: 7, d: 7, strength: 1.4, at: { x: -3, y: 17, z: 9 } },
   ],
   dark: role('noi.eio.color.world.room'),
 } as const

@@ -25,11 +25,8 @@
     "reads": [
       "noi.eio.color.border.default",
       "noi.eio.color.world.land",
-      "noi.eio.world.base-tile.border-width",
-      "noi.eio.world.base-tile.breadth",
-      "noi.eio.world.base-tile.corner-radius",
-      "noi.eio.world.base-tile.thickness",
-      "noi.eio.world.base-tile.width"
+      "noi.eio.world.tile.size",
+      "noi.eio.world.tile.thickness"
     ],
     "uses": [
       "noi.eio.components.world.drawing"
@@ -37,7 +34,7 @@
     "files": [
       {
         "path": "src/base-tile/base-tile.ts",
-        "sha256": "00b9838d5bca4a06db26eabcfa657d50d49fba560927a1ad62601c3a09b650e5"
+        "sha256": "ae01e594d0ce30664c0fae4dcc30b9912fb8e9daf659d53e273d25180bf9c919"
       }
     ]
   }

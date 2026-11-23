@@ -24,11 +24,7 @@
       }
     },
     "reads": [
-      "noi.eio.color.action.secondary",
-      "noi.eio.world.astroid.active-bright",
-      "noi.eio.world.astroid.active-light-above",
-      "noi.eio.world.astroid.active-light-across",
-      "noi.eio.world.astroid.active-light-bright"
+      "noi.eio.color.action.secondary"
     ],
     "uses": [
       "noi.eio.components.world.base-tile",
@@ -37,7 +33,7 @@
     "files": [
       {
         "path": "src/astroid/astroid.ts",
-        "sha256": "99ec3c72f26dcefc38aebfa449cc14fad1db54628730fa33c0fdbe2a83342f92"
+        "sha256": "2ff10759ae51deeb1e0479ad2ed68bf69a0777025eb30a404d77a7d4d98e1191"
       }
     ]
   }

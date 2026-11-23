@@ -9,10 +9,11 @@
 // camera reaches the end, and then they should go back to their normal state", and then: "Since we added glow
 // animation for the asteroids, it should be a state, right?" So: Default, as it always was; and Active, in which it
 // glows. Named as the stage's two states are. The user saw the glow in the intro and said "Glow is right"; how it
-// glows was a session's pick till then, and each number of it is Eidos's (noi.eio.world.astroid).
+// glows was a session's pick till then. Its numbers are this element's own (GLOW, below): since 23 Nov (issue 131)
+// an element's own numbers are not registered one by one.
 import type { AstroidMeasure, AstroidState } from '@noi/eio-tokens/components'
 import { BASE_TILE } from '../base-tile/base-tile.ts'
-import { role, value } from '../drawing/eidos.ts'
+import { role } from '../drawing/eidos.ts'
 import type { Astroid, ElementState, WorldElement } from '../drawing/element.ts'
 
 /** Each measure of the astroid, in metres: the base tile's, by the key Mero holds for it. */
@@ -20,6 +21,11 @@ export const ASTROID_MEASURES: Record<AstroidMeasure, number> = {
   radius: BASE_TILE.shape.cornerRadius,
   thickness: BASE_TILE.size.z,
 }
+
+/** How the astroid glows when it is active: `bright`, how brightly it gives off its colour (1 is the colour
+ * itself); the soft light round it, `across` metres wide (just under a tile, so it stops short of the next
+ * astroid's), `above` metres over the tiles (so that it does not flicker into them) and `lightBright` as bright. */
+const GLOW = { bright: 1.5, across: 9, above: 0.05, lightBright: 0.5 } as const
 
 /** The astroid's states, by the key Mero holds for each. Active: it gives off its own colour, brighter than the
  * colour itself, and a soft light of that colour lies on the tiles round it, nearly as far as the next astroid's. */
@@ -32,12 +38,8 @@ export const ASTROID_STATES: Record<AstroidState, Omit<ElementState, 'id'>> = {
       colour: role('noi.eio.color.action.secondary'),
       borders: [],
       whole: {
-        bright: value('noi.eio.world.astroid.active-bright'),
-        round: {
-          across: value('noi.eio.world.astroid.active-light-across'),
-          above: value('noi.eio.world.astroid.active-light-above'),
-          bright: value('noi.eio.world.astroid.active-light-bright'),
-        },
+        bright: GLOW.bright,
+        round: { across: GLOW.across, above: GLOW.above, bright: GLOW.lightBright },
       },
     },
   },

@@ -27,40 +27,9 @@
       "noi.eio.color.world.step-edge",
       "noi.eio.color.world.wall",
       "noi.eio.color.world.water",
-      "noi.eio.world.base-tile.breadth",
-      "noi.eio.world.base-tile.width",
-      "noi.eio.world.first-sight.margin",
-      "noi.eio.world.first-sight.widest-angle",
-      "noi.eio.world.light.sheen",
-      "noi.eio.world.light.shown-at-least",
-      "noi.eio.world.light.sky-share",
-      "noi.eio.world.light.under-share",
-      "noi.eio.world.room.blur",
-      "noi.eio.world.room.lamp-1-depth",
-      "noi.eio.world.room.lamp-1-strength",
-      "noi.eio.world.room.lamp-1-width",
-      "noi.eio.world.room.lamp-2-depth",
-      "noi.eio.world.room.lamp-2-strength",
-      "noi.eio.world.room.lamp-2-width",
-      "noi.eio.world.room.lamp-3-depth",
-      "noi.eio.world.room.lamp-3-strength",
-      "noi.eio.world.room.lamp-3-width",
-      "noi.eio.world.room.lamp-4-depth",
-      "noi.eio.world.room.lamp-4-strength",
-      "noi.eio.world.room.lamp-4-width",
-      "noi.eio.world.room.lamp-thickness",
-      "noi.eio.world.room.size",
       "noi.eio.world.states.change",
-      "noi.eio.world.stud-grid.across",
-      "noi.eio.world.stud-grid.count",
-      "noi.eio.world.stud-grid.pitch",
-      "noi.eio.world.stud-grid.tall",
-      "noi.eio.world.surface.frost-edge",
-      "noi.eio.world.surface.frost-ior",
-      "noi.eio.world.surface.frost-thickness",
-      "noi.eio.world.surface.gloss-coat-roughness",
-      "noi.eio.world.surface.gloss-mirrors",
-      "noi.eio.world.surface.gloss-roughness"
+      "noi.eio.world.stud.pitch",
+      "noi.eio.world.tile.size"
     ],
     "uses": [],
     "files": [
@@ -70,19 +39,19 @@
       },
       {
         "path": "src/drawing/eidos.ts",
-        "sha256": "12d4bfb275b1369299b7c438cc2c4d8c42de5b34ac453f55d3d3514d70266085"
+        "sha256": "0c21f0c48e5e640d729a11408458ce794b8f93780342b261c4a6bf3e8b14dd8c"
       },
       {
         "path": "src/drawing/element.ts",
-        "sha256": "a0a15cf45669f9a5471db57df9e42cb85bb18d22281d3e2f906b759ed7b6322a"
+        "sha256": "0ed7b517584669a50770096a0a0920a7675056ad3b68f94816229af9cecab39d"
       },
       {
         "path": "src/drawing/light.ts",
-        "sha256": "1be9e78537da1e762d5fcc0377b567700d97a501aee29753e218f734d0b9388e"
+        "sha256": "247698275c52081a8014c82cf3edd48d8cf7c58452c0e336c5b5d9bfb4e0f6c1"
       },
       {
         "path": "src/drawing/make.ts",
-        "sha256": "594b9de070028c28ce4f0e7ea0f6d3eac38e68b7a8b2375f31c70e99382f93d4"
+        "sha256": "fe10eb154eb28774ae75a912b033327b7f4cb605d96f4921cf8bdf84ab0cfc34"
       },
       {
         "path": "src/drawing/outline.ts",
@@ -94,11 +63,11 @@
       },
       {
         "path": "src/drawing/studs.ts",
-        "sha256": "f0f15dc0ba9c3ed9d27d2df3f5a0b9a7a4c5649af8f31699dac11d6528454446"
+        "sha256": "9b617aa98522bd69afcc32ad486f4983309adc09f8168dc04c8104ba52c6b3f4"
       },
       {
         "path": "src/drawing/wave.ts",
-        "sha256": "94f1748497e40b60638566658bea6b43ffa283e1e4ecb981791c9d5a5c9e1dc1"
+        "sha256": "823b592b5778dc5df4532715d1a2468377c9e8906243625ef4f1c2adc4d6d177"
       }
     ]
   }

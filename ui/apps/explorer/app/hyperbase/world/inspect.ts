@@ -8,7 +8,7 @@
 // One thing only here: a matte thing shows its shape only by how much light each of its faces catches, and a
 // colour as dark as the tile's black would show none; so an element whose colour is too dark to show its faces
 // is lit more, until its top is shown as a dark grey.
-import { ASTROID, BASE_TILE, calledIn, firstSight, fitsOn, light, lightFor, makeElement, makeMany, reachIn, sizedBy, type Made, type WorldElement } from '@noi/eio-3d'
+import { ASTROID, BASE_TILE, calledIn, chosenAs, firstSight, fitsOn, light, lightFor, makeElement, makeMany, reachIn, sizedBy, type Chosen, type Made, type WorldElement } from '@noi/eio-3d'
 import { openEye, type Eye, type Sight } from './eye.ts'
 import { openWorld, type World } from './world.ts'
 
@@ -83,11 +83,11 @@ export async function showElement(world: World, element: WorldElement, look: Ins
   world.xyz.add(made.thing)
   const reach = Math.hypot(element.size.x, element.size.y, element.size.z) / 2
   // the element in the largest size that can be chosen for it: the eye must be able to stand back from that
-  const largestStep = (along: 'x' | 'y' | 'z') => {
-    const steps = (element.settings ?? []).filter(s => s.sets.along === along).flatMap(s => s.steps.map(step => step.value))
+  const largestStep = (as: keyof Chosen) => {
+    const steps = (element.settings ?? []).filter(s => chosenAs(s) === as).flatMap(s => s.steps.map(step => step.value))
     return steps.length > 0 ? Math.max(...steps) : undefined
   }
-  const largest = (sizedBy(element, { x: largestStep('x'), y: largestStep('y'), z: largestStep('z') }) ?? element).size
+  const largest = (sizedBy(element, { x: largestStep('x'), y: largestStep('y'), z: largestStep('z'), scale: largestStep('scale') }) ?? element).size
   const reachMost = Math.hypot(largest.x, largest.y, largest.z) / 2
   // how near the hand may come: a tenth of the element's reach; to ground, as near as to one base tile, since
   // what is placed on it is small beside it. How far: twelve times its reach (in its largest size), and never
@@ -109,7 +109,7 @@ export async function showElement(world: World, element: WorldElement, look: Ins
   let onAs: WorldElement | null = null
   // what was chosen for each of the two: its state, the colours tried on it, the sizes chosen for it. A thing
   // made again in another size is given these at once.
-  const nothingChosen = () => ({ state: null as string | null, colours: new Map<string, string>(), sizes: {} as { x?: number; y?: number; z?: number } })
+  const nothingChosen = () => ({ state: null as string | null, colours: new Map<string, string>(), sizes: {} as { x?: number; y?: number; z?: number; scale?: number } })
   const chosen = { it: nothingChosen(), on: nothingChosen() }
   // LOOKING THROUGH IT: which of the two one looks through (or neither), where the eye was before, how wide it
   // then saw, and the ground laid for the time
@@ -253,7 +253,7 @@ export async function showElement(world: World, element: WorldElement, look: Ins
       const setting = base?.settings?.find(s => s.id === id)
       if (!base || !setting) return false
       const sizes = chosen[of].sizes
-      const along = setting.sets.along
+      const along = chosenAs(setting)
       if ((sizes[along] ?? setting.value) === value) return true // it is that size already
       sizes[along] = value
       const resized = sizedBy(base, sizes)

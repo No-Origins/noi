@@ -18,11 +18,12 @@
 // section, and an astroid wherever four tiles meet. Each is a thing in the land's data: which element it is,
 // and the place it lies on by the middle of its base.
 //
-// THE LAND'S NUMBERS ARE EIDOS'S (23 Nov 2026): how far it runs is the base platform's (noi.eio.world.base-platform),
-// how its coordinates are marked is noi.eio.world.coordinates, and how it is seen is noi.eio.world.isometric; the
-// elements laid on it are @noi/eio-3d's. Which side is which, and the places the user laid stages on, are the
-// land's own.
-import { ASTROID, BASE_PLATFORM_MEASURES, BASE_TILE, STAGE, covers, elementById, sizedBy, value, type WorldElement } from '@noi/eio-3d'
+// THE LAND'S NUMBERS (23 Nov 2026): how far it runs is the base platform's, and the coordinates' every 10 m is the
+// tile's (both from @noi/eio-3d, which takes them from Eidos); the elements laid on it are @noi/eio-3d's. How its
+// coordinates are marked and how it is seen (PICKS, ISOMETRIC) are the land's own, named here: since the user's
+// decision of 23 Nov (issue 131) numbers that one thing alone uses are not registered one by one. Which side is
+// which, and the places the user laid stages on, are the land's own too.
+import { ASTROID, BASE_PLATFORM_MEASURES, BASE_TILE, STAGE, covers, elementById, sizedBy, type WorldElement } from '@noi/eio-3d'
 import { at, between, readPlace, standsOn, toThree, writePlace, written, type Place, type Size, type Span } from './place.ts'
 
 /** Half of how far the land runs along x: from -HALF to HALF. 200 m across at first (the user, 21 Nov 2026);
@@ -54,8 +55,8 @@ export function middleOf(size: LandSize = SIZE): Place {
   return at(0, size.long / 2)
 }
 /** The stronger lines, the numbers on the edges and the upright markers come every this many metres (the user's
- * choice of the four ways, each of them every 10 m). */
-export const EVERY = value('noi.eio.world.coordinates.every')
+ * choice of the four ways, each of them every 10 m): every tile. */
+export const EVERY = BASE_TILE.size.x
 
 /** The four ways of seeing the coordinates, all kept by the user ("All four"): the lines on the ground, the
  * numbers along the four edges, the upright markers at the 10 m crossings, the place under the pointer. */
@@ -127,7 +128,7 @@ const sideOf = (id: Side['id']): Side => SIDES.find(side => side.id === id)!
  * (with this eye, how far it stands changes nothing in the picture). */
 export const ISOMETRIC: { readonly off: readonly [Side['id'], Side['id']]; readonly away: number } = {
   off: ['end', 'right'],
-  away: value('noi.eio.world.isometric.eye-away'),
+  away: 200,
 }
 
 /** The isometric sight of a place: the eye looks at it from ISOMETRIC.away metres back along x, along y and up,
@@ -163,16 +164,16 @@ export interface Picks {
 }
 
 export const PICKS: Picks = {
-  markerHeight: value('noi.eio.world.coordinates.marker-height'),
-  markerWidth: value('noi.eio.world.coordinates.marker-width'),
-  wordsAbove: value('noi.eio.world.coordinates.words-above'),
-  wordsWithin: value('noi.eio.world.coordinates.words-within'),
+  markerHeight: 1.2,
+  markerWidth: 0.2,
+  wordsAbove: 1.5,
+  wordsWithin: 45,
   // 4 m till 22 Nov 2026: in the isometric view a number 4 m out lay under the nearest marker's words
-  numbersOut: value('noi.eio.world.coordinates.numbers-out'),
-  pointerDecimals: value('noi.eio.world.coordinates.pointer-decimals'),
-  namesOut: value('noi.eio.world.coordinates.names-out'),
-  viewMargin: value('noi.eio.world.isometric.margin'),
-  scrollGain: value('noi.eio.world.isometric.scroll-gain'),
+  numbersOut: 8,
+  pointerDecimals: 1,
+  namesOut: 20,
+  viewMargin: 15,
+  scrollGain: 1,
 }
 
 /** A thing laid on the land: an element of the world (by its id), on a place by the middle of its base. */

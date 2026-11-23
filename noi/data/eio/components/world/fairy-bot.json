@@ -24,14 +24,7 @@
         "running": "running"
       }
     },
-    "reads": [
-      "noi.eio.world.fairy-bot.wing-back",
-      "noi.eio.world.fairy-bot.wing-flap",
-      "noi.eio.world.fairy-bot.wing-flap-every",
-      "noi.eio.world.fairy-bot.wing-height",
-      "noi.eio.world.fairy-bot.wing-lean",
-      "noi.eio.world.fairy-bot.wing-span"
-    ],
+    "reads": [],
     "uses": [
       "noi.eio.components.world.character-drawing",
       "noi.eio.components.world.drawing"
@@ -51,7 +44,7 @@
       },
       {
         "path": "src/fairy-bot/fairy-bot.ts",
-        "sha256": "8b5aa553eca2de61b6d7f7b930ed2bd3d2b1812ad3ce3e82a45278f391124f46"
+        "sha256": "c6a0e3bf79630083db13e339fd17dcaee20804de631f8efa0058e3d92e196caa"
       }
     ]
   }

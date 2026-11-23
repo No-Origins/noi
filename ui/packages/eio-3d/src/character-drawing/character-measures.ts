@@ -1,6 +1,6 @@
-// The numbers the characters carry, as pages show them: THE CHARACTER (noi.eio.world.character), HOW IT MOVES
-// (noi.eio.world.movement), ITS FLIGHT INTO A SYSTEM (noi.eio.world.flight) and THE EYE THAT FOLLOWS IT
-// (noi.eio.world.eye). A length is a line beside or behind the character; a speed or a time is words over him,
+// The numbers the characters carry, as pages show them: THE CHARACTER, HOW IT MOVES, ITS FLIGHT INTO A SYSTEM and
+// THE EYE THAT FOLLOWS IT, the first world's. (Of their values Eidos keeps only the character's height since 23 Nov
+// 2026, issue 131: nothing reads the others till a character moves again; a page gives them.) A length is a line beside or behind the character; a speed or a time is words over him,
 // and a walk or a run is shown by his clip at that speed. He stands at the middle, facing the eye (+z).
 import type { Motion } from './characters.ts'
 

@@ -108,48 +108,56 @@
 // stands 1 m in from the two sides at its corner, which is the corner's radius itself, worked out from it: at
 // the 10 m stage x 4, y 4, z 2 (and the other three by sign). The old 0.5 m is gone. (The posts have no border:
 // a glow may name a piece without one, and then lights all of that piece.)
-// Every number is Eidos's (noi.eio.world.stage), each by its name below, and so is every colour; its states, its
-// settings and its colour are keys Mero holds for it. Its outline, corners and border are the base tile's, read
+// ON THE GRID, IN STEPS (23 Nov 2026, issue 131). The user decided how elements are sized: "the stage might need
+// individual steps with width, height, and length", and part sizes are not registered ("there is no point in saving
+// individual part sizes"). So Eidos holds the stage's steps (noi.eio.world.stage): its width and breadth in whole
+// tiles, 1 to 10 (one record for both: MY PICK), and the heights of its base, 2, 4, 6, 8 and 10 m. Every other
+// number is this element's own, named below. Every colour is Eidos's; its states, its settings and its colour are
+// keys Mero holds for it. Its outline, corners and border are the base tile's, read
 // from BASE_TILE; the glass's white is the pool wall's (noi.eio.color.world.wall).
 import type { StageColour, StageSetting, StageState } from '@noi/eio-tokens/components'
 import { BASE_TILE } from '../base-tile/base-tile.ts'
-import { role, value } from '../drawing/eidos.ts'
+import { role, steps } from '../drawing/eidos.ts'
 import type { ElementColour, ElementState, Piece, Pieces, Surface, WorldElement } from '../drawing/element.ts'
 import type { Size } from '../drawing/space.ts'
 
-/** The stage as it is made, on its first base: how tall the base is, how far above it the glass floats, how
- * thick the glass is. */
+/** The heights the base may have (Eidos's steps), and the widths and breadths, in whole tiles. */
+const BASE_HEIGHTS = steps('noi.eio.world.stage.base-height')
+const TILES = steps('noi.eio.world.stage.width-and-breadth')
+/** The stage as it is made, on its first base: how tall the base is (the first of its heights), how far above it
+ * the glass floats (the user's 1 m), how thick the glass is. */
 const MADE = {
-  tall: value('noi.eio.world.stage.base-height'),
-  gap: value('noi.eio.world.stage.glass-gap'),
-  glass: value('noi.eio.world.stage.glass-thickness'),
+  tall: BASE_HEIGHTS[0]?.value ?? 0,
+  gap: 1,
+  glass: 0.05,
 } as const
 /** How much of the base's growth each of these takes: 1 grows as the base does, 0 not at all. */
 const GROWS = {
-  glass: value('noi.eio.world.stage.glass-grows'),
-  border: value('noi.eio.world.stage.border-grows'),
-  gap: value('noi.eio.world.stage.gap-grows'),
+  glass: 1,
+  border: 0.5,
+  gap: 0.1,
 } as const
-const POST = { across: value('noi.eio.world.stage.post-width') } as const
-/** How much the block and its posts shine: glossy. */
-const SHINE = value('noi.eio.world.stage.block-shine')
-const GLASS: Surface = { colour: role('noi.eio.color.world.wall'), finish: 'frosted', hides: value('noi.eio.world.stage.glass-hides'), frost: value('noi.eio.world.stage.glass-frost'), says: 'heavily frosted glass' }
+const POST = { across: 0.4 } as const
+/** How much the block and its posts shine: glossy (the user's "Shine: Glossy"). */
+const SHINE = 1
+/** How bright its lit parts are in the active state: the borders fully, the top and the sides half as brightly
+ * (the user's "Top face: Half. Border: Full. Sides: Half."). */
+const BRIGHT = { full: 1, half: 0.5 } as const
+/** The glass: it hides nothing behind it, and is heavily frosted (the user's "Frost: Heavy. Hides: Nothing."). */
+const GLASS: Surface = { colour: role('noi.eio.color.world.wall'), finish: 'frosted', hides: 0, frost: 0.85, says: 'heavily frosted glass' }
 
-/** The sizes one may choose, in metres: the width and breadth in steps of 10 m up to the widest (the user: "Sizes
- * are steps of 10m."); the base's height in steps of the height it is made with, up to the tallest (the user's
- * own numbers: "starting with 2, then 4, then 8, and then 10"; and 6, 23 Nov 2026, piece 51, after laying stages
- * 6 m tall: "Yeah, let's do it."). */
-const stepsUpTo = (step: number, most: number) => Array.from({ length: Math.round(most / step) }, (_, n) => step * (n + 1))
-const TENS = stepsUpTo(value('noi.eio.world.stage.size-step'), value('noi.eio.world.stage.widest'))
-const BASE_HEIGHTS = stepsUpTo(MADE.tall, value('noi.eio.world.stage.tallest-base'))
+/** The sizes one may choose, in metres: the width and breadth in whole tiles, each said in metres (the user: "Sizes
+ * are steps of 10m."); the base's heights as Eidos holds them (the user's own numbers: "starting with 2, then 4,
+ * then 8, and then 10"; and 6, 23 Nov 2026, piece 51, after laying stages 6 m tall: "Yeah, let's do it."). */
 const inMetres = (metres: number) => ({ name: `${metres} m`, value: metres })
+const ACROSS = TILES.map(step => step.value * BASE_TILE.size.x)
 
 /** THE STAGE'S SETTINGS, each by the key Mero holds for it: what it is called, which way it sizes the stage, and
  * the steps one may choose among. They are offered in one group, Size. */
 export const STAGE_SETTINGS: Record<StageSetting, { readonly name: string; readonly along: 'x' | 'y' | 'z'; readonly steps: readonly number[] }> = {
-  width: { name: 'Width', along: 'x', steps: TENS },
-  breadth: { name: 'Breadth', along: 'y', steps: TENS },
-  height: { name: 'Height of the base', along: 'z', steps: BASE_HEIGHTS },
+  width: { name: 'Width', along: 'x', steps: ACROSS },
+  breadth: { name: 'Breadth', along: 'y', steps: ACROSS },
+  height: { name: 'Height of the base', along: 'z', steps: BASE_HEIGHTS.map(step => step.value) },
 }
 
 /** THE STAGE'S COLOUR, by the key Mero holds for it: the one colour all its lit parts give off, lime to begin
@@ -170,12 +178,12 @@ export const STAGE_STATES: Record<StageState, Omit<ElementState, 'id'>> = {
     glow: {
       colour: role('noi.eio.color.action.primary'),
       borders: [
-        { piece: 'block', colour: ONE, bright: value('noi.eio.world.stage.active-border-bright'), sidesBright: value('noi.eio.world.stage.active-sides-bright') },
-        { piece: 'glass', colour: ONE, bright: value('noi.eio.world.stage.active-glass-bright') },
+        { piece: 'block', colour: ONE, bright: BRIGHT.full, sidesBright: BRIGHT.half },
+        { piece: 'glass', colour: ONE, bright: BRIGHT.full },
         // the posts light as the block's sides do
-        ...[1, 2, 3, 4].map(n => ({ piece: `post ${n}`, colour: ONE, bright: value('noi.eio.world.stage.active-sides-bright'), sidesBright: value('noi.eio.world.stage.active-sides-bright') })),
+        ...[1, 2, 3, 4].map(n => ({ piece: `post ${n}`, colour: ONE, bright: BRIGHT.half, sidesBright: BRIGHT.half })),
       ],
-      tops: [{ piece: 'block', colour: ONE, bright: value('noi.eio.world.stage.active-top-bright') }],
+      tops: [{ piece: 'block', colour: ONE, bright: BRIGHT.half }],
     },
   },
 }

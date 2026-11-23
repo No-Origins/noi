@@ -9,48 +9,51 @@
 // FROM THE USER'S WORDS AND DRAWING: the line seen from the side; no flat start and no flat end; as wide as the base
 // platform (21 tiles); every tile whole.
 // MY PICKS, not the user's word: every length and turn of the line's thirteen runs, laid over the drawing; the
-// slant; the easing; tiles on both faces. Every number is Eidos's (noi.eio.world.wave-platform), each by the key
-// Mero holds for it, and the width is the base platform's; what each run is, in words, is this element's own.
+// slant; the easing; tiles on both faces. The width is the base platform's; every other number is this element's
+// own (since 23 Nov 2026, issue 131, an element's own numbers are not registered one by one), each given by the key
+// Mero holds for it; what each run is, in words, is the element's own too.
 import type { WavePlatformMeasure } from '@noi/eio-tokens/components'
 import { ASTROID } from '../astroid/astroid.ts'
+import { BASE_PLATFORM_MEASURES } from '../base-platform/base-platform.ts'
 import { BASE_TILE } from '../base-tile/base-tile.ts'
-import { value } from '../drawing/eidos.ts'
 import type { Laid, WorldElement } from '../drawing/element.ts'
 import { frameOf, lengthOf, sizeOf, type Run, type Wave } from '../drawing/wave.ts'
 
-/** Each measure of the wave strip, as Eidos holds it: lengths in metres, the slant and the turns in degrees. */
+/** Each measure of the wave strip: lengths in metres, the slant and the turns in degrees. The runway before the
+ * wave and the flat end after the twist are 0 m: both were chopped off ("You can just chop it off just before it
+ * starts to curl"; "The end of the curl is also too long"). */
 export const WAVE_PLATFORM_MEASURES: Record<WavePlatformMeasure, number> = {
-  width: value('noi.eio.world.base-platform.width'),
-  runway: value('noi.eio.world.wave-platform.runway'),
-  end: value('noi.eio.world.wave-platform.end'),
-  slant: value('noi.eio.world.wave-platform.slant'),
-  ease: value('noi.eio.world.wave-platform.ease'),
-  'run-1-long': value('noi.eio.world.wave-platform.run-1-long'),
-  'run-1-turn': value('noi.eio.world.wave-platform.run-1-turn'),
-  'run-2-long': value('noi.eio.world.wave-platform.run-2-long'),
-  'run-2-turn': value('noi.eio.world.wave-platform.run-2-turn'),
-  'run-3-long': value('noi.eio.world.wave-platform.run-3-long'),
-  'run-3-turn': value('noi.eio.world.wave-platform.run-3-turn'),
-  'run-4-long': value('noi.eio.world.wave-platform.run-4-long'),
-  'run-4-turn': value('noi.eio.world.wave-platform.run-4-turn'),
-  'run-5-long': value('noi.eio.world.wave-platform.run-5-long'),
-  'run-5-turn': value('noi.eio.world.wave-platform.run-5-turn'),
-  'run-6-long': value('noi.eio.world.wave-platform.run-6-long'),
-  'run-6-turn': value('noi.eio.world.wave-platform.run-6-turn'),
-  'run-7-long': value('noi.eio.world.wave-platform.run-7-long'),
-  'run-7-turn': value('noi.eio.world.wave-platform.run-7-turn'),
-  'run-8-long': value('noi.eio.world.wave-platform.run-8-long'),
-  'run-8-turn': value('noi.eio.world.wave-platform.run-8-turn'),
-  'run-9-long': value('noi.eio.world.wave-platform.run-9-long'),
-  'run-9-turn': value('noi.eio.world.wave-platform.run-9-turn'),
-  'run-10-long': value('noi.eio.world.wave-platform.run-10-long'),
-  'run-10-turn': value('noi.eio.world.wave-platform.run-10-turn'),
-  'run-11-long': value('noi.eio.world.wave-platform.run-11-long'),
-  'run-11-turn': value('noi.eio.world.wave-platform.run-11-turn'),
-  'run-12-long': value('noi.eio.world.wave-platform.run-12-long'),
-  'run-12-turn': value('noi.eio.world.wave-platform.run-12-turn'),
-  'run-13-long': value('noi.eio.world.wave-platform.run-13-long'),
-  'run-13-turn': value('noi.eio.world.wave-platform.run-13-turn'),
+  width: BASE_PLATFORM_MEASURES.width,
+  runway: 0,
+  end: 0,
+  slant: 15,
+  ease: 150,
+  'run-1-long': 400,
+  'run-1-turn': 55,
+  'run-2-long': 340,
+  'run-2-turn': 0,
+  'run-3-long': 140,
+  'run-3-turn': -155,
+  'run-4-long': 380,
+  'run-4-turn': 0,
+  'run-5-long': 110,
+  'run-5-turn': 160,
+  'run-6-long': 440,
+  'run-6-turn': 0,
+  'run-7-long': 300,
+  'run-7-turn': -150,
+  'run-8-long': 240,
+  'run-8-turn': 0,
+  'run-9-long': 410,
+  'run-9-turn': -200,
+  'run-10-long': 120,
+  'run-10-turn': 0,
+  'run-11-long': 170,
+  'run-11-turn': -55,
+  'run-12-long': 100,
+  'run-12-turn': 0,
+  'run-13-long': 150,
+  'run-13-turn': -15,
 }
 
 const M = WAVE_PLATFORM_MEASURES

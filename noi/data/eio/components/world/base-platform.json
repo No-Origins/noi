@@ -20,8 +20,8 @@
       }
     },
     "reads": [
-      "noi.eio.world.base-platform.length",
-      "noi.eio.world.base-platform.width"
+      "noi.eio.world.base-platform.tiles-across",
+      "noi.eio.world.base-platform.tiles-long"
     ],
     "uses": [
       "noi.eio.components.world.astroid",
@@ -31,7 +31,7 @@
     "files": [
       {
         "path": "src/base-platform/base-platform.ts",
-        "sha256": "ff10f82ffae9ad5e6b3c9d8e2f09329cdf36bc6d8b44a7dc902f8fcf1bd71913"
+        "sha256": "b988984ff2f3406ecbcf8c43fe7fe84bf2085b5b084279c0d5841299a18b866c"
       }
     ]
   }
