@@ -462,6 +462,32 @@ async fn verify(url: &str) {
     );
     assert!(with(you.clone(), None).waiting(&me).await.unwrap() >= 1);
     denied(as_agent.waiting(&agent).await, "read-review");
+    // The agent takes back its own batch (23 Nov), Governance answering as for proposing; an owner
+    // may not withdraw what the agent proposed, and nothing of it waits any more.
+    let taken = as_agent
+        .propose_batch(
+            &agent,
+            batch(
+                "Taken back",
+                vec![add(meron(inv_scope, "noi.inv.taken-back"))],
+            ),
+        )
+        .await
+        .unwrap();
+    denied(
+        with(you.clone(), None)
+            .withdraw(&me, taken.uid, "Not mine")
+            .await,
+        "proposer",
+    );
+    let withdrawn = as_agent
+        .withdraw(&agent, taken.uid, "A smaller batch follows")
+        .await
+        .unwrap();
+    assert!(withdrawn
+        .iter()
+        .all(|p| p.state == ProposalState::Withdrawn
+            && p.decided_by.as_deref() == Some("design-agent")));
     // Only one place and what is under it, for Governance's pages.
     let gov_only = with(you.clone(), None)
         .snapshot_under(&me, Some("noi.gov"))

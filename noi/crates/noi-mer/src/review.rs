@@ -147,6 +147,8 @@ pub enum ProposalState {
     Landing,
     Approved,
     Rejected,
+    /// Taken back by its proposer before anyone decided it (`noi withdraw`, 23 Nov). Final.
+    Withdrawn,
 }
 impl ProposalState {
     fn as_str(self) -> &'static str {
@@ -156,6 +158,7 @@ impl ProposalState {
             Self::Landing => "landing",
             Self::Approved => "approved",
             Self::Rejected => "rejected",
+            Self::Withdrawn => "withdrawn",
         }
     }
     fn parse(s: &str) -> Result<Self> {
@@ -165,6 +168,7 @@ impl ProposalState {
             "landing" => Self::Landing,
             "approved" => Self::Approved,
             "rejected" => Self::Rejected,
+            "withdrawn" => Self::Withdrawn,
             other => return Err(ValidationError(format!("unknown proposal state {other}")).into()),
         })
     }
@@ -978,6 +982,81 @@ impl Registry {
             note,
         )
         .await
+    }
+    /// The proposer takes back its own batch (23 Nov): every proposal of it still waiting or sent
+    /// back is withdrawn, with the proposer's note, and stays on record. Nothing else changes, and no
+    /// reviewer is asked: it is the proposer's own proposal. Governance is asked, as for proposing,
+    /// whether the proposer may propose in those places; only the batch's own proposer may withdraw.
+    /// A change approved and waiting to land is no longer the proposer's: a reviewer rejects it.
+    pub async fn withdraw(
+        &self,
+        proposer: &Actor,
+        batch: Uuid,
+        note: &str,
+    ) -> Result<Vec<Proposal>> {
+        let note = note_text(Some(note), true)?;
+        let mut tx = self.write().await?;
+        let owner: Option<String> =
+            sqlx::query_scalar("SELECT proposer FROM mer.batches WHERE uid=$1")
+                .bind(batch)
+                .fetch_optional(tx.as_mut())
+                .await?;
+        let owner = owner.ok_or(Error::NotFound)?;
+        if owner != proposer.subject {
+            return Err(Error::Denied(
+                "only its proposer can withdraw a batch".into(),
+            ));
+        }
+        let rows = sqlx::query_as::<_, ProposalRow>("SELECT uid,batch,position,change,state,revision,outcome,checked_at,decided_by,decided_at,created_at,updated_at FROM mer.proposals WHERE batch=$1 AND state IN ('waiting','sent-back') ORDER BY position FOR UPDATE")
+            .bind(batch)
+            .fetch_all(tx.as_mut())
+            .await?;
+        if rows.is_empty() {
+            return Err(ValidationError(
+                "nothing in this batch is waiting or sent back: there is nothing to withdraw"
+                    .into(),
+            )
+            .into());
+        }
+        let changes = rows
+            .iter()
+            .map(|r| serde_json::from_value(r.change.clone()))
+            .collect::<std::result::Result<Vec<Change>, _>>()?;
+        let resources = change_resources(tx.as_mut(), &changes).await?;
+        let decision = self
+            .authorize(
+                proposer,
+                Action::Propose,
+                resources,
+                json!({"withdraw": batch, "proposals": rows.len()}),
+            )
+            .await?;
+        let uids: Vec<Uuid> = rows.iter().map(|r| r.uid).collect();
+        sqlx::query("UPDATE mer.proposals SET state='withdrawn',decided_by=$2,decided_at=clock_timestamp(),updated_at=clock_timestamp() WHERE uid = ANY($1)")
+            .bind(&uids)
+            .bind(&proposer.subject)
+            .execute(tx.as_mut())
+            .await?;
+        for row in &rows {
+            proposal_event(
+                tx.as_mut(),
+                batch,
+                Some(row.uid),
+                "proposal.withdraw",
+                proposer,
+                &decision,
+                note.as_deref(),
+                json!({"was": row.state}),
+            )
+            .await?;
+        }
+        tx.commit().await?;
+        let mut conn = self.pool.acquire().await?;
+        let rows = sqlx::query_as::<_, ProposalRow>("SELECT uid,batch,position,change,state,revision,outcome,checked_at,decided_by,decided_at,created_at,updated_at FROM mer.proposals WHERE uid = ANY($1) ORDER BY position")
+            .bind(&uids)
+            .fetch_all(&mut *conn)
+            .await?;
+        rows.into_iter().map(|r| r.into_proposal(false)).collect()
     }
     async fn decide(
         &self,

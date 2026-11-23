@@ -21,7 +21,7 @@ import { asList, listChange, listChanged, type ListChange } from '../../lib/list
 import styles from './review.module.css'
 
 const OPERATION = { add: 'New', update: 'Change', rename: 'Rename', deprecate: 'Deprecate', reinstate: 'Reinstate', retire: 'Retire' } as const
-const STATE = { waiting: 'Waiting', 'sent-back': 'Sent back', landing: 'Approved, waiting to land', approved: 'Approved', rejected: 'Rejected' } as const
+const STATE = { waiting: 'Waiting', 'sent-back': 'Sent back', landing: 'Approved, waiting to land', approved: 'Approved', rejected: 'Rejected', withdrawn: 'Withdrawn' } as const
 const ACTION: Record<string, string> = {
   'proposal.submit': 'proposed this batch',
   'proposal.revise': 'revised',
@@ -29,6 +29,7 @@ const ACTION: Record<string, string> = {
   'proposal.approve': 'approved',
   'proposal.reject': 'rejected',
   'proposal.land': 'landed',
+  'proposal.withdraw': 'withdrew',
 }
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -130,7 +131,7 @@ function ProposalCard({ p, b, s, idx, nodes, current, writable }: {
       <div className={styles.proposalHead}>
         <Badge>{OPERATION[p.change.operation]}</Badge>
         <h2 className="eio-type-style-heading">{changeName(idx, p.change)}</h2>
-        <Badge state={p.state === 'approved' ? 'active' : p.state === 'rejected' ? 'deprecated' : 'proposed'}>{STATE[p.state]}</Badge>
+        <Badge state={p.state === 'approved' ? 'active' : p.state === 'rejected' || p.state === 'withdrawn' ? 'deprecated' : 'proposed'}>{STATE[p.state]}</Badge>
         {p.revision > 1 && <Badge>Rev {p.revision}</Badge>}
         {open && p.stale && <Badge tone="warning">Stale</Badge>}
       </div>
@@ -154,6 +155,7 @@ function ProposalCard({ p, b, s, idx, nodes, current, writable }: {
         </p>
       )}
       {p.state === 'rejected' && <p className="eio-type-style-body">Rejected by {p.decided_by} on {when(p.decided_at!)}.</p>}
+      {p.state === 'withdrawn' && <p className="eio-type-style-body">Withdrawn by {p.decided_by}, its proposer, on {when(p.decided_at!)}.</p>}
       {p.state === 'sent-back' && <p className={cx(styles.muted, 'eio-type-style-body')}>Waiting for {b.proposer} to revise it.</p>}
       {writable && open && <Decide proposal={p.uid} waiting={p.state === 'waiting'} blocked={blocker(p)} />}
     </Card>
