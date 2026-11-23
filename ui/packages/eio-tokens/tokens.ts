@@ -450,8 +450,11 @@ export const tokens = {
       "sweep-every": 6
     },
     "character": {
+      "arms-out": 0.2,
+      "depth": 0.6,
       "height": 1.8,
-      "step-up": 0.45
+      "step-up": 0.45,
+      "width": 0.8
     },
     "coordinates": {
       "every": 10,
@@ -489,6 +492,14 @@ export const tokens = {
       "gateway": 3.4,
       "jump": 3.8,
       "on-foot": 6
+    },
+    "fairy-bot": {
+      "wing-back": 0.23,
+      "wing-flap": 30,
+      "wing-flap-every": 0.33,
+      "wing-height": 1.02,
+      "wing-lean": 10,
+      "wing-span": 1.2
     },
     "first-sight": {
       "margin": 1.15,

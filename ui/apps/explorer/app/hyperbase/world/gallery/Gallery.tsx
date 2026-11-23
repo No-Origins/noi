@@ -59,7 +59,7 @@
 // for two panes is still Eidos's to say: WhenTwoPanes and WhenOnePane.
 import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Choices, Drawer, Radio, Select, Swatch, Toggle, WhenOnePane, WhenTwoPanes } from '@noi/eio-react'
-import { COLOURS_TO_TRY, ELEMENTS, bentLength as lengthOf, coloursIn, fitsOn, inWords, sizedBy, type ElementColour, type ElementSetting, type ElementState, type WorldElement } from '@noi/eio-3d'
+import { COLOURS_TO_TRY, ELEMENTS, bentLength as lengthOf, calledIn, coloursIn, fitsOn, inWords, sizedBy, type ElementColour, type ElementSetting, type ElementState, type WorldElement } from '@noi/eio-3d'
 import { picturesOf } from '../inspect'
 import { ElementView } from './ElementView'
 import { sideOf, stripOf } from '../rideAlong'
@@ -79,7 +79,7 @@ const inSize = (element: WorldElement, chosen: Record<string, number>): WorldEle
 /** One element's own control: the states it can be in, and under them what it does in the chosen one. */
 function States({ of, chosen, choose, name }: { of: WorldElement; chosen: ElementState; choose(id: string): void; name: string }) {
   return (
-    <Choices legend={`The ${of.name.toLowerCase()} is`} across note={chosen.says}>
+    <Choices legend={`${calledIn(of, true)} is`} across note={chosen.says}>
       {(of.states ?? []).map(state => (
         <Radio key={state.id} name={name} checked={state === chosen} onChange={() => choose(state.id)}>{state.name}</Radio>
       ))}
@@ -131,7 +131,8 @@ function Settings({ of, offered, tried, tryOut }: { of: WorldElement; offered: r
 
 export function Gallery() {
   const page = useRef<HTMLDivElement>(null)
-  const [pictures, setPictures] = useState<Record<string, string>>({})
+  // each element's still picture, by its id; or, for a thing drawn from files that could not be loaded, why not
+  const [pictures, setPictures] = useState<Record<string, string | { cannot: string }>>({})
   // the element in the 3D view stays there while the view leaves, so `open` and `shown` are kept apart
   const [shown, setShown] = useState<WorldElement | null>(null)
   const [open, setOpen] = useState(false)
@@ -230,13 +231,14 @@ export function Gallery() {
         </p>
       ) : (
         <p className={cx(styles.muted, 'eio-type-style-caption')}>
-        The {shown.name.toLowerCase()} stands at x 0, y 0. Drag to turn it round, scroll to come near, right-drag to slide.
+        {calledIn(shown, true)} stands at x 0, y 0. Drag to turn it round, scroll to come near, right-drag to slide.
         </p>
       )}
     </div>
   )
 
-  // the still pictures: taken once, on a canvas that is laid out but not shown
+  // the still pictures: taken once, on a canvas that is laid out but not shown; each shows as soon as it is taken
+  // (a character's once its files have come, after the rest)
   useEffect(() => {
     const host = page.current
     if (!host) return
@@ -246,8 +248,7 @@ export function Gallery() {
     host.append(canvas)
     const css = getComputedStyle(canvas)
     let left = false
-    picturesOf(ELEMENTS, canvas, { background: css.backgroundColor, colour: token => css.getPropertyValue(token).trim() })
-      .then(taken => { if (!left) setPictures(taken) })
+    picturesOf(ELEMENTS, canvas, { background: css.backgroundColor, colour: token => css.getPropertyValue(token).trim() }, (id, picture) => { if (!left) setPictures(was => ({ ...was, [id]: picture })) })
       .catch((why: unknown) => { console.error(why) })
       .finally(() => canvas.remove())
     return () => { left = true }
@@ -266,7 +267,11 @@ export function Gallery() {
           <li key={element.id} data-element={element.id}>
             <Card className={styles.element} onClick={() => inspect(element)}>
               <div className={styles.picture} data-theme="dark">
-                {pictures[element.id] && <img className={styles.shot} src={pictures[element.id]} alt={`The ${element.name.toLowerCase()}, seen from above and to one side.`} />}
+                {(() => {
+                  const picture = pictures[element.id]
+                  if (typeof picture === 'string') return <img className={styles.shot} src={picture} alt={`${calledIn(element, true)}, seen from above and to one side.`} />
+                  return picture ? <p className={cx(styles.cannot, 'eio-type-style-caption')}>{picture.cannot}</p> : null
+                })()}
               </div>
               <div className={styles.words}>
                 <h2 className="eio-type-style-heading">{element.name}</h2>

@@ -2,7 +2,7 @@
   "name": "@noi/eio-3d",
   "version": "0.1.0",
   "private": true,
-  "description": "Eidos's 3D elements for No Origins: the new 3D world's eight elements and the drawing they share, made by three.js with every number and colour from @noi/eio-tokens, and the three characters. Shipped as TypeScript source; apps compile it.",
+  "description": "Eidos's 3D elements for No Origins: the new 3D world's eleven elements (eight made of shapes, and the three characters drawn from their files) and the drawing they share, made by three.js with every number and colour from @noi/eio-tokens. Shipped as TypeScript source; apps compile it.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

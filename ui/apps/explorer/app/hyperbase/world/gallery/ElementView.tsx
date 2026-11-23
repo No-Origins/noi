@@ -4,7 +4,7 @@
 // gives everything back when it goes.
 import { useEffect, useRef, useState } from 'react'
 import type { Object3D } from 'three/webgpu'
-import { elementById, light, lightFor, makeElement, type WorldElement } from '@noi/eio-3d'
+import { calledIn, elementById, light, lightFor, makeElement, type WorldElement } from '@noi/eio-3d'
 import { showElement, type Inspection } from '../inspect'
 import { readPlace, writePlace } from '../place'
 import { rideStrip, type Riding } from '../ride'
@@ -34,6 +34,8 @@ const NOTHING: Record<string, number> = {}
 export function ElementView({ element, on = null, state = null, onState = null, through = null, colours = NONE, onColours = NONE, settings = NOTHING, onSettings = NOTHING, ride = false, onRide }: { element: WorldElement; on?: WorldElement | null; state?: string | null; onState?: string | null; through?: 'it' | 'on' | null; colours?: Record<string, string>; onColours?: Record<string, string>; settings?: Record<string, number>; onSettings?: Record<string, number>; ride?: boolean; onRide?: (y: number) => void }) {
   const stage = useRef<HTMLDivElement>(null)
   const [cannot, setCannot] = useState(false)
+  // why a thing drawn from files (a character) cannot be drawn, in plain words, when it cannot
+  const [trouble, setTrouble] = useState<string | null>(null)
   // the open 3D view, kept so that what is set on the element can change without opening the view again
   const [opened, setOpened] = useState<Inspection | null>(null)
   // a strip one rides along (ride.ts): seen as the world is, the scroll going along it, not the hand turning it
@@ -58,6 +60,7 @@ export function ElementView({ element, on = null, state = null, onState = null, 
     let uncut: (() => void) | null = null
     let unlit: (() => void) | null = null
     let gone: (() => void) | null = null
+    setTrouble(null)
     openWorld(canvas, { background: css.backgroundColor }, riding ? 'orthographic' : 'perspective')
       .then(async w => {
         if (left) { w.close(); return }
@@ -81,7 +84,7 @@ export function ElementView({ element, on = null, state = null, onState = null, 
           ;(window as unknown as { __ride?: { world: World; riding: Riding } }).__ride = { world: w, riding: ridden }
           return
         }
-        const shown = await showElement(w, element, { background: css.backgroundColor, colour })
+        const shown = await showElement(w, element, { background: css.backgroundColor, colour }, words => { if (!left) setTrouble(words) })
         if (left) { shown.close(); return }
         inspection = shown
         setOpened(shown)
@@ -113,6 +116,8 @@ export function ElementView({ element, on = null, state = null, onState = null, 
 
   // what is set on the element follows the choice
   useEffect(() => { opened?.setOn(on) }, [opened, on])
+  // a new thing set on it is drawn afresh: what was said of the last one no longer holds
+  useEffect(() => { if (on) setTrouble(null) }, [on])
   // and so does the state each of the two is in
   useEffect(() => { if (opened && state) opened.state(state, 'it') }, [opened, state])
   useEffect(() => { if (opened && on && onState) opened.state(onState, 'on') }, [opened, on, onState])
@@ -126,8 +131,9 @@ export function ElementView({ element, on = null, state = null, onState = null, 
   useEffect(() => { opened?.through(through) }, [opened, on, through])
 
   return (
-    <div ref={stage} className={styles.view} data-theme="dark" role="img" aria-label={`The ${element.name.toLowerCase()} in 3D${on ? `, with the ${on.name.toLowerCase()} set on it` : ''}.`}>
+    <div ref={stage} className={styles.view} data-theme="dark" role="img" aria-label={`${calledIn(element, true)} in 3D${on ? `, with ${calledIn(on)} set on it` : ''}.`}>
       {cannot && <p className={styles.cannot}>This browser cannot draw the 3D view.</p>}
+      {!cannot && trouble && <p className={styles.cannot}>{trouble}</p>}
     </div>
   )
 }

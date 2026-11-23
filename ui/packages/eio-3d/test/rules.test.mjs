@@ -7,8 +7,8 @@
 //     no drawing code of its own, and an element takes three.js from the world it is drawn into.
 // 4 · Everything of an element goes into the world's xyz, in the user's x, y, z; nothing is put in three.js's
 //     own order.
-// The characters: small copies with their clips and the joints standing uses; every measure as long as its
-// number.
+// The characters (elements since 23 Nov) keep these rules too: small copies with their clips and the joints
+// standing uses; every measure as long as its number.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -22,8 +22,10 @@ const source = Object.fromEntries(files().map(f => [basename(f), readFileSync(f,
 assert.equal(Object.keys(source).length, files().length, 'two files of the package share a name')
 /** Code without its comments (a // after a colon or a backslash is part of an address or a pattern). */
 const uncommented = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1')
-/** The new world's files: the shared drawing and the eight elements; not the characters, which join it next. */
-const world = Object.entries(source).filter(([file]) => !files().find(f => basename(f) === file)?.includes('/character-drawing/'))
+/** The new world's files: the shared drawing, the elements and the character drawing (the characters joined on
+ * 23 Nov). All but the characters' measures (character-measures.ts): their words and the lines a page may draw
+ * beside a character are still the first world's (y up), kept as they were till a page shows them again. */
+const world = Object.entries(source).filter(([file]) => file !== 'character-measures.ts')
 
 test('1 · no colour of its own: colours come from Eidos', () => {
   for (const [file, text] of Object.entries(source)) {
@@ -40,10 +42,9 @@ test('1 · no colour of its own: colours come from Eidos', () => {
 import { tokens } from '../../eio-tokens/tokens.ts'
 
 test('2 · none of the new world\'s numbers is written in the code: they come from Eidos', () => {
-  const characters = new Set(['character', 'movement', 'flight', 'eye'])
-  // Every number Eidos holds for the new world, but none, a half, one, two, three and four: the code counts the
-  // corners of a square, halves a width, doubles a radius, with these.
-  const numbers = new Set(Object.entries(tokens.world).filter(([group]) => !characters.has(group)).flatMap(([, values]) => Object.values(values)))
+  // Every number Eidos holds for the world (the characters' too, since they joined it on 23 Nov), but none, a half,
+  // one, two, three and four: the code counts the corners of a square, halves a width, doubles a radius, with these.
+  const numbers = new Set(Object.values(tokens.world).flatMap(values => Object.values(values)))
   for (const plain of [0, 0.5, 1, 2, 3, 4]) numbers.delete(plain)
   // What is not a number of the world though it may equal one: a way or a place (no kind of value holds them),
   // and the code's own precision. Each such line, by what it says.
@@ -74,10 +75,12 @@ test('3 · three.js draws every element: the package writes no drawing code of i
     assert.doesNotMatch(code, /\b(vertexShader|fragmentShader|gl_Position|gl_FragColor)\b/, `${file} writes a program for the graphics card by hand`)
   }
   // An element's drawing takes three.js from the world it is drawn into, so no page carries three.js before the
-  // world opens: its files import three.js's types only. Only the characters' painter loads three.js itself,
-  // until the characters join the new world.
-  const loads = Object.entries(source).filter(([, t]) => /^\s*import\s+(?!type\b)[^\n]*from\s+'three[/']|\bawait import\('three[/']/m.test(uncommented(t))).map(([f]) => f)
-  assert.deepEqual(loads, ['characters.ts'], 'only the characters\' painter loads three.js itself')
+  // world opens: its files import three.js's types only. The one thing of three.js the package asks for itself is
+  // the loader for model files, which three.js keeps outside its core: the character drawing asks for it when a
+  // character is first drawn, and it draws with the world's own three.js (one core for both).
+  const loads = Object.entries(source).flatMap(([f, t]) => [...uncommented(t).matchAll(/^\s*import\s+(?!type\b)[^\n]*from\s+'(three[^']*)'|\bawait import\('(three[^']*)'\)/gm)].map(m => `${f} ${m[1] ?? m[2]}`))
+  assert.deepEqual(loads, ['characters.ts three/examples/jsm/loaders/GLTFLoader.js'], 'only the loader for model files, and only when a character is drawn')
+  assert.match(uncommented(source['characters.ts']), /const THREE = world\.three/, 'a character is drawn with the world\'s three.js')
   assert.match(uncommented(source['make.ts']), /const THREE = world\.three/, 'an element is made with the world\'s three.js')
   assert.match(uncommented(source['light.ts']), /const THREE = world\.three/, 'and lit with it')
   for (const name of ['make.ts', 'space.ts']) assert.match(uncommented(source[name]), /from 'three\/webgpu'|import\('three\/webgpu'\)/, `${name}: the world is drawn by three.js's newer renderer, with WebGPU where the browser has it`)
@@ -115,11 +118,13 @@ test('three characters, small copies: no pictures packed in, their clips, the sa
   }
   assert.ok(statSync(join(ASSETS, 'fairy-bot', 'wings.glb')).size < 4e6, 'the Fairy Bot\'s wings')
   // Standing is no clip (the user, 17 Nov: not the resting idle with a bent leg, "just standing"): the pose the rig
-  // was made in, legs straight, arms turned down to the sides.
-  assert.doesNotMatch(source['characters.ts'].replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, ''), /Idle_?\d/, 'no idle clip is asked for')
-  assert.match(source['characters.ts'], /if \(motion === 'stand'\) \{ this\.stand\(c\); continue \}/, 'standing plays no clip')
-  assert.match(source['characters.ts'], /sk\.skeleton\.pose\(\)/, 'standing starts from the pose the rig was made in')
-  assert.match(source['characters.ts'], /new THREE\.Vector3\(side \* STANDING\.out, -1, 0\)/, 'and turns each arm down to the side')
+  // was made in, legs straight, arms turned down to the sides; a walk or a run fades back to it.
+  const drawing = uncommented(source['characters.ts'])
+  assert.doesNotMatch(drawing, /Idle_?\d/, 'no idle clip is asked for')
+  assert.match(drawing, /const CLIPS: Record<Motion, string \| null> = \{ stand: null, walk: 'Walking', run: 'Running' \}/, 'standing plays no clip')
+  assert.match(drawing, /for \(const sk of skinned\) sk\.skeleton\.pose\(\)/, 'standing starts from the pose the rig was made in')
+  assert.match(drawing, /new THREE\.Vector3\(side \* ARMS\.out, -1, 0\)\.transformDirection\(holder\.matrixWorld\)/, 'and turns each arm down to its own side, as it stands in the world')
+  assert.match(drawing, /loaded\.playing\?\.fadeOut\(how\.change\)/, 'a clip fades back to the pose it started from')
 })
 
 test('each character measure: a length is a line as long as its number; a speed or a time is words', () => {

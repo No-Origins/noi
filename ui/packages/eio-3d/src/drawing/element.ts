@@ -3,18 +3,22 @@
 // its surface. Its picture (make.ts) is made from this and from nothing else. Each element is in a folder of its
 // own in this package (base-tile/, drone/ …); this file says what any element can be.
 //
-// Nothing here knows three.js. Like every thing, an element stands on its place by the middle of its base: its
+// Nothing here knows three.js, but for the code a thing drawn from files comes with (Model), which is handed in
+// with its data and named here by its type only. Like every thing, an element stands on its place by the middle of its base: its
 // outline is drawn round 0, 0, and it rises from z 0. Every number of an element is a value of Eidos, and every
 // colour a role of Eidos by its token's name (eidos.ts).
 //
 // What an element can be grew with the user's words, each written where it is used below: a slab, the astroid
 // (21 Nov); a ring and a thing made of pieces, studs, states (22 Nov); frosted glass, a piece's border, borders
 // that glow, colours and settings to try, a place to look out of, a thing laid from other elements, ground, and
-// a strip that is bent or curled (23 Nov). The solids of 21 Nov (glass, lit edges, cut edges, moons, parts that
-// turn) were removed at the user's word on 22 Nov and are no longer here.
+// a strip that is bent or curled (23 Nov); a thing drawn from files, the characters (23 Nov: "bring in the
+// characters into elements"). The solids of 21 Nov (glass, lit edges, cut edges, moons, parts that turn) were
+// removed at the user's word on 22 Nov and are no longer here.
+import type { CharacterDrawingMotion } from '@noi/eio-tokens/components'
 import type { Bend } from './bend.ts'
 import { role, value } from './eidos.ts'
-import type { Frame, Size, Xyz } from './space.ts'
+import type { Drawn, DrawnHow } from './make.ts'
+import type { Frame, Size, ThreeWorld, Xyz } from './space.ts'
 
 /** A surface: its colour, as a role of Eidos by its token's name, and whether light shines back off it. */
 export interface Surface {
@@ -155,16 +159,33 @@ export interface Laid {
   readonly frame?: (x: number, y: number) => Frame
 }
 
+/** A THING DRAWN FROM FILES (23 Nov 2026): a model made elsewhere, with its bones and its clips, which is loaded when
+ * the thing is first shown, not when a page opens (the characters: Clay, the Mannequin, the Fairy Bot). Its data
+ * cannot say its shape piece by piece, so the code that draws it comes with it (`drawn`: a character's is the
+ * character drawing). Seen from above it takes up the ground its size says: so wide along x and so deep along y,
+ * round its middle. Like every thing it stands on its place by the middle of its base, and faces low y, an
+ * element's front. */
+export interface Model {
+  readonly kind: 'model'
+  /** Draws it into the world: at once, and empty till its files have come. */
+  readonly drawn: (world: ThreeWorld, how: DrawnHow) => Drawn
+  /** The shape in words. */
+  readonly says: string
+}
+
 export interface WorldElement {
   /** What code calls it. */
   readonly id: string
   /** What it is called in words. */
   readonly name: string
+  /** How a sentence calls it, when that is not "the" and its name in small letters: a character is called by its
+   * own name (Clay). */
+  readonly called?: string
   /** One plain sentence on what it is. */
   readonly says: string
   /** How far it runs along x, along y, and up, in metres. */
   readonly size: Size
-  readonly shape: Flat | Pieces | Laid
+  readonly shape: Flat | Pieces | Laid | Model
   readonly surface: Surface
   /** Its border, when it has one. */
   readonly border?: Border
@@ -312,6 +333,9 @@ export interface ElementState {
     readonly borders: ReadonlyArray<{ readonly piece: string; readonly faces?: 'up'; readonly colour?: string; readonly bright?: number; readonly sidesBright?: number }>
     readonly tops?: ReadonlyArray<{ readonly piece: string; readonly colour?: string; readonly bright?: number }>
   }
+  /** What a character does in it, by the motion Mero holds for the character drawing: stands plainly, or plays its
+   * walk or its run on its place. Left out: it stands. */
+  readonly motion?: CharacterDrawingMotion
 }
 
 /** Where an element is and what it is doing, some seconds into a state: where the middle of its base is from
@@ -388,9 +412,17 @@ export function fitsOn(piece: WorldElement, onto: WorldElement): Xyz | null {
 /** A length in words: to the millimetre at the finest, with no long tail. */
 export const metres = (n: number) => String(Math.round(n * 1000) / 1000)
 
-/** An element's size in words: a strip that is bent is so tall, a flat thing so thick. */
+/** An element's size in words: a strip that is bent is so tall, and so is a character; a flat thing so thick. */
 export function sizeWords(e: WorldElement): string {
-  return `${metres(e.size.x)} m along x, ${metres(e.size.y)} m along y, ${metres(e.size.z)} m ${e.shape.kind === 'laid' && e.shape.bend ? 'tall' : 'thick'}`
+  const tall = (e.shape.kind === 'laid' && e.shape.bend) || e.shape.kind === 'model'
+  return `${metres(e.size.x)} m along x, ${metres(e.size.y)} m along y, ${metres(e.size.z)} m ${tall ? 'tall' : 'thick'}`
+}
+
+/** How a sentence calls an element: its own name for a character (Clay), else "the" and its name in small letters;
+ * `first`, at the start of a sentence ("The drone"). */
+export function calledIn(e: WorldElement, first = false): string {
+  const called = e.called ?? `the ${e.name.toLowerCase()}`
+  return first ? called.charAt(0).toUpperCase() + called.slice(1) : called
 }
 
 /** A kind of shape that one of the choices below has no answer for: the type check stops here until every
@@ -407,6 +439,7 @@ export function shapeWords(e: WorldElement): string {
     case 'ring': return `a round ring ${metres(e.shape.outer)} m out from its middle, its band ${metres(e.shape.outer - e.shape.inner)} m wide`
     case 'pieces': return e.shape.says
     case 'laid': return e.shape.says
+    case 'model': return e.shape.says
     default: return noSuchShape(e.shape)
   }
 }

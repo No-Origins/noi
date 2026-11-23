@@ -2,7 +2,8 @@
 // system's pages. gov.<base>/account/sign-in shows app/gov/account/sign-in, eidos.<base> the gallery,
 // hyperbase.<base>/projects shows app/hyperbase/projects (Hyperbase Studio, 15 Nov), and
 // mero.<base> Merons and Review as they are. A page asked for under another name, or under plain
-// localhost, is sent to its own name. Health checks and Next's own files pass straight through.
+// localhost, is sent to its own name. Health checks, Next's own files and the 3D world's files (/3d: the
+// characters' models and looks, which a page on any name may show, 23 Nov) pass straight through.
 import { NextResponse, type NextRequest } from 'next/server'
 import { frontDesk, originOf, splitHost } from './lib/hosts'
 
@@ -21,5 +22,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/|health/|favicon\\.ico).*)'],
+  matcher: ['/((?!_next/|health/|favicon\\.ico|3d/).*)'],
 }

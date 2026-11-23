@@ -14,15 +14,20 @@
     "part": "package",
     "job": "Make the 3D elements one package that apps can use, and test it.",
     "states": {},
-    "reads": [],
+    "reads": [
+      "noi.eio.world.character.height"
+    ],
     "uses": [
       "noi.eio.components.world.astroid",
       "noi.eio.components.world.base-platform",
       "noi.eio.components.world.base-tile",
       "noi.eio.components.world.camera-module",
       "noi.eio.components.world.character-drawing",
+      "noi.eio.components.world.clay",
       "noi.eio.components.world.drawing",
       "noi.eio.components.world.drone",
+      "noi.eio.components.world.fairy-bot",
+      "noi.eio.components.world.mannequin",
       "noi.eio.components.world.mobius-platform",
       "noi.eio.components.world.stage",
       "noi.eio.components.world.wave-platform"
@@ -30,19 +35,19 @@
     "files": [
       {
         "path": "package.json",
-        "sha256": "03c7ef0237589abceb7ba31488f1e27db7f94c3ab9885f4d197349bf39c82ba8"
+        "sha256": "d96c9f24577684cfd25993fe52d32246c2a0072c7fe3d5f648030d9b82bfd22d"
       },
       {
         "path": "src/index.ts",
-        "sha256": "c52a60de63a9199a228636b6431974f02658ad32e2167486b7ceb72a02fcd78c"
+        "sha256": "5dc3762e0c35c6a5e69de0894896697eeb29715daa4f46c0451e349d328068e9"
       },
       {
         "path": "test/elements.test.mjs",
-        "sha256": "fb3e9bdfa7647aa16c04f3f5e055729364ea7ae56ba7e9114e9fc0ab760c08a0"
+        "sha256": "531f6b1e33ef63bae144cd55f57de5c4552a36ad4bb932977b983eb570b1177f"
       },
       {
         "path": "test/rules.test.mjs",
-        "sha256": "1d55d65d40dd84745ebda09f51cadd5669a74e911332f022e76db1bfdf14feed"
+        "sha256": "c16cde14dd22a4775e99a14124f2ff3f81996c189e474e6b2563f517c6f2709b"
       },
       {
         "path": "test/states.test.mjs",

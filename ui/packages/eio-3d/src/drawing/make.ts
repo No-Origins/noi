@@ -16,8 +16,13 @@
 // data, the room's and its lamps' by their roles (noi.eio.color.world.room and the light's). Where the room's
 // lamps are, places, is this file's own; so is the longest step one picture moves a thing on by (a tenth of a
 // second, so that after a pause nothing jumps), and where a face counts as looking up (more up than not).
+//
+// A THING DRAWN FROM FILES (element.ts, Model; the characters, 23 Nov 2026) is drawn by the code that comes with its
+// data: the thing is made at once, that code puts what it draws into its body, and its files are loaded then,
+// when the thing is first shown. Its surface is this file's matte one, in the element's colour, with the
+// picture its files bring over it.
 import type * as THREE_ from 'three/webgpu'
-import type { BufferGeometry, Material, Object3D } from 'three/webgpu'
+import type { BufferGeometry, Material, Object3D, Texture } from 'three/webgpu'
 import { frameOf } from './bend.ts'
 import { role, value } from './eidos.ts'
 import { pieceTurn, poseIn, type ElementState, type Laid, type Piece, type Surface, type WorldElement } from './element.ts'
@@ -70,8 +75,34 @@ export interface Made {
   /** Where one looks out of it, when its element says one can: a thing with no shape, on the eye's place, that
    * goes and turns with the element. One looks along its low y. */
   readonly lookOut?: Object3D
+  /** When it is drawn from files (element.ts, Model): settles once they have come and it is drawn, and fails, with
+   * words a page can show, when they cannot be loaded. Till then nothing of it is seen. */
+  readonly ready?: Promise<void>
   /** Takes it out of the world and gives the card's memory back. */
   gone(): void
+}
+
+/** WHAT THE CODE THAT COMES WITH A THING'S DATA DRAWS (element.ts, Model): a thing for the element's body, empty
+ * till its files have come. */
+export interface Drawn {
+  readonly thing: Object3D
+  /** Settles once its files have come and it is drawn; fails, with words a page can show, when they cannot be
+   * loaded. */
+  readonly ready: Promise<void>
+  /** Puts it in one of its element's states (a character: what the state says it does). */
+  act(state: ElementState | undefined): void
+  /** Moves it on by so many seconds. */
+  step(passed: number): void
+  /** Takes it away and gives the card's memory back. */
+  gone(): void
+}
+
+/** What the drawing hands the code that draws a thing from its files. */
+export interface DrawnHow {
+  /** How long a thing takes to go over from one state to another, in seconds (noi.eio.world.states). */
+  readonly change: number
+  /** This drawing's matte surface, in the element's colour, with a picture over it. */
+  pictured(picture: Texture): Material
 }
 
 /** A glossy surface: how rough its colour itself is and its clear coat (0 is a mirror, 1 is matte), and how
@@ -146,8 +177,9 @@ function roomFor(world: ThreeWorld, colourOf: (token: string) => string) {
 /** The parts an element is drawn as, each a shape and a surface as three.js holds them: one part for an element
  * without a border; for one with a border, what lies inside the border, and the border round it. */
 function parts(world: ThreeWorld, element: WorldElement, colourOf: (token: string) => string, still = false): Part[] {
-  // a thing laid from other elements has no parts of its own: it is those elements, drawn on their places (makeLaid)
-  if (element.shape.kind === 'laid') return []
+  // a thing laid from other elements has no parts of its own: it is those elements, drawn on their places (makeLaid);
+  // nor has a thing drawn from files: the code that comes with it draws it (makeElement)
+  if (element.shape.kind === 'laid' || element.shape.kind === 'model') return []
   const THREE = world.three
   const TSL = world.tsl
   const points = (e: WorldElement) => outline(e).map(p => new THREE.Vector2(p.x, p.y))
@@ -306,6 +338,12 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
   const body = new THREE.Group()
   body.name = `whole ${element.id}` // not `${element.id} …`: that is how its pieces are named, and one may be called body
   thing.add(body)
+  // A THING DRAWN FROM FILES (element.ts, Model): the code that comes with its data draws it into the body, and
+  // loads its files now, when it is first shown; its surface is the matte one, in its colour, with its picture
+  const drawn = element.shape.kind === 'model'
+    ? element.shape.drawn(world, { change: CHANGE, pictured: picture => new THREE.MeshStandardNodeMaterial({ color: new THREE.Color(colourOf(element.surface.colour)), map: picture, roughness: 1, metalness: 0 }) })
+    : null
+  if (drawn) body.add(drawn.thing)
   // the parts that move together, each a group of its pieces round the upright line through the element's middle
   const partsByName = new Map<string, InstanceType<typeof THREE.Group>>()
   const partNamed = (name: string) => {
@@ -380,6 +418,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
     }
   }
   lightUp(state)
+  drawn?.act(state)
   let since = 0 // seconds it has been in this state
   let last: number | null = null // when it was last moved on
   const is = { x: 0, y: 0, z: 0, heading: 0, lean: 0, spin: poseIn(state, 0).spin }
@@ -387,7 +426,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
   // where it was when its state last changed, and how far it has gone over since: 0 to 1
   let was = { ...is, swept: new Map(swept) }
   let over = 1
-  if (spinners.length > 0 || states.length > 0) {
+  if (spinners.length > 0 || states.length > 0 || drawn) {
     step = seconds => {
       const passed = last === null ? 0 : Math.max(0, Math.min(seconds - last, LONGEST_STEP))
       last = seconds
@@ -422,6 +461,8 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
         spinner.spun += (pieceTurn(spinner.piece, passed) - pieceTurn(spinner.piece, 0)) * is.spin
         spinner.mesh.rotation.z = ((pieceTurn(spinner.piece, 0) + spinner.spun) * Math.PI) / 180
       }
+      // what is drawn from files moves on by itself (a character's walk or run)
+      drawn?.step(passed)
     }
   }
   return {
@@ -429,6 +470,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
     body,
     step,
     lookOut,
+    ready: drawn?.ready,
     state(id, atOnce = false) {
       const next = states.find(s => s.id === id)
       if (!next) return false
@@ -440,6 +482,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
         since = 0
         for (const light of lights) { light.was = light.is; light.topWas = light.topIs }
         lightUp(next)
+        drawn?.act(next)
         // or is there at once: nothing to go over from
         if (atOnce) over = 1
       }
@@ -453,6 +496,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
     },
     gone() {
       thing.removeFromParent()
+      drawn?.gone()
       for (const part of new Set(made.map(m => m.shape))) part.dispose()
       for (const surface of new Set(made.map(m => m.surface))) surface.dispose()
     },

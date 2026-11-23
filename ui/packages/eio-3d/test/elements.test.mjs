@@ -8,9 +8,9 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
-  ASTROID, BASE_PLATFORM, BASE_PLATFORM_MEASURES, BASE_TILE, CAMERA_MODULE, COLOURS_TO_TRY, DRONE, ELEMENTS, MOBIUS_PLATFORM, STAGE, STUD_GRID, bent, bentFrame, bentLength, bentSize,
-  borderWords, coloursIn, covers, elementById, firstSight, fitsOn, holesOf, inBorder, inWords, outline, pieceOutline, pieceTurn, poseIn, reachIn, shapeWords, sizeWords, sizedBy,
-  surfaceWords, withinBorder, withinPieceBorder,
+  ASTROID, BASE_PLATFORM, BASE_PLATFORM_MEASURES, BASE_TILE, CAMERA_MODULE, CLAY, COLOURS_TO_TRY, DRONE, ELEMENTS, FAIRY_BOT, MANNEQUIN, MOBIUS_PLATFORM, STAGE, STUD_GRID, bent, bentFrame,
+  bentLength, bentSize, borderWords, calledIn, coloursIn, covers, elementById, firstSight, fitsOn, holesOf, inBorder, inWords, outline, pieceOutline, pieceTurn, poseIn, reachIn, shapeWords, sizeWords, sizedBy,
+  surfaceWords, value, withinBorder, withinPieceBorder,
 } from '../src/index.ts'
 
 const SRC = fileURLToPath(new URL('../src/', import.meta.url))
@@ -243,8 +243,9 @@ test('the astroid is the secondary colour', () => {
 
 // THE FOUR SOLIDS REMOVED (22 Nov 2026, issue 127). The user: "I want you to remove the diamond, [low-poly]
 // sphere, octahedron, hexagon [tori] shapes from the world elements that we have built in the gallery."
-test('the elements are the eight the user has today, each in a folder of its own, and every one is in the list', async () => {
-  assert.deepEqual(ELEMENTS.map(e => e.id), ['base-tile', 'astroid', 'base-platform', 'mobius-platform', 'wave-platform', 'drone', 'camera-module', 'stage'], 'the diamond, the low-poly sphere, the octahedron and the hexagon tori are gone')
+// THE CHARACTERS JOINED (23 Nov 2026). The user: "bring in the characters into elements". They come after the rest.
+test('the elements are the eleven the user has today, each in a folder of its own, and every one is in the list', async () => {
+  assert.deepEqual(ELEMENTS.map(e => e.id), ['base-tile', 'astroid', 'base-platform', 'mobius-platform', 'wave-platform', 'drone', 'camera-module', 'stage', 'clay', 'mannequin', 'fairy-bot'], 'the diamond, the low-poly sphere, the octahedron and the hexagon tori are gone; the three characters are in')
   for (const gone of ['diamond', 'low-poly-sphere', 'octahedron', 'hexagon-tori']) assert.equal(elementById(gone), null, `there is no ${gone}`)
   assert.equal(elementById('astroid'), ASTROID)
   assert.equal(`${sizeWords(ASTROID)}; ${shapeWords(ASTROID)}; ${surfaceWords(ASTROID)}`, '2 m along x, 2 m along y, 0.2 m thick; four points 1 m from its middle, sides curved inward by 1 m; matte, in the secondary colour')
@@ -489,7 +490,7 @@ test('the base platform is an element laid as the land is, and what stands by it
   assert.equal(laid.filter(t => t.element === ASTROID).length, ASTROIDS, 'and an astroid wherever four tiles meet')
   assert.match(shapeWords(BASE_PLATFORM), new RegExp(`^${TILES} base tiles, and ${ASTROIDS} astroids`))
   // "select items to place on the platform just like we do in the drone": worked out from the data, no list
-  assert.deepEqual(ELEMENTS.filter(e => e !== BASE_PLATFORM && fitsOn(e, BASE_PLATFORM)).map(e => e.id), ['drone', 'stage'], 'today: the drone and the stage can be placed on it')
+  assert.deepEqual(ELEMENTS.filter(e => e !== BASE_PLATFORM && fitsOn(e, BASE_PLATFORM)).map(e => e.id), ['drone', 'stage', 'clay', 'mannequin', 'fairy-bot'], 'today: the drone, the stage and the three characters can be placed on it')
   assert.equal(fitsOn(CAMERA_MODULE, BASE_PLATFORM), null, 'the camera module goes on studs, not on the ground')
   assert.equal(fitsOn(BASE_TILE, BASE_PLATFORM), null, 'the tiles are what it is laid from')
   assert.equal(fitsOn(ASTROID, BASE_PLATFORM), null, 'and the astroids')
@@ -859,4 +860,44 @@ test('the base platform as a Möbius strip: 21 square tiles across, curving all 
   assert.ok(lowest > -1e-6 && lowest < 0.05, 'its lowest point is on z 0')
   assert.ok(Math.abs(MOBIUS_PLATFORM.size.z - bentSize(bend).z) < 0.06, 'its size is the room it takes')
   assert.equal(fitsOn(MOBIUS_PLATFORM, BASE_PLATFORM), null, 'a platform is not set on another')
+})
+
+// THE CHARACTERS AS ELEMENTS (23 Nov 2026). The user: "bring in the characters into elements". And on 17 Nov: characters
+// of about 6 feet; standing is not the resting idle "with the right leg bent" but "just standing", legs straight, arms
+// down; and "we should bring in Mannequin and Fairyboat too". That their states are these three, that they walk and
+// run on the spot, the room they take up, how far the arms hang out and their sentences are a session's design and
+// are not held as rules.
+test('the three characters are elements: drawn from their files as tall as a character is, standing first, then walking and running', () => {
+  for (const one of [CLAY, MANNEQUIN, FAIRY_BOT]) {
+    assert.ok(ELEMENTS.includes(one), `${one.name} is in the gallery`)
+    assert.equal(one.shape.kind, 'model', `${one.name} is drawn from its files`)
+    assert.equal(one.size.z, value('noi.eio.world.character.height'), 'as tall as Eidos says a character is')
+    assert.match(sizeWords(one), / m tall$/, 'and said to be so tall')
+    // standing first, and standing is no clip: the state says to stand, and the drawing plays nothing for it
+    assert.deepEqual(one.states.map(s => s.name), ['Standing', 'Walking', 'Running'])
+    assert.deepEqual(one.states.map(s => s.motion), ['stand', 'walk', 'run'])
+    for (const s of one.states) assert.deepEqual(poseIn(s, 3), poseIn(undefined, 3), `${s.name.toLowerCase()}, it stays on its place`)
+    // it stands by itself: on ground, not on studs
+    assert.ok(fitsOn(one, BASE_PLATFORM), `${one.name} can be placed on the base platform`)
+    assert.equal(fitsOn(one, DRONE), null)
+  }
+  assert.equal(calledIn(CLAY), 'Clay', 'Clay is called by his own name')
+  assert.equal(calledIn(MANNEQUIN), 'the mannequin')
+  assert.equal(calledIn(DRONE), 'the drone', 'and the rest as before')
+  // the Fairy Bot has its wings, hung by Eidos's numbers
+  assert.match(code(read('fairy-bot/fairy-bot.ts')), /wings: \{\s+file: 'fairy-bot\/wings\.glb',\s+span: value\('noi\.eio\.world\.fairy-bot\.wing-span'\)/)
+  assert.doesNotMatch(code(read('clay/clay.ts')) + code(read('mannequin/mannequin.ts')), /wings:/, 'and only the Fairy Bot')
+  // drawn by the world's three.js into the element's body, which is in xyz: stood up, the mirror undone, as tall as
+  // Eidos says, its feet on its place and its middle over it
+  const drawing = code(read('character-drawing/characters.ts'))
+  assert.match(drawing, /const THREE = world\.three/, 'with the world\'s own three.js')
+  assert.match(drawing, /holder\.rotation\.x = Math\.PI \/ 2\s+holder\.scale\.x = -1/, 'a model\'s y up is the world\'s z up, and the mirror of xyz is undone')
+  assert.match(drawing, /const k = CHARACTER_SIZE\.z \/ tall/, 'as tall as a character is')
+  assert.match(drawing, /inner\.position\.set\(\(0 - k \* \(box\.min\.x \+ box\.max\.x\)\) \/ 2, 0 - k \* box\.min\.y, /, 'its feet on its place, its middle over it')
+  const made = code(read('drawing/make.ts'))
+  assert.match(made, /if \(drawn\) body\.add\(drawn\.thing\)/, 'into the body of the thing, which goes into xyz')
+  assert.match(made, /drawn\?\.act\(next\)/, 'and acts out the state it is put in')
+  // loaded when it is first shown, not when a page opens: nothing of three.js is imported but its types
+  assert.doesNotMatch(drawing, /^\s*import\s+(?!type\b)[^\n]*from\s+'three/m)
+  assert.match(drawing, /await import\('three\/examples\/jsm\/loaders\/GLTFLoader\.js'\)/, 'the loader for model files is asked for when a character is drawn')
 })

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.fairy-bot.wing-flap-every",
+  "name": "Fairy Bot wings, one flutter",
+  "classification": {
+    "type": "token",
+    "subtype": "time"
+  },
+  "semantics": {
+    "definition": "How long one flutter of the Fairy Bot’s wings takes: three a second, to the hundredth of a second. The old project’s number (its FAIRY_WINGS, tuned by you there, for a Fairy Bot 1.8 m tall), brought with the Fairy Bot (17 Nov).",
+    "responsibility": "Flutter the Fairy Bot’s wings."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "old project"
+  },
+  "spec": {
+    "s": 0.33
+  }
+}

@@ -27,4 +27,7 @@ export interface ThreeWorld {
   readonly tsl: typeof import('three/tsl')
   readonly renderer: import('three/webgpu').WebGPURenderer
   readonly xyz: import('three/webgpu').Group
+  /** Where the page serves this package's assets (its characters' files under `characters/`), when it does: a
+   * thing drawn from files is loaded from there. */
+  readonly assets?: string
 }

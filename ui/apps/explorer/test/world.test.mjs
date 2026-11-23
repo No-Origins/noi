@@ -664,7 +664,8 @@ test('the gallery shows every element, and a click opens it in a 3D view', () =>
 test('the gallery offers an element\'s states as that element\'s own control, and the 3D view acts them out', () => {
   // the gallery: each element's own control, made from its data; what is set on it has its own, and goes with it
   const gallery = code(GALLERY('Gallery.tsx'))
-  assert.match(gallery, /<Choices legend=\{`The \$\{of\.name\.toLowerCase\(\)\} is`\} across note=\{chosen\.says\}>/, 'the control is the element\'s own question, a choice of Eidos\'s, with what the chosen state does under it')
+  // (the element as a sentence calls it: "The drone is", and, since the characters joined on 23 Nov, "Clay is")
+  assert.match(gallery, /<Choices legend=\{`\$\{calledIn\(of, true\)\} is`\} across note=\{chosen\.says\}>/, 'the control is the element\'s own question, a choice of Eidos\'s, with what the chosen state does under it')
   assert.match(gallery, /<Radio key=\{state\.id\} name=\{name\} checked=\{state === chosen\} onChange=\{\(\) => choose\(state\.id\)\}>\{state\.name\}<\/Radio>/, 'one choice for each state, from the data')
   assert.match(gallery, /\{chosen && <States of=\{element\} chosen=\{chosen\} choose=\{choose\} name=\{`\$\{where\}-state-of-\$\{of\}`\} \/>\}/, 'in the element\'s own card')
   assert.match(gallery, /\{card\('it', shown, state, setStateId, where\)\}/, 'for the element shown')
@@ -673,6 +674,22 @@ test('the gallery offers an element\'s states as that element\'s own control, an
   const stage = code(read('inspect.ts'))
   assert.match(stage, /made\.body\.add\(on\.thing\)/, 'what is set on an element goes where the element goes')
   assert.match(stage, /const done = on\?\.state\(id\) \?\? false/, 'and is put in its own states')
+})
+
+// THE CHARACTERS (23 Nov 2026). The user: "bring in the characters into elements". A character is drawn from its
+// files, which are loaded when it is first shown (@noi/eio-3d tests the character itself). Here, what the page does:
+// its still picture waits for its files, what cannot be loaded is said in plain words instead of a broken page,
+// and its files are served on every name the page may be on.
+test('a character in the gallery: its picture waits for its files, a failure is said in plain words, its files are served on every name', () => {
+  const stage = code(read('inspect.ts'))
+  assert.match(stage, /await made\.ready\s+eye\.put\(firstSight\(element, narrowerAngle\(world\)\)\)/, 'the picture is taken once its files have come')
+  assert.match(stage, /taken\?\.\(element\.id, \{ cannot: cannotDraw\(element, why\) \}\)/, 'or the card is told why not')
+  assert.match(stage, /thing\.ready\?\.catch\(\(why: unknown\) => trouble\?\.\(cannotDraw\(of, why\)\)\)/, 'and so is the 3D view')
+  const gallery = code(GALLERY('Gallery.tsx'))
+  assert.match(gallery, /return picture \? <p className=\{cx\(styles\.cannot, 'eio-type-style-caption'\)\}>\{picture\.cannot\}<\/p> : null/, 'in the card, in plain words')
+  assert.match(code(GALLERY('ElementView.tsx')), /\{!cannot && trouble && <p className=\{styles\.cannot\}>\{trouble\}<\/p>\}/, 'and over the 3D view')
+  assert.match(code(read('world.ts')), /assets: ASSETS,/, 'the world says where its files are served')
+  assert.match(readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8'), /matcher: \['\/\(\(\?!_next\/\|health\/\|favicon\\\\\.ico\|3d\/\)\.\*\)'\]/, 'and the front desk lets them through on every name')
 })
 
 // THROUGH THE CAMERA (23 Nov 2026, issue 127). The user: "Also add Camera view, I mean, through the camera."

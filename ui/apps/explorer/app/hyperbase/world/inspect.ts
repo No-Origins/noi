@@ -8,7 +8,7 @@
 // One thing only here: a matte thing shows its shape only by how much light each of its faces catches, and a
 // colour as dark as the tile's black would show none; so an element whose colour is too dark to show its faces
 // is lit more, until its top is shown as a dark grey.
-import { ASTROID, BASE_TILE, firstSight, fitsOn, light, lightFor, makeElement, makeMany, reachIn, sizedBy, type Made, type WorldElement } from '@noi/eio-3d'
+import { ASTROID, BASE_TILE, calledIn, firstSight, fitsOn, light, lightFor, makeElement, makeMany, reachIn, sizedBy, type Made, type WorldElement } from '@noi/eio-3d'
 import { openEye, type Eye, type Sight } from './eye.ts'
 import { openWorld, type World } from './world.ts'
 
@@ -66,11 +66,19 @@ export interface Inspection {
  * element stands on, with the astroids between them. MY PICK, not the user's word. */
 const GROUND_TILES = 2
 
-/** Puts one element alone on an open stage, at x 0, y 0, lit, with an eye the hand can move. */
-export async function showElement(world: World, element: WorldElement, look: InspectLook): Promise<Inspection> {
+/** Why a thing drawn from files (a character) cannot be shown, in plain words: what it is, and what went wrong. */
+export function cannotDraw(element: WorldElement, why: unknown): string {
+  return `${calledIn(element, true)} cannot be drawn here. ${why instanceof Error ? why.message : String(why)}`
+}
+
+/** Puts one element alone on an open stage, at x 0, y 0, lit, with an eye the hand can move. `trouble` is told, in
+ * plain words, when a thing drawn from files (a character) cannot be drawn: the element, or what is set on it. */
+export async function showElement(world: World, element: WorldElement, look: InspectLook, trouble?: (words: string) => void): Promise<Inspection> {
   const dark = light(world, look.colour, lightFor(world, look.colour(element.surface.colour)), true)
+  const watch = (thing: Made, of: WorldElement) => { thing.ready?.catch((why: unknown) => trouble?.(cannotDraw(of, why))) }
   // the thing, and the element as it is shown: in the size chosen for it, when one was
   let made = makeElement(world, element, look.colour)
+  watch(made, element)
   let shownAs = element
   world.xyz.add(made.thing)
   const reach = Math.hypot(element.size.x, element.size.y, element.size.z) / 2
@@ -207,6 +215,7 @@ export async function showElement(world: World, element: WorldElement, look: Ins
         return false
       }
       on = makeElement(world, piece, look.colour)
+      watch(on, piece)
       onPiece = piece
       onAs = piece
       // the middle of the piece's base goes on the place its sockets and this element's studs give it (or, on
@@ -283,8 +292,10 @@ export async function showElement(world: World, element: WorldElement, look: Ins
 }
 
 /** A still picture of each element, taken on a canvas of the page that is laid out but not shown: the address
- * of each picture, by the element's id. */
-export async function picturesOf(elements: readonly WorldElement[], canvas: HTMLCanvasElement, look: InspectLook): Promise<Record<string, string>> {
+ * of each picture, by the element's id. Each is told to `taken` as soon as it is taken, in the elements' order. A
+ * thing drawn from files (a character) is taken once its files have come; when they cannot be loaded it has no
+ * picture, and `taken` is told why, in plain words. */
+export async function picturesOf(elements: readonly WorldElement[], canvas: HTMLCanvasElement, look: InspectLook, taken?: (id: string, picture: string | { cannot: string }) => void): Promise<Record<string, string>> {
   const world = await openWorld(canvas, { background: look.background })
   const eye = await openEye(world, 0.01, 100000)
   const pictures: Record<string, string> = {}
@@ -293,11 +304,18 @@ export async function picturesOf(elements: readonly WorldElement[], canvas: HTML
       const dark = light(world, look.colour, lightFor(world, look.colour(element.surface.colour)), true)
       const made = makeElement(world, element, look.colour)
       world.xyz.add(made.thing)
-      eye.put(firstSight(element, narrowerAngle(world)))
-      world.renderer.render(world.scene, world.camera)
-      pictures[element.id] = canvas.toDataURL('image/png')
-      made.gone()
-      dark()
+      try {
+        await made.ready
+        eye.put(firstSight(element, narrowerAngle(world)))
+        world.renderer.render(world.scene, world.camera)
+        pictures[element.id] = canvas.toDataURL('image/png')
+        taken?.(element.id, pictures[element.id])
+      } catch (why) {
+        taken?.(element.id, { cannot: cannotDraw(element, why) })
+      } finally {
+        made.gone()
+        dark()
+      }
     }
   } finally {
     eye.close()

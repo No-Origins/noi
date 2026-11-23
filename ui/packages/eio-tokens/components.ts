@@ -142,6 +142,8 @@ export type CharacterDrawingMotion = 'run' | 'stand' | 'walk'
 // noi.eio.components.world.clay
 /** running: running · walking: walking */
 export type ClayClips = 'running' | 'walking'
+/** running: running on the spot, with the run his model carries · standing: standing plainly on his place, legs straight, arms down at his sides · walking: walking on the spot, with the walk his model carries */
+export type ClayState = 'running' | 'standing' | 'walking'
 
 // noi.eio.components.world.drone
 /** flying: flying round its place, leaning into its way, its fans turning faster · hovering: hanging over its place, rising and sinking a little, its fans turning · landed: standing on its place, its fans still */
@@ -150,10 +152,14 @@ export type DroneState = 'flying' | 'hovering' | 'landed'
 // noi.eio.components.world.fairy-bot
 /** running: running · walking: walking */
 export type FairyBotClips = 'running' | 'walking'
+/** running: running on the spot, with the run its model carries · standing: standing plainly on its place, legs straight, arms down at its sides · walking: walking on the spot, with the walk its model carries */
+export type FairyBotState = 'running' | 'standing' | 'walking'
 
 // noi.eio.components.world.mannequin
 /** running: running · walking: walking */
 export type MannequinClips = 'running' | 'walking'
+/** running: running on the spot, with the run its model carries · standing: standing plainly on its place, legs straight, arms down at its sides · walking: walking on the spot, with the walk its model carries */
+export type MannequinState = 'running' | 'standing' | 'walking'
 
 // noi.eio.components.world.mobius-platform
 /** length: how long it is all the way round · width: how wide: the base platform’s */
@@ -268,15 +274,18 @@ export const states = {
   },
   'noi.eio.components.world.clay': {
     clips: ['running', 'walking'],
+    state: ['running', 'standing', 'walking'],
   },
   'noi.eio.components.world.drone': {
     state: ['flying', 'hovering', 'landed'],
   },
   'noi.eio.components.world.fairy-bot': {
     clips: ['running', 'walking'],
+    state: ['running', 'standing', 'walking'],
   },
   'noi.eio.components.world.mannequin': {
     clips: ['running', 'walking'],
+    state: ['running', 'standing', 'walking'],
   },
   'noi.eio.components.world.mobius-platform': {
     measure: ['length', 'width'],

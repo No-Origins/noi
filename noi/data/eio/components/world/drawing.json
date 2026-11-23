@@ -74,7 +74,7 @@
       },
       {
         "path": "src/drawing/element.ts",
-        "sha256": "c3d615b12a7af1418d17a115b2cf66643e7cd81ab2e7c12070695f75def35de2"
+        "sha256": "ff296e5b375efe041e5dcf03cec116c2a0cdb6f070b350ca48df5aa68e13d60b"
       },
       {
         "path": "src/drawing/light.ts",
@@ -82,15 +82,15 @@
       },
       {
         "path": "src/drawing/make.ts",
-        "sha256": "72291bd2c513255da08704054cd3ca24ccfdcbf684e567d1c7e811b2e9de05ba"
+        "sha256": "0aa4e1adf83caaed4bf8ca25e7b7b86897ce06dd8a09a17b058c802b4e908898"
       },
       {
         "path": "src/drawing/outline.ts",
-        "sha256": "c75a8c0e53c19b46e151f3be29134b673a66ec80052ae5b2b10810732aa5a9a7"
+        "sha256": "09b3782a7da8ab35207cf80c32ccafae4cd630d282cfb57a09531c8a00f78f67"
       },
       {
         "path": "src/drawing/space.ts",
-        "sha256": "3350c4a3aeeea3a91f06b7f077e78375756bf7a8c81079a9ae32d24739a5239f"
+        "sha256": "7eadcc261a6413f927fbb2ffcc088148188d608c0bd37c12e757945bcb8a1a1f"
       },
       {
         "path": "src/drawing/studs.ts",

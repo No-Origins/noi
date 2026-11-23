@@ -5,7 +5,7 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "Clay, a character of the old No Origins project, made with Meshy.ai: his model and his look, as small copies. The character chosen for now.",
+    "definition": "Clay, a character of the old No Origins project, made with Meshy.ai: his model and his look, as small copies, and the element of the 3D world they make, drawn by the world’s three.js as tall as a character is. He stands plainly, legs straight and arms down, or walks or runs on his place. The character chosen for now.",
     "responsibility": "Be the one clay every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
@@ -14,13 +14,21 @@
     "part": "component",
     "job": "Be a person in the 3D world.",
     "states": {
+      "state": {
+        "standing": "standing plainly on his place, legs straight, arms down at his sides",
+        "walking": "walking on the spot, with the walk his model carries",
+        "running": "running on the spot, with the run his model carries"
+      },
       "clips": {
         "walking": "walking",
         "running": "running"
       }
     },
     "reads": [],
-    "uses": [],
+    "uses": [
+      "noi.eio.components.world.character-drawing",
+      "noi.eio.components.world.drawing"
+    ],
     "files": [
       {
         "path": "assets/characters/clay/clay.glb",
@@ -29,6 +37,10 @@
       {
         "path": "assets/characters/clay/clay.jpg",
         "sha256": "a453dd4e414c7967cf9d29a81ebcbd27a21b71f6fb8e75c563c694cbb64e9010"
+      },
+      {
+        "path": "src/clay/clay.ts",
+        "sha256": "161d3560f9916ba556901748bd8a0f0397b0a316959c12babe3fb8afbc5a5922"
       }
     ]
   }

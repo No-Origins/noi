@@ -31,6 +31,9 @@ export function covers(e: WorldElement, dx: number, dy: number): boolean {
     case 'laid':
       // the ground it takes up: all that lies within the outline round what it is laid from
       return inside(roundLaid(e.shape), dx, dy)
+    case 'model':
+      // a thing drawn from files (a character): all the ground its size says, so wide and so deep
+      return true
     default:
       return noSuchShape(e.shape)
   }
@@ -79,6 +82,8 @@ export function outline(e: WorldElement, pieces = CORNER_PIECES): Array<{ x: num
     case 'ring': return flatOutline(e.shape, e.size, pieces)
     case 'pieces': return roundPieces(e.shape, pieces)
     case 'laid': return roundLaid(e.shape)
+    // a thing drawn from files (a character): the ground its size says, a slab with square corners
+    case 'model': return flatOutline({ kind: 'slab', cornerRadius: 0 }, e.size, pieces)
     default: return noSuchShape(e.shape)
   }
 }

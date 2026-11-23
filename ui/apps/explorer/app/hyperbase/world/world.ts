@@ -63,6 +63,9 @@ export interface World extends ThreeWorld {
   close(): void
 }
 
+/** Where this app serves @noi/eio-3d's assets (app/3d): the characters' models and looks, under `characters/`. */
+export const ASSETS = '/3d'
+
 /** Opens the world on a canvas. Rejects when the browser can draw neither with WebGPU nor with WebGL 2. */
 export async function openWorld(canvas: HTMLCanvasElement, look: WorldLook, sees: Seeing = 'perspective'): Promise<World> {
   const THREE = await import('three/webgpu')
@@ -114,6 +117,7 @@ export async function openWorld(canvas: HTMLCanvasElement, look: WorldLook, sees
     three: THREE,
     tsl: TSL,
     renderer, scene, camera, xyz,
+    assets: ASSETS,
     shows(metres) {
       if (!(metres > 0) || metres === metresShown) return
       metresShown = metres
