@@ -92,6 +92,16 @@ enum Command {
         #[command(flatten)]
         run: RunArgs,
     },
+    /// An agent takes back its own batch while nothing in it is decided: every change still waiting
+    /// or sent back is withdrawn, with the note, and stays on record. Only the batch's proposer may.
+    Withdraw {
+        batch: Uuid,
+        /// Why it is taken back.
+        #[arg(long)]
+        note: String,
+        #[command(flatten)]
+        run: RunArgs,
+    },
     /// Mero's check on a commit (part B, agreed 18 Nov): are its Eidos meron files exactly what you
     /// approved? With --post, Mero posts the answer on GitHub as the commit status "Mero approved".
     /// Fails (exit 1) when they are not.
@@ -493,6 +503,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await?,
             )?
         }
+        Command::Withdraw { batch, note, run } => {
+            let (agent, registry) = as_agent(&registry, &governance, &run).await?;
+            print(registry.withdraw(&agent, batch, &note).await?)?
+        }
         Command::Serve { bind, github } => {
             // On this Mac, loopback only. Inside a container (its image sets NOI_IN_CONTAINER=1) the
             // container's own network is private, and only the ports its host publishes reach it.
@@ -595,7 +609,7 @@ async fn as_agent(
             governance.run_token(String::from_utf8(out.stdout)?.trim()).await?
         }
         (None, None) => {
-            return Err("noi propose acts for an agent: pass --agent, or NOI_RUN_TOKEN from Hyperbase's tool runner".into())
+            return Err("noi propose, revise and withdraw act for an agent: pass --agent, or NOI_RUN_TOKEN from Hyperbase's tool runner".into())
         }
     };
     let credential = Credential::RunToken(token);

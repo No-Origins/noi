@@ -119,8 +119,9 @@ export const checkParams = (inv: Meron | undefined, name: string): any =>
 
 // ——— Review ———
 
-/** `landing`: approved, waiting for its code to land (part B, decision 4, agreed 18 Nov). */
-export type ProposalState = 'waiting' | 'sent-back' | 'landing' | 'approved' | 'rejected'
+/** `landing`: approved, waiting for its code to land (part B, decision 4, agreed 18 Nov). `withdrawn`:
+ *  taken back by its proposer before anyone decided it (`noi withdraw`, 23 Nov). */
+export type ProposalState = 'waiting' | 'sent-back' | 'landing' | 'approved' | 'rejected' | 'withdrawn'
 
 /** One change, exactly as proposed; approval runs this. */
 export type Change =

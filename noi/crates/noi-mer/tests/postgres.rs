@@ -158,8 +158,8 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    // Every registry migration (16, the last "retire", 21 Nov) plus the other application's row.
-    assert_eq!(unmoved, 17);
+    // Every registry migration (17, the last "withdraw", 23 Nov) plus the other application's row.
+    assert_eq!(unmoved, 18);
     metadata
         .execute("DELETE FROM public._sqlx_migrations WHERE version=42")
         .await
@@ -169,7 +169,7 @@ async fn verify(url: &str) {
         .fetch_one(&mut metadata)
         .await
         .unwrap();
-    assert_eq!(own_count, 16);
+    assert_eq!(own_count, 17);
     assert_eq!(registry.snapshot(&actor).await.unwrap().merons.len(), 3);
     let root = registry.get(&actor, "noi").await.unwrap();
     let root_uid = root.identity.uid;
@@ -2510,6 +2510,134 @@ async fn verify_review(url: &str) {
             .definition,
         "Ink for review tests"
     );
+
+    // A proposer takes back its own batch (23 Nov): every open change of it is withdrawn, with its
+    // note, by the proposer and no one else; nothing reaches Mero, and withdrawn is final.
+    let taken = registry
+        .propose_batch(
+            &agent,
+            batch(
+                "Taken back",
+                vec![
+                    add(token(
+                        &format!("{P}review-taken"),
+                        "color",
+                        grey(0.3, "#262626"),
+                    )),
+                    add(role("noi.eio.color.text.review-taken", "review-taken")),
+                ],
+            ),
+        )
+        .await
+        .unwrap();
+    registry
+        .send_back(&human, taken.proposals[1].uid, "Say what it is for")
+        .await
+        .unwrap();
+    for (who, why) in [(&human, "a reviewer"), (&observer, "an observer")] {
+        assert!(
+            matches!(
+                registry.withdraw(who, taken.uid, "Not mine").await,
+                Err(Error::Denied(_))
+            ),
+            "{why} does not withdraw another's batch"
+        );
+    }
+    assert!(
+        registry.withdraw(&agent, taken.uid, "  ").await.is_err(),
+        "a note is required"
+    );
+    assert!(matches!(
+        registry.withdraw(&agent, Uuid::new_v4(), "None").await,
+        Err(Error::NotFound)
+    ));
+    let withdrawn = registry
+        .withdraw(
+            &agent,
+            taken.uid,
+            "Too many records: a smaller batch follows",
+        )
+        .await
+        .unwrap();
+    assert_eq!(withdrawn.len(), 2);
+    assert!(withdrawn.iter().all(|p| p.state == ProposalState::Withdrawn
+        && p.decided_by.as_deref() == Some("design-agent")
+        && p.decided_at.is_some()));
+    let taken = registry.batch(&human, taken.uid).await.unwrap();
+    let notes: Vec<(&str, Option<&str>)> = taken
+        .events
+        .iter()
+        .filter(|e| e.action == "proposal.withdraw")
+        .map(|e| (e.actor.as_str(), e.note.as_deref()))
+        .collect();
+    assert_eq!(
+        notes,
+        vec![
+            (
+                "design-agent",
+                Some("Too many records: a smaller batch follows")
+            );
+            2
+        ]
+    );
+    assert!(taken.places.is_empty(), "nothing of it waits to be decided");
+    assert!(registry
+        .withdraw(&agent, taken.uid, "Again")
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("nothing to withdraw"));
+    assert!(registry.approve(&human, &[taken.uid]).await.is_err());
+    assert!(registry
+        .reject(&human, taken.proposals[0].uid, "After")
+        .await
+        .is_err());
+    assert!(matches!(
+        registry.get(&human, &format!("{P}review-taken")).await,
+        Err(Error::NotFound)
+    ));
+    // The database's own guard: withdrawn is final, and only the batch's proposer withdraws.
+    let mut raw = PgConnection::connect(url).await.unwrap();
+    assert!(raw
+        .execute(
+            format!(
+                "UPDATE mer.proposals SET state='waiting',decided_by=NULL,decided_at=NULL WHERE uid='{}'",
+                taken.proposals[0].uid
+            )
+            .as_str()
+        )
+        .await
+        .is_err());
+    let other = registry
+        .propose_batch(
+            &agent,
+            batch(
+                "Not theirs",
+                vec![add(token(
+                    &format!("{P}review-other"),
+                    "color",
+                    grey(0.4, "#3D3D3D"),
+                ))],
+            ),
+        )
+        .await
+        .unwrap();
+    let refused = raw
+        .execute(
+            format!(
+                "UPDATE mer.proposals SET state='withdrawn',decided_by='maintainer',decided_at=clock_timestamp() WHERE uid='{}'",
+                other.proposals[0].uid
+            )
+            .as_str(),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(refused.contains("only its proposer withdraws"), "{refused}");
+    registry
+        .withdraw(&agent, other.uid, "Only a test")
+        .await
+        .unwrap();
 
     // The one way back through Review (agreed 8 Nov): set aside, then reinstated with a reason,
     // meeting today's invariants again.
