@@ -9,11 +9,13 @@
 // user's x, y, z; nothing else is put straight into the scene. (The eye alone stays outside, where three.js's
 // own mover wants it, and crosses by the same two functions: drawLand.ts.)
 //
-// It lives in the Explorer while the world is a lab: @noi/eio-3d holds the first world's elements and its own
-// rules (three.js draws only the characters there), and is left as it is.
+// The world's elements live in Eidos's own package, @noi/eio-3d (23 Nov 2026): each is made there by three.js from
+// its data, with every number and colour from Eidos, and put into this stage's `xyz`. The stage, its eye, the land
+// and the pages stay in the Explorer while the world is a lab.
 //
 // three.js is asked for only when the world opens, so no other page carries it. Its newer renderer is used: it
 // draws with WebGPU where the browser has it and with WebGL 2 where not, from the same code.
+import type { ThreeWorld } from '@noi/eio-3d'
 import type { Group, OrthographicCamera, PerspectiveCamera, Scene, WebGPURenderer } from 'three/webgpu'
 import { at, toThree } from './place.ts'
 
@@ -37,8 +39,9 @@ export interface WorldLook {
  * side: what an isometric view needs (the land, at the user's word of 22 Nov 2026). */
 export type Seeing = 'perspective' | 'orthographic'
 
-/** The open world. `close` stops the drawing and gives the card's memory back. */
-export interface World {
+/** The open world. `close` stops the drawing and gives the card's memory back. It is the three.js world the
+ * elements of @noi/eio-3d are drawn into. */
+export interface World extends ThreeWorld {
   /** What draws it in this browser. */
   readonly backend: 'webgpu' | 'webgl'
   /** How many pictures have been drawn: it grows while the world is alive. */

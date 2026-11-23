@@ -17,7 +17,12 @@
 // LAID ON THE LAND at the user's word ("Lay them on the land", 21 Nov 2026): a base tile on every 10 m by 10 m
 // section, and an astroid wherever four tiles meet. Each is a thing in the land's data: which element it is,
 // and the place it lies on by the middle of its base.
-import { ASTROID, BASE_TILE, STAGE, covers, elementById, sizedBy, type WorldElement } from './elements.ts'
+//
+// THE LAND'S NUMBERS ARE EIDOS'S (23 Nov 2026): how far it runs is the base platform's (noi.eio.world.base-platform),
+// how its coordinates are marked is noi.eio.world.coordinates, and how it is seen is noi.eio.world.isometric; the
+// elements laid on it are @noi/eio-3d's. Which side is which, and the places the user laid stages on, are the
+// land's own.
+import { ASTROID, BASE_PLATFORM_MEASURES, BASE_TILE, STAGE, covers, elementById, sizedBy, value, type WorldElement } from '@noi/eio-3d'
 import { at, between, readPlace, standsOn, toThree, writePlace, written, type Place, type Size, type Span } from './place.ts'
 
 /** Half of how far the land runs along x: from -HALF to HALF. 200 m across at first (the user, 21 Nov 2026);
@@ -26,10 +31,10 @@ import { at, between, readPlace, standsOn, toThree, writePlace, written, type Pl
  * have one column for the center ... our x0 and y0 can always pass through the center of the center column." So
  * the land is 21 tiles across, 210 m: x 0 runs down the middle of the middle column, and the tiles' middles are
  * on x 0, 10, 20 and so on, where things are said to stand. */
-export const HALF = 105
+export const HALF = BASE_PLATFORM_MEASURES.width / 2
 /** How far the land runs along y: from 0, the beginning's side, to LONG, the end's. THE USER, 22 Nov 2026: "maybe
  * we can make y up to 600." Till then the land was a square, and y ran to 200. */
-export const LONG = 600
+export const LONG = BASE_PLATFORM_MEASURES.length
 
 /** How large a land is: `half`, half of how far it runs along x (from -half to half); `long`, how far it runs
  * along y (from 0 at the beginning's side to `long` at the end's). */
@@ -50,7 +55,7 @@ export function middleOf(size: LandSize = SIZE): Place {
 }
 /** The stronger lines, the numbers on the edges and the upright markers come every this many metres (the user's
  * choice of the four ways, each of them every 10 m). */
-export const EVERY = 10
+export const EVERY = value('noi.eio.world.coordinates.every')
 
 /** The four ways of seeing the coordinates, all kept by the user ("All four"): the lines on the ground, the
  * numbers along the four edges, the upright markers at the 10 m crossings, the place under the pointer. */
@@ -122,7 +127,7 @@ const sideOf = (id: Side['id']): Side => SIDES.find(side => side.id === id)!
  * (with this eye, how far it stands changes nothing in the picture). */
 export const ISOMETRIC: { readonly off: readonly [Side['id'], Side['id']]; readonly away: number } = {
   off: ['end', 'right'],
-  away: 200,
+  away: value('noi.eio.world.isometric.eye-away'),
 }
 
 /** The isometric sight of a place: the eye looks at it from ISOMETRIC.away metres back along x, along y and up,
@@ -158,15 +163,16 @@ export interface Picks {
 }
 
 export const PICKS: Picks = {
-  markerHeight: 1.2,
-  markerWidth: 0.2,
-  wordsAbove: 1.5,
-  wordsWithin: 45,
-  numbersOut: 8, // 4 till 22 Nov 2026: in the isometric view a number 4 m out lay under the nearest marker's words
-  pointerDecimals: 1,
-  namesOut: 20,
-  viewMargin: 15,
-  scrollGain: 1,
+  markerHeight: value('noi.eio.world.coordinates.marker-height'),
+  markerWidth: value('noi.eio.world.coordinates.marker-width'),
+  wordsAbove: value('noi.eio.world.coordinates.words-above'),
+  wordsWithin: value('noi.eio.world.coordinates.words-within'),
+  // 4 m till 22 Nov 2026: in the isometric view a number 4 m out lay under the nearest marker's words
+  numbersOut: value('noi.eio.world.coordinates.numbers-out'),
+  pointerDecimals: value('noi.eio.world.coordinates.pointer-decimals'),
+  namesOut: value('noi.eio.world.coordinates.names-out'),
+  viewMargin: value('noi.eio.world.isometric.margin'),
+  scrollGain: value('noi.eio.world.isometric.scroll-gain'),
 }
 
 /** A thing laid on the land: an element of the world (by its id), on a place by the middle of its base. */

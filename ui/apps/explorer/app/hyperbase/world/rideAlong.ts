@@ -5,7 +5,7 @@
 // goes toward the end. Unlike the Möbius strip, these strips have two ends: the scroll stops at each.
 //
 // ride.ts is the Möbius strip's and is left as it is; this does the same for any strip laid with a frame of its
-// own (elements.ts, Laid.frame).
+// own (Laid.frame, @noi/eio-3d).
 // MY PICKS, not the user's word: the eye looks at the strip's middle line (x 0); it glides as the world's eye does.
 //
 // WHAT COMES BETWEEN THE EYE AND THE STRIP IS CUT AWAY. The user, riding down the first wave: "since the other curve
@@ -14,13 +14,11 @@
 // climb came between. Now whatever stands more than CLEAR metres above the strip where the eye looks (on the eye's
 // side of it) is not drawn while riding. MY PICK: the 40 m.
 import type { Object3D } from 'three/webgpu'
-import { frameOf as frameOfBend, lengthOf as lengthOfBend, type Bend } from './bend.ts'
-import type { Laid, WorldElement } from './elements.ts'
+import { bentFrame as frameOfBend, bentLength as lengthOfBend, type Bend, type Frame, type Laid, type WorldElement, type Xyz } from '@noi/eio-3d'
 import { GLIDE } from './eye.ts'
 import { isometricOver, pictureHolds, startOfLand, wayInPicture } from './land.ts'
 import { at, toThree } from './place.ts'
 import type { Riding } from './ride.ts'
-import type { Frame, Xyz } from './wave.ts'
 import type { World } from './world.ts'
 
 /** A strip one can ride along: where its place x, y is and its ways there, and how long it is along y. */

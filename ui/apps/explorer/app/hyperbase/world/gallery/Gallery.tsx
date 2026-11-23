@@ -1,5 +1,5 @@
 'use client'
-// The gallery of the world's elements: every element in ../elements.ts, each with a still picture taken by
+// The gallery of the world's elements: every element of Eidos's @noi/eio-3d, each with a still picture taken by
 // three.js, its name and its size in words. A click on an element opens it over the whole window in a 3D view,
 // to be turned round and looked at from every side (ElementView.tsx). The parts are Eidos's: Card, Button, and
 // Drawer, which is Eidos's modal.
@@ -59,10 +59,9 @@
 // for two panes is still Eidos's to say: WhenTwoPanes and WhenOnePane.
 import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Choices, Drawer, Radio, Select, Swatch, Toggle, WhenOnePane, WhenTwoPanes } from '@noi/eio-react'
-import { COLOURS_TO_TRY, ELEMENTS, coloursIn, fitsOn, inWords, sizedBy, type ElementColour, type ElementSetting, type ElementState, type WorldElement } from '../elements'
+import { COLOURS_TO_TRY, ELEMENTS, bentLength as lengthOf, coloursIn, fitsOn, inWords, sizedBy, type ElementColour, type ElementSetting, type ElementState, type WorldElement } from '@noi/eio-3d'
 import { picturesOf } from '../inspect'
 import { ElementView } from './ElementView'
-import { lengthOf } from '../bend'
 import { sideOf, stripOf } from '../rideAlong'
 import styles from './gallery.module.css'
 

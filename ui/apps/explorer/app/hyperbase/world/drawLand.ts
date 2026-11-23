@@ -21,7 +21,7 @@
 // style of Eidos, whose class the page gives.
 //
 // LAID ON THE LAND (the user, 21 Nov: "Lay them on the land"): the things in the land's data, each drawn from
-// its element (makeElement.ts) on its place, in the same light as in the gallery (light.ts). Where things cover
+// its element (@noi/eio-3d, makeMany) on its place, in the same light as in the gallery (light). Where things cover
 // the ground, the lines and the pointer are on their tops: the coordinates stay seen on what is laid.
 //
 // Everything is put into the stage's `xyz`, where a position is the user's x, y, z. Only the eye is outside it
@@ -51,11 +51,9 @@
 // along the strip of where the eye looks; the pointer reads the strip's x and y where it meets the ground or the
 // tiles' tops.
 import type { Object3D } from 'three/webgpu'
-import type { WorldElement } from './elements.ts'
+import { light, makeMany, type Made, type WorldElement } from '@noi/eio-3d'
 import { GLIDE, openEye, type Eye } from './eye.ts'
 import { EVERY, edgeNumbers, elementOf, groundTop, highestTop, markerBox, markers, middleOf, pictureHolds, pointerWords, sideNames, slid, topAt, wayInPicture, wordsShown, type Land, type LandState } from './land.ts'
-import { light } from './light.ts'
-import { makeMany, type Made } from './makeElement.ts'
 import { at as placeAt, toThree, type Place } from './place.ts'
 import { CLEAR, type Strip } from './rideAlong.ts'
 import type { World } from './world.ts'
@@ -217,7 +215,7 @@ export async function drawLand(world: World, land: Land, host: HTMLElement, look
   const marksOnTops = placed(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), marksOnly))
 
   // THE LIGHT: plain light, the same as in the gallery
-  undo.push(light(world))
+  undo.push(light(world, look.colour))
 
   // WHAT IS LAID: every thing in the land's data, the many of one element drawn as one
   let laid: Made[] = []

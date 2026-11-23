@@ -4,11 +4,9 @@
 // gives everything back when it goes.
 import { useEffect, useRef, useState } from 'react'
 import type { Object3D } from 'three/webgpu'
-import { elementById, type WorldElement } from '../elements'
+import { elementById, light, lightFor, makeElement, type WorldElement } from '@noi/eio-3d'
 import { showElement, type Inspection } from '../inspect'
-import { makeElement } from '../makeElement'
 import { readPlace, writePlace } from '../place'
-import { light, lightFor } from '../light'
 import { rideStrip, type Riding } from '../ride'
 import { cutAbove, mobiusFrameAt, rideAlong, stripOf } from '../rideAlong'
 import { openWorld, type World } from '../world'
@@ -66,7 +64,7 @@ export function ElementView({ element, on = null, state = null, onState = null, 
         world = w
         const colour = (token: string) => css.getPropertyValue(token).trim()
         if (riding && (bend || along)) {
-          unlit = light(w, lightFor(w, colour(element.surface.colour)), true)
+          unlit = light(w, colour, lightFor(w, colour(element.surface.colour)), true)
           const made = makeElement(w, element, colour)
           w.xyz.add(made.thing)
           gone = () => made.gone()

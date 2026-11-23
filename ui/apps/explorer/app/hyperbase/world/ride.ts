@@ -12,7 +12,7 @@
 //
 // MY PICKS, not the user's word: the eye looks at the strip's middle line (x 0); it glides to where it was
 // scrolled to, as the world's eye does (eye.ts, GLIDE); the scroll has no end (it goes on round the loop).
-import { frameOf, lengthOf, type Bend, type Xyz } from './bend.ts'
+import { bentFrame as frameOf, bentLength as lengthOf, type Bend, type Xyz } from '@noi/eio-3d'
 import { GLIDE } from './eye.ts'
 import { isometricOver, pictureHolds, startOfLand, wayInPicture } from './land.ts'
 import { at, toThree } from './place.ts'

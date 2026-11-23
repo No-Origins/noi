@@ -3,14 +3,13 @@
 // element." This puts one element alone on a stage, standing at x 0, y 0, lights it, and gives the stage an eye
 // the hand can move. It also takes the still pictures the gallery shows, the same way and from the same sight.
 //
-// MY PICKS, not the user's word: the light (light.ts), and where the eye first stands (elements.ts, firstSight).
+// MY PICKS, not the user's word: the light, and where the eye first stands (firstSight); both are the elements' own
+// (@noi/eio-3d), drawn with numbers from Eidos.
 // One thing only here: a matte thing shows its shape only by how much light each of its faces catches, and a
 // colour as dark as the tile's black would show none; so an element whose colour is too dark to show its faces
 // is lit more, until its top is shown as a dark grey.
-import { ASTROID, BASE_TILE, firstSight, fitsOn, reachIn, sizedBy, type WorldElement } from './elements.ts'
+import { ASTROID, BASE_TILE, firstSight, fitsOn, light, lightFor, makeElement, makeMany, reachIn, sizedBy, type Made, type WorldElement } from '@noi/eio-3d'
 import { openEye, type Eye, type Sight } from './eye.ts'
-import { light, lightFor } from './light.ts'
-import { makeElement, makeMany, type Made } from './makeElement.ts'
 import { openWorld, type World } from './world.ts'
 
 export interface InspectLook {
@@ -33,29 +32,29 @@ function narrowerAngle(world: World): number {
 export interface Inspection {
   readonly element: WorldElement
   readonly eye: Eye
-  /** Sets another element on this one, where its sockets meet this one's studs (elements.ts, `fitsOn`), to
+  /** Sets another element on this one, where its sockets meet this one's studs (`fitsOn`), to
    * see the two together; `null` takes off what was set on. Says whether something is now set on: not when
    * the piece does not fit. (The user, 22 Nov 2026: "give options in the drone element to select things that
    * can attach to the drone, and then ... show a preview of how it looks like when it's attached.") */
   setOn(piece: WorldElement | null): boolean
   /** Puts the element (`of` 'it') or what is set on it (`of` 'on') in one of its own states, by the state's
-   * id (elements.ts, ElementState). When the state has the element reach farther than is in sight, the eye
+   * id (ElementState). When the state has the element reach farther than is in sight, the eye
    * stands back, the way it was looking. Says whether there is such a state. (The user, 22 Nov 2026: "each
    * [element] also have their own set of controls that are specific to them ... we should also cater for those
    * states and features of an element.") */
   state(id: string, of?: 'it' | 'on'): boolean
   /** Gives one of the element's own colours (`of` 'it'), or one of what is set on it (`of` 'on'), another
-   * colour to try: by the colour's id (elements.ts, ElementColour) and a role of Eidos by its token's name.
+   * colour to try: by the colour's id (ElementColour) and a role of Eidos by its token's name.
    * Says whether there is such a colour. (The user, 23 Nov 2026: "I want to play with colors on the sides,
    * border, top face, the glass slab.") */
   colour(id: string, token: string, of?: 'it' | 'on'): boolean
   /** Gives one of the element's own settings (`of` 'it'), or one of what is set on it (`of` 'on'), another
-   * number: by the setting's id (elements.ts, ElementSetting). A setting is of a size, so the thing is made
+   * number: by the setting's id (ElementSetting). A setting is of a size, so the thing is made
    * again in that size, and is at once in the state and the colours it was in. Says whether there is such a
    * setting. (The user, 23 Nov 2026: "Only controls we need are colour, width, breadth and height.") */
   set(id: string, value: number, of?: 'it' | 'on'): boolean
   /** Looks through the element (`of` 'it') or through what is set on it (`of` 'on'), from the place its data
-   * says one looks out of it (elements.ts, LookOut); `null` looks from outside again, from where the eye was.
+   * says one looks out of it (LookOut); `null` looks from outside again, from where the eye was.
    * While one looks through it, a piece of ground lies under the element, so there is something to see. Says
    * whether one now looks through it. (The user, 23 Nov 2026: "Also add Camera view, I mean, through the
    * camera.") */
@@ -69,7 +68,7 @@ const GROUND_TILES = 2
 
 /** Puts one element alone on an open stage, at x 0, y 0, lit, with an eye the hand can move. */
 export async function showElement(world: World, element: WorldElement, look: InspectLook): Promise<Inspection> {
-  const dark = light(world, lightFor(world, look.colour(element.surface.colour)), true)
+  const dark = light(world, look.colour, lightFor(world, look.colour(element.surface.colour)), true)
   // the thing, and the element as it is shown: in the size chosen for it, when one was
   let made = makeElement(world, element, look.colour)
   let shownAs = element
@@ -291,7 +290,7 @@ export async function picturesOf(elements: readonly WorldElement[], canvas: HTML
   const pictures: Record<string, string> = {}
   try {
     for (const element of elements) {
-      const dark = light(world, lightFor(world, look.colour(element.surface.colour)), true)
+      const dark = light(world, look.colour, lightFor(world, look.colour(element.surface.colour)), true)
       const made = makeElement(world, element, look.colour)
       world.xyz.add(made.thing)
       eye.put(firstSight(element, narrowerAngle(world)))
