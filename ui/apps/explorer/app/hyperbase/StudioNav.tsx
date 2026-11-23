@@ -1,7 +1,8 @@
 'use client'
 // Studio's own short list (agreed 12 Nov), as Governance has: Today, Projects, Standing orders,
-// Teams, Runs, Score, and Space (added 12 Nov by "Spaces As You Picture Them"). Each is a link on
-// Hyperbase's own name; Today carries the count of what waits.
+// Teams, Runs, Score, and Space (added 12 Nov by "Spaces As You Picture Them"). World comes first
+// (21 Nov): the new 3D world, on the whole screen, beside the flat pages while it is made. Each is a
+// link on Hyperbase's own name; Today carries the count of what waits.
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Count, Icon, type IconName } from '@noi/eio-react'
@@ -10,6 +11,7 @@ import { useWaiting } from './mock/visit'
 import styles from './studio.module.css'
 
 const PAGES: { href: string; name: string; icon: IconName }[] = [
+  { href: '/world', name: 'World', icon: 'eye' },
   { href: '/', name: 'Today', icon: 'check' },
   { href: '/projects', name: 'Projects', icon: 'layers' },
   { href: '/orders', name: 'Standing orders', icon: 'arrow' },

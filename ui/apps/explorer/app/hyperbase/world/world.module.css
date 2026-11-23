@@ -1,0 +1,64 @@
+/* The new 3D world (21 Nov): the world is the page. What lies behind the land is the try's pick, the same dark
+   as the land itself, until the user's picture says otherwise. */
+.world {
+  position: fixed;
+  inset: 0;
+  background: var(--eio-color-world-sky);
+}
+
+/* Where the picture and its words are put. */
+.stage {
+  position: absolute;
+  inset: 0;
+  background: var(--eio-color-world-sky);
+}
+
+/* What the user asked to have over the world (21 Nov): one toggle, for the markers. It is Eidos's Toggle,
+   placed in a corner on a small plate so its words can be read over the land. */
+.controls {
+  position: absolute;
+  top: var(--eio-window-margin);
+  left: var(--eio-window-margin);
+  z-index: 1;
+  padding: var(--eio-space-gap-inline) var(--eio-space-inset-control);
+  border: var(--eio-border-width-default) solid var(--eio-color-border-default);
+  border-radius: var(--eio-radius-field);
+  background: var(--eio-color-surface-raised);
+  color: var(--eio-color-text-primary);
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.cannot {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--eio-space-inset-card);
+  color: var(--eio-color-text-muted);
+  text-align: center;
+}
+
+/* What holds the words on the land: the numbers along the edges, the names of the sides, the markers' places,
+   the place under the pointer. They are part of the land's coordinates, not a panel: nothing here can be
+   pressed, and the pointer passes through them to the world. */
+.words {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* A number along an edge: plain words in Eidos's own caption style (the class is Eidos's, given in
+   WorldView.tsx); here only its colour, the try's pick. Every other word on the land is Eidos's Badge
+   (LandWords.tsx) and has no look of this page's. */
+.edgeNumber {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--eio-color-world-step-edge);
+}
