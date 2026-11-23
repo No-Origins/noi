@@ -1,0 +1,106 @@
+{
+  "path": "noi.eio.inv.steps",
+  "name": "Steps invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos set of steps must meet: a named list, in one record, of the steps one may choose among.",
+    "responsibility": "Hold an element's steps in one record instead of one record a number: the drone's scale (Small 0.5, Base 1, Medium 1.5, Large 2), the heights of a stage's base (2, 4, 6, 8, 10 m), a stage's width and breadth in whole tiles."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "steps"
+    },
+    "schema": {
+      "title": "Eidos steps",
+      "type": "object",
+      "required": [
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "description": "The steps in their order, from the least to the most, at least 2 and at most 100. Each has a name in words and one number, every step in the same unit: a share of another value (`share`, as the share rule: 0 to 10, to the ten-thousandth), a length in metres (`m`, as the length rule: 0 to 10,000, to the millimetre), or a count of things (`count`, as the count rule: a whole number from 1 to 10,000). Which value a share is of, or which thing is counted, is said in the record's definition.",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 100,
+          "oneOf": [
+            {
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "share"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "$ref": "#/$defs/name"
+                  },
+                  "share": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "multipleOf": 0.0001
+                  }
+                }
+              }
+            },
+            {
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "m"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "$ref": "#/$defs/name"
+                  },
+                  "m": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "multipleOf": 0.001
+                  }
+                }
+              }
+            },
+            {
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "count"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "$ref": "#/$defs/name"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "$defs": {
+        "name": {
+          "description": "The step's name in words, as a person chooses it: Small, Base, 2 m, 3 tiles.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    }
+  }
+}

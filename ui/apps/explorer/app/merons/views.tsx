@@ -24,7 +24,7 @@ const PLURAL: Record<string, string> = {
   color: 'palette colors', 'color-role': 'color roles', 'font-family': 'fonts', 'font-size': 'font sizes',
   'text-style': 'text styles', space: 'spacing steps', 'space-role': 'spacing roles', size: 'sizes',
   radius: 'corners', 'border-width': 'border widths', window: 'windows', invariant: 'invariants', system: 'systems',
-  length: 'lengths', time: 'times', speed: 'speeds', share: 'shares', angle: 'angles', count: 'counts',
+  length: 'lengths', time: 'times', speed: 'speeds', share: 'shares', angle: 'angles', count: 'counts', steps: 'sets of steps',
   component: 'components', 'shared-part': 'shared parts', package: 'for a package’s own files',
 }
 const kindOf = (m: Meron) =>
