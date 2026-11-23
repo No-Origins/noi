@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.drone.ring-outer",
+  "name": "Drone ring, outer",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How far out the drone's four rings reach, as a share of the astroid's radius: 0.84, read off your picture. A guess, not agreed.",
+    "responsibility": "Size the drone's rings, and with them the drone."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 0.84
+  }
+}

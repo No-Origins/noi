@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.surface.gloss-roughness",
+  "name": "Glossy, roughness",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How rough a glossy surface's own colour is, from 0 (a mirror) to 1 (matte); a matte surface made to shine comes this smooth at its most. A guess, not agreed.",
+    "responsibility": "Draw glossy surfaces."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 0.16
+  }
+}

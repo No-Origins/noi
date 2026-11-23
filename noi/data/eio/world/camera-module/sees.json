@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.sees",
+  "name": "Camera eye, angle of view",
+  "classification": {
+    "type": "token",
+    "subtype": "angle"
+  },
+  "semantics": {
+    "definition": "How wide one sees through the camera, from the bottom of the picture to the top, in degrees. A guess, not agreed.",
+    "responsibility": "Show what the camera sees."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "deg": 60
+  }
+}

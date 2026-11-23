@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.states.change",
+  "name": "Change of state",
+  "classification": {
+    "type": "token",
+    "subtype": "time"
+  },
+  "semantics": {
+    "definition": "How long a thing takes to go over from one of its states to the next: rising, settling, its fans picking up speed, its light coming on. A guess, not agreed.",
+    "responsibility": "Let a thing go over smoothly from state to state."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "s": 1.2
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.drone.hovering-bob-every",
+  "name": "Drone hovering, rise and sink time",
+  "classification": {
+    "type": "token",
+    "subtype": "time"
+  },
+  "semantics": {
+    "definition": "How long the hovering drone takes to rise, sink and come back. A guess, not agreed.",
+    "responsibility": "Let the hovering drone rise and sink a little."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "s": 2.4
+  }
+}

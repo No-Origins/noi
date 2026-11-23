@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.wave-platform.run-13-turn",
+  "name": "Wave strip, run 13, turn",
+  "classification": {
+    "type": "token",
+    "subtype": "angle"
+  },
+  "semantics": {
+    "definition": "How far run 13 of the line you drew curves round (levelling off, higher than the start), in degrees: more than 0 curves upward, less than 0 downward, 0 runs straight. A guess, not agreed.",
+    "responsibility": "Lay the wave strip along the line you drew."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "deg": -15
+  }
+}

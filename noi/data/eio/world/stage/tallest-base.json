@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.tallest-base",
+  "name": "Stage base, tallest",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "The tallest base one may choose; the heights go up from the base as made, in steps of it. Your word: \"starting with 2, then 4, then 8, and then 10\", and 6 (\"Yeah, let's do it\").",
+    "responsibility": "Offer the heights of the stage's base."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "m": 10
+  }
+}

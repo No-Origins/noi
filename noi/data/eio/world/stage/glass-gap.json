@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.glass-gap",
+  "name": "Stage glass, above the block",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far above the block the glass floats on the 2 m base. Your word (your settings picture): \"Above the block: 1 m\".",
+    "responsibility": "Float the stage's glass, and size its posts."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "m": 1
+  }
+}

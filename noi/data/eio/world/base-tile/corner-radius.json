@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.base-tile.corner-radius",
+  "name": "Base tile, corner radius",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far a base tile's corners are rounded; the astroid's four sides are those corners. Your word: \"with 1 meter border radius\".",
+    "responsibility": "Round the base tile's corners, and shape the astroid."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "m": 1
+  }
+}

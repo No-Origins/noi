@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.active-glass-bright",
+  "name": "Stage active, glass border",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How brightly the glass's border glows while the stage is active, from 0 to 1. Your word: \"The glass's border: Full\".",
+    "responsibility": "Light the stage when it is active."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "share": 1
+  }
+}

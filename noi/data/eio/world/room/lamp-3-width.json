@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.room.lamp-3-width",
+  "name": "Mirrored room, lamp 3, width",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How wide the soft lamp toward low x in the mirrored room is. A guess, not agreed.",
+    "responsibility": "Give glossy things something to mirror."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 6
+  }
+}

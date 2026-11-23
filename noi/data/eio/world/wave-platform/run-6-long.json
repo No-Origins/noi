@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.wave-platform.run-6-long",
+  "name": "Wave strip, run 6, length",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How long run 6 of the line you drew is (rising toward the twist), along the strip's middle, laid over your drawing. A guess, not agreed.",
+    "responsibility": "Lay the wave strip along the line you drew."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 440
+  }
+}

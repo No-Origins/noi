@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.base-corner",
+  "name": "Camera base, corner",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How far the base's corners are rounded, as a share of the studs' pitch. A guess, not agreed.",
+    "responsibility": "Round the camera module's base."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 0.2
+  }
+}

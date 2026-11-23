@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stud-grid.across",
+  "name": "Stud, width",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How wide a stud is, and a socket, as a share of the pitch (noi.eio.world.stud-grid.pitch): 0.6, the toy's own proportions. A guess, not agreed.",
+    "responsibility": "Size the studs and sockets."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 0.6
+  }
+}

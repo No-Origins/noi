@@ -1,0 +1,24 @@
+{
+  "path": "noi.eio.color.world.light",
+  "name": "World light colour",
+  "classification": {
+    "type": "token",
+    "subtype": "color-role"
+  },
+  "semantics": {
+    "definition": "The colour of the light the 3D world is lit by, the sun's, the sky's and the soft lamps' that glossy things mirror: plain white, so that every colour shows as Eidos has it. A guess, not agreed.",
+    "responsibility": "Give the 3D world this colour by its meaning, so its drawing code reads a role, never a palette colour."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "world": true
+  },
+  "spec": {
+    "light": {
+      "ref": "noi.eio.color.palette.white"
+    },
+    "dark": {
+      "ref": "noi.eio.color.palette.white"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.active-sides-bright",
+  "name": "Stage active, sides",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How brightly the block's sides, and the posts, glow while the stage is active, from 0 to 1. Your word: \"Sides: Half\", and the posts \"of the sides\".",
+    "responsibility": "Light the stage when it is active."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "share": 0.5
+  }
+}

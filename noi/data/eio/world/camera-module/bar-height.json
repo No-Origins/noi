@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.bar-height",
+  "name": "Camera light between the lenses, height",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How tall the light between the two lenses is: 14 mm. A guess, not agreed.",
+    "responsibility": "Draw the light between the lenses."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.014
+  }
+}

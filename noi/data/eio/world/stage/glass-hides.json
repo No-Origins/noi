@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.glass-hides",
+  "name": "Stage glass, hides",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How much of what is behind it the frosted glass hides, from 0 (nothing) to 1 (all). Your word (your settings picture): \"Hides: Nothing\".",
+    "responsibility": "Let what is behind the stage's glass show through it."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "share": 0
+  }
+}

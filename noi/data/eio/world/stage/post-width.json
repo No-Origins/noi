@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.post-width",
+  "name": "Stage post, width",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How thick across each of the four round posts that join the glass to the block is. A guess, not agreed.",
+    "responsibility": "Size the stage's posts."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.4
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.glass-thickness",
+  "name": "Stage glass, thickness",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How thick the sheet of glass is on the 2 m base: a fortieth of the base's height. A guess, not agreed.",
+    "responsibility": "Size the stage's glass."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.05
+  }
+}

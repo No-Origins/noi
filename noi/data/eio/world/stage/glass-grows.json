@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.glass-grows",
+  "name": "Stage glass, growth",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How much of the base's growth the glass's thickness takes: all of it, so it stays the same share of the base's height (your \"it is the thickness\"). A guess, not agreed.",
+    "responsibility": "Grow the stage's glass with its base."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 1
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.isometric.scroll-gain",
+  "name": "Isometric view, scroll",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How far the world moves in the picture for the scroll: 1 moves it as many dots as were scrolled, as a page moves. A guess, not agreed.",
+    "responsibility": "Move along the land with the scroll."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 1
+  }
+}

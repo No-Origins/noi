@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.head-depth",
+  "name": "Camera head, depth",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How deep the head is, from its front to its back. A guess, not agreed.",
+    "responsibility": "Size the camera module's head."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.44
+  }
+}

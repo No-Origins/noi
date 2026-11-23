@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.drone.spin-hovering",
+  "name": "Drone hovering, fans",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How fast the fans turn while the drone hovers, as a share of their own speed: at their own speed. A guess, not agreed.",
+    "responsibility": "Turn the fans as the drone's state says."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 1
+  }
+}

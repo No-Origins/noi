@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.neck-height",
+  "name": "Camera neck, height",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How tall the neck is. A guess, not agreed.",
+    "responsibility": "Size the camera module's neck."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.19
+  }
+}

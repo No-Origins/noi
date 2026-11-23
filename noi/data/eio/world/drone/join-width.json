@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.drone.join-width",
+  "name": "Drone join, width",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How thick across each of the drone's round joins is, as a share of the body's thickness: half. A guess, not agreed.",
+    "responsibility": "Draw the joins between the drone's rings and its body."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 0.5
+  }
+}

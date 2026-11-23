@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.isometric.margin",
+  "name": "Isometric view, margin",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How far beyond the land's left and right edges the picture holds, so that the numbers along them are seen. A guess, not agreed.",
+    "responsibility": "Fit the land into the picture."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 15
+  }
+}

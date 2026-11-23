@@ -117,6 +117,8 @@
   --eio-color-world-circle: #525252;
   --eio-color-world-highlight: #CEEE38;
   --eio-color-world-land: #0A0A0A;
+  --eio-color-world-light: #FFFFFF;
+  --eio-color-world-room: #050505;
   --eio-color-world-sky: #0A0A0A;
   --eio-color-world-step-edge: #737373;
   --eio-color-world-wall: #FAFAFA;
@@ -151,6 +153,8 @@
     --eio-color-world-circle: #525252;
     --eio-color-world-highlight: #CEEE38;
     --eio-color-world-land: #0A0A0A;
+    --eio-color-world-light: #FFFFFF;
+    --eio-color-world-room: #050505;
     --eio-color-world-sky: #0A0A0A;
     --eio-color-world-step-edge: #737373;
     --eio-color-world-wall: #FAFAFA;
@@ -182,6 +186,8 @@
   --eio-color-world-circle: #525252;
   --eio-color-world-highlight: #CEEE38;
   --eio-color-world-land: #0A0A0A;
+  --eio-color-world-light: #FFFFFF;
+  --eio-color-world-room: #050505;
   --eio-color-world-sky: #0A0A0A;
   --eio-color-world-step-edge: #737373;
   --eio-color-world-wall: #FAFAFA;
@@ -212,6 +218,8 @@
   --eio-color-world-circle: #525252;
   --eio-color-world-highlight: #CEEE38;
   --eio-color-world-land: #0A0A0A;
+  --eio-color-world-light: #FFFFFF;
+  --eio-color-world-room: #050505;
   --eio-color-world-sky: #0A0A0A;
   --eio-color-world-step-edge: #737373;
   --eio-color-world-wall: #FAFAFA;

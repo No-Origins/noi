@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.isometric.eye-away",
+  "name": "Isometric eye, away",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How many metres the isometric eye stands back from what it looks at, along x, along y and up (with this eye it changes nothing in the picture). A guess, not agreed.",
+    "responsibility": "Hold the land's isometric view."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 200
+  }
+}

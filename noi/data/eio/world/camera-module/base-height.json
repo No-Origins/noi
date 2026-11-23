@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.base-height",
+  "name": "Camera base, height",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How tall the camera module's square base is, its sockets in it. Your word: \"keeping the same height\".",
+    "responsibility": "Size the camera module's base."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "m": 0.1
+  }
+}

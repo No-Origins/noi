@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.plate-height",
+  "name": "Camera plate, height",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "How tall the round plate on the base is. A guess, not agreed.",
+    "responsibility": "Size the camera module's plate."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.05
+  }
+}

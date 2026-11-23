@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.surface.gloss-mirrors",
+  "name": "Glossy, mirroring",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How strongly a glossy surface mirrors the room round it: 2.2 times the room's own light. A guess, not agreed.",
+    "responsibility": "Draw glossy surfaces."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 2.2
+  }
+}

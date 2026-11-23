@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.plate-radius",
+  "name": "Camera plate, radius",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How far the round plate on the base reaches from its middle, as a share of the studs' pitch. A guess, not agreed.",
+    "responsibility": "Size the camera module's plate."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 0.9
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.first-sight.widest-angle",
+  "name": "First sight, angle",
+  "classification": {
+    "type": "token",
+    "subtype": "angle"
+  },
+  "semantics": {
+    "definition": "The angle of view the eye allows for when it first stands back from an element alone, in degrees. A guess, not agreed.",
+    "responsibility": "Stand the eye far enough back to see the whole of an element."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "deg": 50
+  }
+}

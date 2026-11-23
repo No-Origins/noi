@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.light.sheen",
+  "name": "Matte sheen",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "What a matte face sends back in plain light whatever its colour, as a share of full light: the faint sheen three.js's surfaces keep at their roughest, measured on the base tile (21 Nov). A guess, not agreed.",
+    "responsibility": "Light a dark element alone so that its faces show."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 0.0093
+  }
+}

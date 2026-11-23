@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.camera-module.lens-inner",
+  "name": "Camera lens, inner",
+  "classification": {
+    "type": "token",
+    "subtype": "length"
+  },
+  "semantics": {
+    "definition": "Where each lens's glass ends and its ring begins, from its middle: 95 mm. A guess, not agreed.",
+    "responsibility": "Size the camera module's lenses and their glass."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "m": 0.095
+  }
+}

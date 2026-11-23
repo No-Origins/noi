@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.stage.block-shine",
+  "name": "Stage block, shine",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How much the block and its posts shine, from 0 (matte) to 1 (glossy). Your word: \"Shine: Glossy\", and \"The posts should have the material and color of the sides\".",
+    "responsibility": "Make the stage's block and posts glossy."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "your word"
+  },
+  "spec": {
+    "share": 1
+  }
+}

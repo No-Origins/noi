@@ -1,0 +1,19 @@
+{
+  "path": "noi.eio.world.first-sight.margin",
+  "name": "First sight, margin",
+  "classification": {
+    "type": "token",
+    "subtype": "share"
+  },
+  "semantics": {
+    "definition": "How much farther back the eye first stands than it must to see the whole element: 1.15 times. A guess, not agreed.",
+    "responsibility": "Leave room round an element when it is first shown."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "metadata": {
+    "number": "guess"
+  },
+  "spec": {
+    "share": 1.15
+  }
+}
