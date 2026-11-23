@@ -5,7 +5,7 @@
 //
 //   1. The branch: not main, nothing uncommitted; to merge, the same as on GitHub.
 //   2. The checks GitHub runs, here first: Rust (format, clippy, tests; the database tests too when
-//      NOI_TEST_ADMIN_URL is set), the component merons match the code, the type checks, the tests.
+//      NOI_TEST_ADMIN_URL is set), component records, type checks, UI and script tests, app build.
 //   3. What you approved: Mero first takes in what main already carries (noi landed), then its own
 //      check (noi check-approved): every component's meron and the component rule in the branch are
 //      what Mero holds, or what a batch approved and waiting for its code leaves them as, and Mero
@@ -79,16 +79,8 @@ else console.log(`  ${branch} at ${here.slice(0, 7)}, not yet the same on GitHub
 if (skipLocal) {
   say('The checks: left to GitHub (--skip-local)')
 } else {
-  say('Rust: format, clippy, tests')
-  run(NOI, 'cargo', ['fmt', '--all', '--', '--check'])
-  run(NOI, 'cargo', ['clippy', '--locked', '--workspace', '--all-targets', '--all-features', '--', '-D', 'warnings'])
-  run(NOI, 'cargo', ['test', '--locked', '--workspace', '--all-features'])
-  if (process.env.NOI_TEST_ADMIN_URL) run(NOI, 'cargo', ['test', '--locked', '--workspace', '--all-features', '--', '--ignored'])
-  else console.log('  (the database tests: set NOI_TEST_ADMIN_URL to run them here; GitHub runs them)')
-  say('The app and the Eidos packages')
-  run(ROOT, 'node', ['noi/scripts/eio-components.mjs', '--check'])
-  run(ROOT, 'pnpm', ['-r', '--filter', './ui/**', 'run', 'typecheck'])
-  run(ROOT, 'pnpm', ['-r', '--filter', './ui/**', 'test'])
+  say('Local checks')
+  run(ROOT, process.execPath, ['scripts/check.mjs'])
 }
 
 // 3 · What you approved: Mero's own check (part B, decision 2), and on a pushed branch it posts the
