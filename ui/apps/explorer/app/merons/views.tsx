@@ -24,7 +24,7 @@ const PLURAL: Record<string, string> = {
   color: 'palette colors', 'color-role': 'color roles', 'font-family': 'fonts', 'font-size': 'font sizes',
   'text-style': 'text styles', space: 'spacing steps', 'space-role': 'spacing roles', size: 'sizes',
   radius: 'corners', 'border-width': 'border widths', window: 'windows', invariant: 'invariants', system: 'systems',
-  length: 'lengths', time: 'times', speed: 'speeds',
+  length: 'lengths', time: 'times', speed: 'speeds', share: 'shares', angle: 'angles', count: 'counts',
   component: 'components', 'shared-part': 'shared parts', package: 'for a package’s own files',
 }
 const kindOf = (m: Meron) =>
@@ -397,7 +397,7 @@ export function LengthView({ m }: { m: Meron }) {
         <i className={cx(styles.bar, styles.barPerson)} style={{ width: `${(PERSON_M / most) * 100}%` }} aria-hidden />
       </div>
       <Facts items={[
-        ['Length', `${plain(metres)} m`, 'Lime: this length. Grey: a person 6 feet tall, 1.8 m'],
+        ['Length', `${metres.toLocaleString('en-GB', { maximumFractionDigits: 3 })} m`, 'Lime: this length. Grey: a person 6 feet tall, 1.8 m'],
         ['Beside a person', times >= 1 ? `${plain(times)} times as long` : `${plain(times * 100)}% as long`, 'One tile of the world is one metre'],
       ]} />
     </>

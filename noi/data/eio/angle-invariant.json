@@ -1,0 +1,35 @@
+{
+  "path": "noi.eio.inv.angle",
+  "name": "Angle invariant",
+  "classification": {
+    "type": "invariant"
+  },
+  "semantics": {
+    "definition": "The rules every Eidos angle in degrees must meet.",
+    "responsibility": "Say how far things turn, lean or slant in the 3D world, in degrees: the camera's head sweeps 40 degrees, a drone leans 12."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "applies_to": {
+      "type": "token",
+      "subtype": "angle"
+    },
+    "schema": {
+      "title": "Eidos angle",
+      "type": "object",
+      "required": [
+        "deg"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "deg": {
+          "description": "An angle in the 3D world, in degrees, to the tenth: -360 to 360, at most one whole turn either way. Less than 0 turns the other way, as a line turning down; 0 is straight on.",
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360,
+          "multipleOf": 0.1
+        }
+      }
+    }
+  }
+}

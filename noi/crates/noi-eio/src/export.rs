@@ -105,8 +105,8 @@ fn insert(tree: &mut Map<String, Value>, path: &str, value: Value) {
 /// Roles become CSS variables in both themes; palette colors are only in the typed object, so
 /// components cannot reach past a role to a palette color. Window classes become media queries that
 /// switch the `--eio-window-*` variables. Motion durations and curves become variables, and every
-/// duration drops to 0 when the system asks for reduced motion. The 3D world's lengths, times and
-/// speeds are only in the typed object and the JSON.
+/// duration drops to 0 when the system asks for reduced motion. The 3D world's lengths, times,
+/// speeds, shares, angles and counts are only in the typed object and the JSON.
 pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
     let mut sources: Vec<&TokenSource> = sources.iter().collect();
     sources.sort_by_key(|s| s.path);
@@ -282,13 +282,17 @@ pub fn export_tokens(sources: &[TokenSource]) -> Result<TokenFiles, String> {
                 );
             }
             // The 3D world's values (17 Nov): a length in metres, a time in seconds, a speed in
-            // metres a second. Code that draws in 3D reads them, CSS never does, so they go into
-            // tokens.ts and tokens.json only.
-            "length" | "time" | "speed" => {
+            // metres a second; since 23 Nov also a share of another value, an angle in degrees and
+            // a count. Code that draws in 3D reads them, CSS never does, so they go into tokens.ts
+            // and tokens.json only.
+            "length" | "time" | "speed" | "share" | "angle" | "count" => {
                 let field = match s.subtype {
                     "length" => "m",
                     "time" => "s",
-                    _ => "m_per_s",
+                    "speed" => "m_per_s",
+                    "share" => "share",
+                    "angle" => "deg",
+                    _ => "count",
                 };
                 let v = spec[field]
                     .as_f64()
@@ -771,6 +775,60 @@ mod tests {
         }])
         .err()
         .is_some_and(|e| e.contains("has no m value")));
+    }
+
+    #[test]
+    fn world_shares_angles_counts_and_fine_lengths_are_typed_values_only() {
+        // 23 Nov: a share, an angle and a count, and lengths to the millimetre, 0 m too.
+        let (ring, turn, studs) = (
+            json!({"share":0.2125}),
+            json!({"deg":-155}),
+            json!({"count":4}),
+        );
+        let (proud, cut) = (json!({"m":0.002}), json!({"m":0}));
+        fn source<'a>(path: &'a str, subtype: &'a str, spec: &'a Value) -> TokenSource<'a> {
+            TokenSource {
+                path,
+                subtype,
+                spec,
+                deprecated: false,
+            }
+        }
+        let sources = [
+            source("noi.eio.world.drone.ring-outer", "share", &ring),
+            source("noi.eio.world.wave-platform.run-3-turn", "angle", &turn),
+            source("noi.eio.world.stud-grid.count", "count", &studs),
+            source(
+                "noi.eio.world.camera-module.lens-ring-proud",
+                "length",
+                &proud,
+            ),
+            source("noi.eio.world.wave-platform.runway", "length", &cut),
+        ];
+        let files = export_tokens(&sources).unwrap();
+        assert!(
+            !files.css.contains("world"),
+            "no CSS for the 3D world's values"
+        );
+        let tree: Value = serde_json::from_str(&files.json).unwrap();
+        assert_eq!(tree["world"]["drone"]["ring-outer"], 0.2125);
+        assert_eq!(tree["world"]["wave-platform"]["run-3-turn"], -155);
+        assert_eq!(tree["world"]["stud-grid"]["count"], 4);
+        assert_eq!(tree["world"]["camera-module"]["lens-ring-proud"], 0.002);
+        assert_eq!(tree["world"]["wave-platform"]["runway"], 0);
+        assert!(files.ts.contains("\"count\": 4"));
+        for (subtype, field, wrong) in [
+            ("share", "share", json!({"m":0.84})),
+            ("angle", "deg", json!({"rad":0.26})),
+            ("count", "count", json!({"n":4})),
+        ] {
+            assert!(
+                export_tokens(&[source("noi.eio.world.x.y", subtype, &wrong)])
+                    .err()
+                    .is_some_and(|e| e.contains(&format!("has no {field} value"))),
+                "{subtype}"
+            );
+        }
     }
 
     #[test]

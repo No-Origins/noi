@@ -307,12 +307,23 @@ fn eio_world_kinds_take_the_worlds_numbers() {
             .check(&json!({ "m_per_s": v }))
             .unwrap_or_else(|e| panic!("{v} m/s: {e}"));
     }
-    // What the schemas refuse: nothing, less than nothing, finer than they hold, too much, or
-    // another kind's unit.
+    // The length rule's next version (23 Nov): to the millimetre, and 0 m for a part cut off. The
+    // new world's lengths finer than a centimetre, its two 0 m, and some of its longest.
+    for m in [
+        0.012, 0.125, 0.095, 0.002, 0.045, 0.028, 0.014, 0.004, 0.006, 0.0, 0.775, 210.0, 600.0,
+        3580.0,
+    ] {
+        length
+            .check(&json!({ "m": m }))
+            .unwrap_or_else(|e| panic!("{m} m: {e}"));
+    }
+    // What the schemas refuse: less than nothing, finer than they hold (half a millimetre, and the
+    // studs' height worked out from the grid), too much, or another kind's unit. A time and a speed
+    // of nothing are still refused.
     for bad in [
-        json!({"m": 0}),
         json!({"m": -1}),
-        json!({"m": 0.005}),
+        json!({"m": 0.0005}),
+        json!({"m": 0.0796875}),
         json!({"m": 20000}),
         json!({"px": 4}),
     ] {
@@ -332,6 +343,65 @@ fn eio_world_kinds_take_the_worlds_numbers() {
         json!({"m_per_s": 2000}),
     ] {
         assert!(speed.check(&bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn eio_world_shares_angles_and_counts_take_the_new_worlds_numbers() {
+    // Three more kinds (23 Nov, the user: "Add the kinds to Mero"): a share of another value, an
+    // angle in degrees, a count. Every number below is one the new world's elements use today.
+    let share = invariant("share-invariant.json");
+    let angle = invariant("angle-invariant.json");
+    let count = invariant("count-invariant.json");
+    // The studs' grid, the eye's margin, the drone's rings, join and fans, the stage's growth,
+    // glass and shine, the drone's spin in its three states, the stage's brightness when active.
+    for s in [
+        0.6, 0.2125, 1.15, 0.84, 0.71, 0.5, 0.1, 0.55, 0.4, 1.0, 0.0, 0.85, 1.4,
+    ] {
+        share
+            .check(&json!({ "share": s }))
+            .unwrap_or_else(|e| panic!("share {s}: {e}"));
+    }
+    // The eye's widest angle, the wave's slant, the camera's sight and sweep, the drone's lean, and
+    // the thirteen turns of the wave's line, down as well as up and more than half a turn.
+    for d in [
+        50.0, 15.0, 60.0, 12.0, 40.0, 55.0, 0.0, -155.0, 160.0, -150.0, -200.0, -55.0, -15.0,
+    ] {
+        angle
+            .check(&json!({ "deg": d }))
+            .unwrap_or_else(|e| panic!("{d} degrees: {e}"));
+    }
+    // Four studs, three lights a side, one decimal, twelve lights, 21 tiles across, 1,260 tiles.
+    for n in [4, 3, 1, 12, 21, 1260] {
+        count
+            .check(&json!({ "count": n }))
+            .unwrap_or_else(|e| panic!("{n}: {e}"));
+    }
+    // What the schemas refuse: less than nothing, finer than they hold, too much, or another unit.
+    for bad in [
+        json!({"share": -0.1}),
+        json!({"share": 0.00005}),
+        json!({"share": 12}),
+        json!({"m": 0.84}),
+    ] {
+        assert!(share.check(&bad).is_err(), "{bad}");
+    }
+    for bad in [
+        json!({"deg": 0.05}),
+        json!({"deg": 400}),
+        json!({"deg": -361}),
+        json!({"rad": 0.26}),
+    ] {
+        assert!(angle.check(&bad).is_err(), "{bad}");
+    }
+    for bad in [
+        json!({"count": 0}),
+        json!({"count": -4}),
+        json!({"count": 2.5}),
+        json!({"count": 20000}),
+        json!({"n": 4}),
+    ] {
+        assert!(count.check(&bad).is_err(), "{bad}");
     }
 }
 
@@ -400,6 +470,9 @@ fn eio_world_values_pass_their_invariants() {
         ("length", invariant("length-invariant.json")),
         ("time", invariant("time-invariant.json")),
         ("speed", invariant("speed-invariant.json")),
+        ("share", invariant("share-invariant.json")),
+        ("angle", invariant("angle-invariant.json")),
+        ("count", invariant("count-invariant.json")),
     ]
     .into_iter()
     .collect();
