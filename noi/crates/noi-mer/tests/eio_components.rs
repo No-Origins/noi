@@ -185,13 +185,15 @@ fn eio_components_pass_their_invariant() {
     // Drawn by Eidos, agreed 18 Nov), the Sidebar (its own batch, 18 Nov) and the Toggle (agreed 22
     // Nov), the box Checkbox and Radio share, where a link leads (Button's and Chip's, its own part
     // since each component got a folder, 18 Nov), and the package's own files; in @noi/eio-3d, the
-    // three characters and the stage (the first world's other elements were taken out on 23 Nov), the
-    // part that draws the characters and the package's own files.
+    // three characters and the new world's eight elements (the base tile, the astroid, the three
+    // platforms, the drone, the camera module and the stage, 23 Nov; the first world's elements were
+    // taken out the same day), the part that draws the characters, the part every element shares,
+    // and the package's own files.
     assert_eq!(n("@noi/eio-react", "components"), 20);
     assert_eq!(n("@noi/eio-react", "shared parts"), 2);
     assert_eq!(n("@noi/eio-react", "the package's own"), 1);
-    assert_eq!(n("@noi/eio-3d", "components"), 4);
-    assert_eq!(n("@noi/eio-3d", "shared parts"), 1);
+    assert_eq!(n("@noi/eio-3d", "components"), 11);
+    assert_eq!(n("@noi/eio-3d", "shared parts"), 2);
     assert_eq!(n("@noi/eio-3d", "the package's own"), 1);
 }
 

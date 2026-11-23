@@ -1,0 +1,105 @@
+{
+  "path": "noi.eio.components.world.drawing",
+  "name": "Shared 3D drawing",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The code every element of the new 3D world shares: what an element can be, held as data; its outline and the ground it covers; the one grid of studs; the strips bent into a Möbius loop or curled as a wave; the light; and three.js making an element from its data, with its surfaces, its states and its glow. Every number and colour it draws with is Eidos’s.",
+    "responsibility": "Hold what several Eidos components share, once. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "shared-part",
+    "job": "Draw every element of the 3D world the same way, from its data, with three.js.",
+    "states": {},
+    "reads": [
+      "noi.eio.color.action.primary",
+      "noi.eio.color.action.secondary",
+      "noi.eio.color.border.default",
+      "noi.eio.color.text.danger",
+      "noi.eio.color.text.success",
+      "noi.eio.color.text.warning",
+      "noi.eio.color.world.land",
+      "noi.eio.color.world.light",
+      "noi.eio.color.world.room",
+      "noi.eio.color.world.step-edge",
+      "noi.eio.color.world.wall",
+      "noi.eio.color.world.water",
+      "noi.eio.world.base-tile.breadth",
+      "noi.eio.world.base-tile.width",
+      "noi.eio.world.first-sight.margin",
+      "noi.eio.world.first-sight.widest-angle",
+      "noi.eio.world.light.sheen",
+      "noi.eio.world.light.shown-at-least",
+      "noi.eio.world.light.sky-share",
+      "noi.eio.world.light.under-share",
+      "noi.eio.world.room.blur",
+      "noi.eio.world.room.lamp-1-depth",
+      "noi.eio.world.room.lamp-1-strength",
+      "noi.eio.world.room.lamp-1-width",
+      "noi.eio.world.room.lamp-2-depth",
+      "noi.eio.world.room.lamp-2-strength",
+      "noi.eio.world.room.lamp-2-width",
+      "noi.eio.world.room.lamp-3-depth",
+      "noi.eio.world.room.lamp-3-strength",
+      "noi.eio.world.room.lamp-3-width",
+      "noi.eio.world.room.lamp-4-depth",
+      "noi.eio.world.room.lamp-4-strength",
+      "noi.eio.world.room.lamp-4-width",
+      "noi.eio.world.room.lamp-thickness",
+      "noi.eio.world.room.size",
+      "noi.eio.world.states.change",
+      "noi.eio.world.stud-grid.across",
+      "noi.eio.world.stud-grid.count",
+      "noi.eio.world.stud-grid.pitch",
+      "noi.eio.world.stud-grid.tall",
+      "noi.eio.world.surface.frost-edge",
+      "noi.eio.world.surface.frost-ior",
+      "noi.eio.world.surface.frost-thickness",
+      "noi.eio.world.surface.gloss-coat-roughness",
+      "noi.eio.world.surface.gloss-mirrors",
+      "noi.eio.world.surface.gloss-roughness"
+    ],
+    "uses": [],
+    "files": [
+      {
+        "path": "src/drawing/bend.ts",
+        "sha256": "d48b8bd02316bee7d299d58a27de6f8be3badcb7de4924ee61e161dfedf819c4"
+      },
+      {
+        "path": "src/drawing/eidos.ts",
+        "sha256": "12d4bfb275b1369299b7c438cc2c4d8c42de5b34ac453f55d3d3514d70266085"
+      },
+      {
+        "path": "src/drawing/element.ts",
+        "sha256": "c3d615b12a7af1418d17a115b2cf66643e7cd81ab2e7c12070695f75def35de2"
+      },
+      {
+        "path": "src/drawing/light.ts",
+        "sha256": "1be9e78537da1e762d5fcc0377b567700d97a501aee29753e218f734d0b9388e"
+      },
+      {
+        "path": "src/drawing/make.ts",
+        "sha256": "72291bd2c513255da08704054cd3ca24ccfdcbf684e567d1c7e811b2e9de05ba"
+      },
+      {
+        "path": "src/drawing/outline.ts",
+        "sha256": "c75a8c0e53c19b46e151f3be29134b673a66ec80052ae5b2b10810732aa5a9a7"
+      },
+      {
+        "path": "src/drawing/space.ts",
+        "sha256": "3350c4a3aeeea3a91f06b7f077e78375756bf7a8c81079a9ae32d24739a5239f"
+      },
+      {
+        "path": "src/drawing/studs.ts",
+        "sha256": "f0f15dc0ba9c3ed9d27d2df3f5a0b9a7a4c5649af8f31699dac11d6528454446"
+      },
+      {
+        "path": "src/drawing/wave.ts",
+        "sha256": "94f1748497e40b60638566658bea6b43ffa283e1e4ecb981791c9d5a5c9e1dc1"
+      }
+    ]
+  }
+}

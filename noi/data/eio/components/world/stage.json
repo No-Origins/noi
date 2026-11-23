@@ -5,26 +5,57 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The stage of the new 3D world: a glossy block in the base tile’s style, with a sheet of heavily frosted glass floating above it. For now only its two states are in Eidos; its drawing comes in with the new world’s elements, which change this meron.",
+    "definition": "A glossy block in the base tile’s style, its outline and its border, with a sheet of heavily frosted glass floating above it on four round posts. Active, it glows in one colour. Its width, its breadth and the height of its base can be chosen.",
     "responsibility": "Be the one stage every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
   "spec": {
     "package": "@noi/eio-3d",
     "part": "component",
-    "job": "Be a stage in the 3D world, standing dark or glowing.",
+    "job": "Be a stage in the 3D world, standing dark or glowing, in the size chosen.",
     "states": {
       "state": {
         "default": "standing dark, in the base tile’s style",
         "active": "glowing: its borders fully, its top and its sides half as brightly"
+      },
+      "setting": {
+        "width": "how far it runs along x: 10 m to 100 m, in steps of 10 m",
+        "breadth": "how far it runs along y: 10 m to 100 m, in steps of 10 m",
+        "height": "how tall its base is: 2, 4, 6, 8 or 10 m"
+      },
+      "colour": {
+        "light": "the one colour all its lit parts give off: lime to begin with"
       }
     },
-    "reads": [],
-    "uses": [],
+    "reads": [
+      "noi.eio.color.action.primary",
+      "noi.eio.color.world.wall",
+      "noi.eio.world.stage.active-border-bright",
+      "noi.eio.world.stage.active-glass-bright",
+      "noi.eio.world.stage.active-sides-bright",
+      "noi.eio.world.stage.active-top-bright",
+      "noi.eio.world.stage.base-height",
+      "noi.eio.world.stage.block-shine",
+      "noi.eio.world.stage.border-grows",
+      "noi.eio.world.stage.gap-grows",
+      "noi.eio.world.stage.glass-frost",
+      "noi.eio.world.stage.glass-gap",
+      "noi.eio.world.stage.glass-grows",
+      "noi.eio.world.stage.glass-hides",
+      "noi.eio.world.stage.glass-thickness",
+      "noi.eio.world.stage.post-width",
+      "noi.eio.world.stage.size-step",
+      "noi.eio.world.stage.tallest-base",
+      "noi.eio.world.stage.widest"
+    ],
+    "uses": [
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
     "files": [
       {
         "path": "src/stage/stage.ts",
-        "sha256": "7385f2977c6d64f41e034d4e5ec89b86c4beb050756ea5d93cb004ed3e6a7dd2"
+        "sha256": "7cdae720802da0a8c38d90d6a9a842048113deaf41ecaaa589bc0a33b1574d71"
       }
     ]
   }

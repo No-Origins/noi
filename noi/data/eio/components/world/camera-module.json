@@ -1,0 +1,72 @@
+{
+  "path": "noi.eio.components.world.camera-module",
+  "name": "Camera module",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "A square base with rounded corners, four sockets underneath for the drone’s studs and small lights on its sides, a round plate, a short neck, and a wide head that looks to the front with two lenses side by side, each with a thin lime ring. Matte black, its glass glossy black. One can look through it.",
+    "responsibility": "Be the one camera module every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "View the world from a drone; let one look through it.",
+    "states": {
+      "state": {
+        "resting": "its head still, looking to the front",
+        "viewing": "its head turning slowly from side to side, looking round"
+      }
+    },
+    "reads": [
+      "noi.eio.color.action.primary",
+      "noi.eio.color.world.land",
+      "noi.eio.world.camera-module.bar-height",
+      "noi.eio.world.camera-module.bar-proud",
+      "noi.eio.world.camera-module.bar-width",
+      "noi.eio.world.camera-module.base-corner",
+      "noi.eio.world.camera-module.base-height",
+      "noi.eio.world.camera-module.base-light-height",
+      "noi.eio.world.camera-module.base-light-proud",
+      "noi.eio.world.camera-module.base-light-up",
+      "noi.eio.world.camera-module.base-light-width",
+      "noi.eio.world.camera-module.base-lights-each",
+      "noi.eio.world.camera-module.eye-clearance",
+      "noi.eio.world.camera-module.face-height",
+      "noi.eio.world.camera-module.face-proud",
+      "noi.eio.world.camera-module.face-width",
+      "noi.eio.world.camera-module.glass-proud",
+      "noi.eio.world.camera-module.head-depth",
+      "noi.eio.world.camera-module.head-height",
+      "noi.eio.world.camera-module.head-width",
+      "noi.eio.world.camera-module.lens-apart",
+      "noi.eio.world.camera-module.lens-inner",
+      "noi.eio.world.camera-module.lens-outer",
+      "noi.eio.world.camera-module.lens-proud",
+      "noi.eio.world.camera-module.lens-ring-proud",
+      "noi.eio.world.camera-module.lens-ring-width",
+      "noi.eio.world.camera-module.neck-height",
+      "noi.eio.world.camera-module.neck-radius",
+      "noi.eio.world.camera-module.plate-height",
+      "noi.eio.world.camera-module.plate-radius",
+      "noi.eio.world.camera-module.sees",
+      "noi.eio.world.camera-module.strip-forward",
+      "noi.eio.world.camera-module.strip-height",
+      "noi.eio.world.camera-module.strip-length",
+      "noi.eio.world.camera-module.strip-width",
+      "noi.eio.world.camera-module.sweep",
+      "noi.eio.world.camera-module.sweep-every"
+    ],
+    "uses": [
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/camera-module/camera-module.ts",
+        "sha256": "0407d3e28431ab533f3850a3b72c47f80643b46a573447c4f9551effdf549ac8"
+      }
+    ]
+  }
+}

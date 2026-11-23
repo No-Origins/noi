@@ -69,7 +69,17 @@ export class CharacterPainter {
   /** Why nothing is drawn, when nothing can be. */
   why = ''
 
-  constructor(private gl: WebGL2RenderingContext, private canvas: HTMLCanvasElement, private changed: () => void) {}
+  private gl: WebGL2RenderingContext
+  private canvas: HTMLCanvasElement
+  private changed: () => void
+
+  // (Its three fields are set here by hand, not as parameter properties, so that Node can load the package for
+  // its tests: Node strips types and does nothing else.)
+  constructor(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, changed: () => void) {
+    this.gl = gl
+    this.canvas = canvas
+    this.changed = changed
+  }
 
   /** Loads the characters (once for the same files), stands them in a row facing the eye, `height` tall,
    * `apart` metres between them, in `motion`. */

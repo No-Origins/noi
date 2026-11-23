@@ -1,0 +1,96 @@
+{
+  "path": "noi.eio.components.world.wave-platform",
+  "name": "Base platform, wave and circular twist",
+  "classification": {
+    "type": "component"
+  },
+  "semantics": {
+    "definition": "The base platform laid as you drew it from the side: a wave that rises and falls, then a circular twist that comes out higher than it began, every tile square, tiles and astroids on both faces. The world’s land is laid along it. A trial: nothing is set on it yet.",
+    "responsibility": "Be the one wave strip every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
+  },
+  "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
+  "spec": {
+    "package": "@noi/eio-3d",
+    "part": "component",
+    "job": "Lay the base platform along the line you drew.",
+    "states": {
+      "measure": {
+        "width": "how wide: the base platform’s, 21 tiles",
+        "runway": "how long it runs flat before it rises: none",
+        "end": "how long it runs flat after its last curve: none",
+        "slant": "how far aslant it is laid, so the twist passes beside itself",
+        "ease": "over how many metres each change of curve is eased in",
+        "run-1-long": "how long run 1 is: the wave starts to rise",
+        "run-1-turn": "how far run 1 turns",
+        "run-2-long": "how long run 2 is: rising",
+        "run-2-turn": "how far run 2 turns",
+        "run-3-long": "how long run 3 is: over the top of the wave",
+        "run-3-turn": "how far run 3 turns",
+        "run-4-long": "how long run 4 is: down the wave, leaning back a little",
+        "run-4-turn": "how far run 4 turns",
+        "run-5-long": "how long run 5 is: round the bottom of the wave",
+        "run-5-turn": "how far run 5 turns",
+        "run-6-long": "how long run 6 is: rising toward the twist",
+        "run-6-turn": "how far run 6 turns",
+        "run-7-long": "how long run 7 is: over the top of the twist",
+        "run-7-turn": "how far run 7 turns",
+        "run-8-long": "how long run 8 is: down its far side",
+        "run-8-turn": "how far run 8 turns",
+        "run-9-long": "how long run 9 is: round its bottom",
+        "run-9-turn": "how far run 9 turns",
+        "run-10-long": "how long run 10 is: up its near side",
+        "run-10-turn": "how far run 10 turns",
+        "run-11-long": "how long run 11 is: curving out under its top",
+        "run-11-turn": "how far run 11 turns",
+        "run-12-long": "how long run 12 is: rising out past its far side",
+        "run-12-turn": "how far run 12 turns",
+        "run-13-long": "how long run 13 is: levelling off, higher than the start",
+        "run-13-turn": "how far run 13 turns"
+      }
+    },
+    "reads": [
+      "noi.eio.world.base-platform.width",
+      "noi.eio.world.wave-platform.ease",
+      "noi.eio.world.wave-platform.end",
+      "noi.eio.world.wave-platform.run-1-long",
+      "noi.eio.world.wave-platform.run-1-turn",
+      "noi.eio.world.wave-platform.run-10-long",
+      "noi.eio.world.wave-platform.run-10-turn",
+      "noi.eio.world.wave-platform.run-11-long",
+      "noi.eio.world.wave-platform.run-11-turn",
+      "noi.eio.world.wave-platform.run-12-long",
+      "noi.eio.world.wave-platform.run-12-turn",
+      "noi.eio.world.wave-platform.run-13-long",
+      "noi.eio.world.wave-platform.run-13-turn",
+      "noi.eio.world.wave-platform.run-2-long",
+      "noi.eio.world.wave-platform.run-2-turn",
+      "noi.eio.world.wave-platform.run-3-long",
+      "noi.eio.world.wave-platform.run-3-turn",
+      "noi.eio.world.wave-platform.run-4-long",
+      "noi.eio.world.wave-platform.run-4-turn",
+      "noi.eio.world.wave-platform.run-5-long",
+      "noi.eio.world.wave-platform.run-5-turn",
+      "noi.eio.world.wave-platform.run-6-long",
+      "noi.eio.world.wave-platform.run-6-turn",
+      "noi.eio.world.wave-platform.run-7-long",
+      "noi.eio.world.wave-platform.run-7-turn",
+      "noi.eio.world.wave-platform.run-8-long",
+      "noi.eio.world.wave-platform.run-8-turn",
+      "noi.eio.world.wave-platform.run-9-long",
+      "noi.eio.world.wave-platform.run-9-turn",
+      "noi.eio.world.wave-platform.runway",
+      "noi.eio.world.wave-platform.slant"
+    ],
+    "uses": [
+      "noi.eio.components.world.astroid",
+      "noi.eio.components.world.base-tile",
+      "noi.eio.components.world.drawing"
+    ],
+    "files": [
+      {
+        "path": "src/wave-platform/wave-platform.ts",
+        "sha256": "88342fcd5cccea5fec4d88bbf568bc0cba8b38cd86503b09118e3dd501179ab3"
+      }
+    ]
+  }
+}
