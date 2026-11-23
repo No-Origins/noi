@@ -7,6 +7,7 @@ import { ChangeForm } from './ChangeForm'
 import { cedarKind } from '../../lib/cedar'
 import { mayHere } from '../../lib/governance'
 import { ChildCards, KindView } from './views'
+import { ElementOnPage } from './ElementOnPage'
 import { Button } from '@noi/eio-react'
 import styles from './merons.module.css'
 
@@ -55,12 +56,16 @@ function MeronView({ s, idx, nodes, m, writable }: { s: Snapshot; idx: Index; no
         <p className="eio-type-style-body">{m.semantics.definition}</p>
         {m.semantics.responsibility && <p className={cx(styles.muted, 'eio-type-style-body')}>{m.semantics.responsibility}</p>}
       </div>
+      {m.classification.type === 'component' && m.identity.path.startsWith(WORLD) && <ElementOnPage id={m.identity.path.slice(WORLD.length)} />}
       <KindView s={s} idx={idx} nodes={nodes} m={m} />
       <Connections s={s} idx={idx} m={m} />
       <Record idx={idx} m={m} />
     </article>
   )
 }
+
+/** Where the 3D world's components are in Mero: an element's page shows it in 3D (ElementOnPage). */
+const WORLD = 'noi.eio.components.world.'
 
 function ChangeView({ m }: { m: Meron }) {
   return (

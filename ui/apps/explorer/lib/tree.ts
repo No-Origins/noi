@@ -28,6 +28,9 @@ const GROUPS: Record<string, string> = {
   inset: 'Insets', margin: 'Margins', size: 'Sizes', control: 'Controls', icon: 'Icons', target: 'Targets', width: 'Widths',
   layout: 'Layout', window: 'Windows', radius: 'Corners', inv: 'Invariants', motion: 'Motion', duration: 'Durations', easing: 'Curves',
   world: '3D world', ripples: 'Lime ripples',
+  // the new world's groups of values (23 Nov 2026), where a name has more than one word
+  'stud-grid': 'Stud grid', 'first-sight': 'First sight', 'base-tile': 'Base tile', 'base-platform': 'Base platform',
+  'mobius-platform': 'Möbius strip', 'wave-platform': 'Wave strip', 'camera-module': 'Camera module',
 }
 const groupName = (path: string) => {
   const seg = path.split('.').pop()!

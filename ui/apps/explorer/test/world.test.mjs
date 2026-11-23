@@ -921,3 +921,14 @@ test('the user laid stages in the world: three 6 m tall a tile apart, two in fro
   assert.deepEqual([Math.min(...stages.map(({ t, e }) => t.at.y - e.size.y / 2)), Math.max(...stages.map(({ t, e }) => t.at.y + e.size.y / 2))], [10, 30])
   assert.throws(() => changed(s, { what: 'lay', element: 'drone', at: 'x 0, y 50', size: { z: 8 } }), /cannot be chosen/)
 })
+
+// AN ELEMENT ON ITS PAGE IN MERO (23 Nov 2026). Till the first world left Eidos its elements were drawn on their
+// components' pages; the new world's are again, with the gallery's own 3D view.
+test('a world element\'s component page in Mero shows the element in 3D, with the gallery\'s view', () => {
+  const merons = fileURLToPath(new URL('../app/merons/', import.meta.url))
+  const page = code(readFileSync(merons + 'MeronScreen.tsx', 'utf8'))
+  assert.match(page, /m\.classification\.type === 'component' && m\.identity\.path\.startsWith\(WORLD\) && <ElementOnPage id=\{m\.identity\.path\.slice\(WORLD\.length\)\} \/>/, 'on a 3D world component\'s page, by the last part of its path')
+  const shown = code(readFileSync(merons + 'ElementOnPage.tsx', 'utf8'))
+  assert.match(shown, /const element = elementById\(id\)/, 'the element is Eidos\'s, by its id')
+  assert.match(shown, /<ElementView element=\{element\} \/>/, 'shown by the gallery\'s own 3D view')
+})
