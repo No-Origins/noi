@@ -25,7 +25,9 @@ mod checks;
 pub mod github;
 pub mod reference;
 mod review;
-pub use review::{Batch, Change, Landed, NewBatch, Proposal, ProposalEvent, ProposalState};
+pub use review::{
+    retire_moved, Batch, Change, Landed, NewBatch, Proposal, ProposalEvent, ProposalState,
+};
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
@@ -375,41 +377,66 @@ impl Registry {
             releases,
         })
     }
-    /// The roles and rules under noi.gov, and nothing else: what Governance copies in order to
-    /// decide. The one read Mero answers without asking Governance, which needs it to answer at
-    /// all; roles and rules hold no secrets (rule 8).
-    /// How current the roles and rules under noi.gov are (9 Nov, step 7), as Governance's copy of
-    /// them is measured: sent with each question, so Governance never decides on a stale copy.
-    pub async fn rules_version(&self) -> Result<String> {
-        let snapshot = self.roles_and_rules().await?;
-        Ok(noi_gov::rules_version(snapshot.merons.iter().map(|m| {
-            (
-                m.identity.path.as_str(),
-                m.revision,
-                m.lifecycle.state.as_str(),
-            )
-        })))
-    }
-    pub async fn roles_and_rules(&self) -> Result<Snapshot> {
-        let mut conn = self.pool.acquire().await?;
-        let rows = sqlx::query_as::<_, MeronRow>(
-            "SELECT * FROM mer.merons WHERE kind = 'rule' AND path LIKE 'noi.gov.%' ORDER BY path",
-        )
-        .fetch_all(&mut *conn)
-        .await?;
-        let merons = rows
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<_>>()?;
-        let generated_at = sqlx::query_scalar("SELECT now()")
-            .fetch_one(&mut *conn)
-            .await?;
-        Ok(Snapshot {
-            schema_version: "inv-registry/0.1.0".into(),
-            generated_at,
-            merons,
-            relationships: vec![],
-            releases: vec![],
+    /// Every role and rule meron under noi.gov, with every revision from Mero's own history: what
+    /// moves to Governance, once (step 3, agreed 9 Nov: "Where Roles and Rules Live", decision 5).
+    /// Read as `actor`, which only the operator's terminal may do; retired ones move too, as history.
+    pub async fn roles_and_rules_to_move(
+        &self,
+        actor: &Actor,
+    ) -> Result<noi_gov::moving::MoveFile> {
+        use noi_gov::moving::{MoveFile, Moving, MovingRevision};
+        let snapshot = self.snapshot_under(actor, Some("noi.gov")).await?;
+        let mut moving = vec![];
+        for m in snapshot.merons.iter().filter(|m| {
+            m.classification.kind == MeronType::Rule
+                && matches!(m.classification.subtype.as_deref(), Some("role" | "policy"))
+        }) {
+            let mut revisions = vec![];
+            for e in self.history(actor, m.identity.uid).await? {
+                let Some(after) = e
+                    .payload
+                    .get("after")
+                    .filter(|_| e.meron_uid == m.identity.uid)
+                else {
+                    continue;
+                };
+                let after: Meron = serde_json::from_value(after.clone())?;
+                let why = e.payload["compatibility"]["rationale"]
+                    .as_str()
+                    .or(e.payload["reason"].as_str())
+                    .map(String::from);
+                revisions.push(MovingRevision {
+                    revision: after.revision,
+                    path: after.identity.path,
+                    name: after.identity.name,
+                    definition: after.semantics.definition,
+                    responsibility: after.semantics.responsibility,
+                    spec: after.spec,
+                    state: after.lifecycle.state.as_str().into(),
+                    at: e.occurred_at,
+                    by: e.actor,
+                    action: e.action,
+                    reference: e.authorization["reference"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .into(),
+                    why,
+                });
+            }
+            revisions.sort_by_key(|r| r.revision);
+            moving.push(Moving {
+                uid: m.identity.uid.to_string(),
+                path: m.identity.path.clone(),
+                subtype: m.classification.subtype.clone().unwrap_or_default(),
+                state: m.lifecycle.state.as_str().into(),
+                revision: m.revision,
+                revisions,
+            });
+        }
+        Ok(MoveFile {
+            moved_from: "mero".into(),
+            written_at: Utc::now(),
+            roles_and_rules: moving,
         })
     }
     pub async fn history(&self, actor: &Actor, uid: Uuid) -> Result<Vec<Event>> {
@@ -789,8 +816,19 @@ impl Registry {
                 .await?
                 .ok_or(Error::NotFound)?
                 .try_into()?;
-        let s = load(tx.as_mut(), r.source).await?;
-        let t = load(tx.as_mut(), r.target).await?;
+        self.unrelate_in(tx.as_mut(), actor, r).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+    /// Removes one link, inside the caller's transaction, asking about both of its ends.
+    pub(crate) async fn unrelate_in(
+        &self,
+        conn: &mut PgConnection,
+        actor: &Actor,
+        r: Relationship,
+    ) -> Result<()> {
+        let s = load(&mut *conn, r.source).await?;
+        let t = load(&mut *conn, r.target).await?;
         let decision = self
             .authorize(
                 actor,
@@ -800,11 +838,11 @@ impl Registry {
             )
             .await?;
         sqlx::query("DELETE FROM mer.relationships WHERE uid=$1")
-            .bind(uid)
-            .execute(tx.as_mut())
+            .bind(r.uid)
+            .execute(&mut *conn)
             .await?;
         event(
-            tx.as_mut(),
+            conn,
             r.source,
             "relationship.remove",
             actor,
@@ -812,7 +850,6 @@ impl Registry {
             json!({"relationship":r}),
         )
         .await?;
-        tx.commit().await?;
         Ok(())
     }
     pub async fn plan_release(

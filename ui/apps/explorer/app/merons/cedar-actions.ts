@@ -1,5 +1,6 @@
 'use server'
-// The editor asks Mero for the Cedar its form says, on the Explorer's server with your sign-in.
+// The editor asks Governance for the Cedar its form says, on the Explorer's server with your sign-in
+// (Mero did until roles and rules moved into Governance, step 3).
 import { writeCedar } from '../../lib/cedar'
 import type { RoleForm, RuleForm } from '../../lib/sentence'
 

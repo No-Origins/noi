@@ -24,7 +24,10 @@ function some(names: string[], n = 3) {
   return `${names.slice(0, n).join(', ')} and ${names.length - n} more`
 }
 
-/** One change as a sentence. `roles` names roles by their ID, from Mero. */
+/** The role or rule a change was about: from its details on the home, its places in the record. */
+const placeOf = (c: Change) => (c.detail?.path as string | undefined) ?? (c as Partial<RecordEntry>).places?.[0] ?? ''
+
+/** One change as a sentence. `roles` names roles by their ID, from Governance. */
 export function changeWords(c: Change, roles: Record<string, string> = {}): string {
   const by = c.by ?? 'Someone'
   const whom = c.whom ?? c.detail?.handle ?? 'an account'
@@ -48,6 +51,15 @@ export function changeWords(c: Change, roles: Record<string, string> = {}): stri
       return c.changed?.length
         ? `${capital(some(c.changed.map(r => revisionWords(r, roles))))} changed in Mero.`
         : 'Roles and rules came from Mero.'
+    // Roles and rules kept by Governance (step 3).
+    case 'approve': {
+      const state = c.detail?.state === 'retired' ? ', retiring it' : c.detail?.state === 'deprecated' ? ', setting it aside' : ''
+      return `${by} approved ${revisionWords(`${placeOf(c)}@${c.detail?.revision ?? ''}`, roles)}${state}.`
+    }
+    case 'move':
+      return `Roles and rules moved in from Mero, with every revision: ${c.detail?.roles ?? 'some'} roles and ${c.detail?.rules ?? 'some'} rules.`
+    case 'recover':
+      return `The recovery command on Governance’s server put changing roles and rules back within ${c.detail?.handle ?? 'someone'}’s reach.`
     default:
       return `${by}: ${c.kind}.`
   }
@@ -126,6 +138,16 @@ export function recordWords(e: RecordEntry, roles: Record<string, string> = {}):
     case 'copy':
       if (!e.allowed) return said('A copy of Mero’s roles and rules was refused.')
       return said(e.changed?.length ? changeWords(e, roles) : 'Mero’s roles and rules were copied; nothing changed.')
+    case 'propose':
+      return said(`${who} proposed a change to ${revisionWords(placeOf(e), roles)}.`)
+    case 'send-back':
+      return said(`${who} sent back a change to ${revisionWords(placeOf(e), roles)}.`)
+    case 'reject':
+      return said(`${who} rejected a change to ${revisionWords(placeOf(e), roles)}.`)
+    case 'approve':
+      return e.allowed ? said(changeWords(e, roles)) : said(`${who} could not approve a change to ${revisionWords(placeOf(e), roles)}.`)
+    case 'recover':
+      return e.allowed ? said(changeWords(e, roles)) : said('The recovery command could not put changing roles and rules back within reach; nothing was kept.')
     default:
       return said(changeWords(e, roles))
   }
