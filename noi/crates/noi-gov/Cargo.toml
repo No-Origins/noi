@@ -11,7 +11,7 @@ client = ["dep:reqwest", "dep:sha2"]
 # record. Mero uses only the boundary types, the Cedar checks and the client, so it builds without this.
 server = [
     "client", "dep:noi-log", "dep:tracing", "dep:axum", "dep:tokio", "dep:sqlx", "dep:webauthn-rs", "dep:jsonwebtoken", "dep:rand",
-    "dep:sha2", "dep:base64", "dep:clap", "dep:url", "dep:chrono", "dep:ed25519-dalek", "dep:thiserror",
+    "dep:sha2", "dep:base64", "dep:clap", "dep:url", "dep:ed25519-dalek", "dep:thiserror",
 ]
 
 [dependencies]
@@ -33,7 +33,8 @@ base64 = { version = "0.22", optional = true }
 clap = { version = "4", features = ["derive", "env"], optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 url = { version = "2", optional = true }
-chrono = { workspace = true, optional = true }
+# The move file from Mero carries when each revision was made (step 3).
+chrono = { workspace = true }
 thiserror = { workspace = true, optional = true }
 
 [dev-dependencies]

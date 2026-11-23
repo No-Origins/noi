@@ -294,3 +294,98 @@ export async function recordPage(q: RecordQuery): Promise<Answer<{ entries: Reco
 export const endGrantWith = (touch: string, grant: string) => post<{ ok: true }>('/api/grants/end', { touch, grant })
 /** Ends every sign-in of someone's, and an agent's runs, with a fresh touch for end-session (owners). */
 export const endSessionsWith = (touch: string, handle: string) => post<{ ended: number }>('/api/sessions/end', { touch, handle })
+
+// ——— Roles and rules, kept by Governance (step 3, agreed 9 Nov: "Where Roles and Rules Live") ———
+
+/** One version of a role or rule, as Governance keeps it: every version is kept. */
+export interface Version {
+  seq: number; path: string; revision: number; kind: 'role' | 'rule'
+  name: string; definition: string; responsibility: string
+  system: string | null; cedar: string
+  state: 'proposed' | 'registered' | 'active' | 'deprecated' | 'retired'
+  at: string
+  /** Approved in Governance, moved from Mero with its history, written at setup, or by the recovery command. */
+  came: 'approved' | 'moved' | 'setup' | 'recovery'
+  approved_by: string | null; why: string | null; proposal: string | null
+  /** For a version moved from Mero: Mero's ID, the path then, who and what. */
+  mero: { uid: string; path: string; by: string; action: string; reference: string } | null
+  /** A role's verbs. */
+  verbs?: string[]
+}
+/** Every role and rule in force, and how current they are (the newest version's number). */
+export interface RolesAndRules { roles: Version[]; rules: Version[]; version: number | null }
+
+/** Every role and rule in force, for whoever may read them: signed in, or a visitor where visitors
+    hold reading. Read once per request. */
+export const rolesAndRules = cache(async (): Promise<Answer<RolesAndRules>> => {
+  const r = await call<RolesAndRules>('/api/roles-and-rules', (await yours()) ?? {})
+  return r.ok ? { ok: true, data: r.data } : r
+})
+
+/** The roles in force, by the name rules use (`owner`) and their own (`Owner`), and whether each is
+    active or set aside (set aside: no new grants). Empty when Governance won't say. */
+export async function roleNames(): Promise<{ id: string; name: string; state: Version['state'] }[]> {
+  const r = await rolesAndRules()
+  return r.ok ? r.data.roles.map(v => ({ id: v.path.slice('noi.gov.roles.'.length), name: v.name, state: v.state })) : []
+}
+
+/** Every version of one role or rule, newest first. */
+export async function versionsOf(path: string): Promise<Answer<Version[]>> {
+  const r = await call<{ versions: Version[] }>(`/api/roles-and-rules/versions?path=${encodeURIComponent(path)}`, (await yours()) ?? {})
+  return r.ok ? { ok: true, data: r.data.versions } : r
+}
+
+/** What a proposal does to a role or rule. */
+export type Operation = 'add' | 'change' | 'set-aside' | 'bring-back' | 'retire'
+/** A change to roles and rules, waiting in Governance or decided there (decision 2). */
+export interface GovProposal {
+  id: string; path: string; kind: 'role' | 'rule'; operation: Operation; base_revision: number | null
+  name: string; definition: string; responsibility: string; system: string | null; cedar: string
+  by_hand: boolean; why: string
+  proposed_by: string; proposed_at: string
+  state: 'waiting' | 'approved' | 'sent-back' | 'rejected'
+  decided_by: string | null; decided_at: string | null; note: string | null
+  /** The version it changes, as it is now. */
+  before: Version | null
+  /** The role or rule changed since: it can only be sent back or rejected. */
+  stale: boolean
+}
+
+/** Governance's proposals, newest first, for Review (decision 3): every one, or only what waits.
+    Signed out, Review is closed, so nothing is asked. */
+export async function govProposals(all = true): Promise<Answer<GovProposal[]>> {
+  if (!(await yours())) return { ok: false, error: SIGNED_OUT }
+  const r = await get<{ proposals: GovProposal[] }>(`/api/proposals${all ? '?all=true' : ''}`)
+  return r.ok ? { ok: true, data: r.data.proposals } : r
+}
+/** How many proposals wait in Governance, for Review's badge. Undefined when Governance won't say. */
+export async function govWaiting(): Promise<number | undefined> {
+  const r = await govProposals(false)
+  return r.ok ? r.data.length : undefined
+}
+export const govProposal = (id: string) => get<GovProposal>(`/api/proposals/${encodeURIComponent(id)}`)
+
+/** What a proposer sends: a new role or rule, or a change, says all of what it will say. */
+export interface Draft {
+  operation: Operation; path: string; base_revision?: number
+  name?: string; definition?: string; responsibility?: string; system?: string; cedar?: string
+  why: string
+}
+/** Proposes a change to roles and rules, with a touch when its Cedar is written by hand. */
+export const proposeToGovernance = (proposal: Draft, touch?: string) =>
+  post<GovProposal>('/api/proposals', touch ? { proposal, touch } : { proposal })
+
+/** How a proposal is decided, as in Mero's Review. */
+export type GovDecision = 'approve' | 'send-back' | 'reject'
+/** What a touch to decide a proposal names beyond its place: the decision and the proposal. */
+export const decideAbout = (decision: GovDecision, proposal: string) => ({ decision, proposals: [proposal] })
+/** Approves, sends back or rejects a proposal, with the touch made for exactly that. */
+export const decideInGovernance = (proposal: string, decision: GovDecision, note: string, touch: string) =>
+  post<{ proposal: string; decision: GovDecision; revision?: number; state?: string; ended_grants?: number }>(
+    '/api/proposals/decide', { proposal, decision, note, touch })
+
+/** Reads roles' and rules' Cedar into the form, and every system's verbs (signed in only). */
+export const cedarRead = (items: unknown[]) =>
+  post<{ readings: import('./sentence').Reading<import('./sentence').AnyReadingForm>[]; verbs: Record<string, string[]> }>('/api/cedar/read', { items })
+/** The Cedar a form says, checked as Governance checks it when it is proposed. */
+export const cedarWrite = (kind: 'rule' | 'role', form: unknown) => post<{ cedar: string }>('/api/cedar/write', { kind, form })

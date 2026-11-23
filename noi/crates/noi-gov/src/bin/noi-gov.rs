@@ -32,9 +32,6 @@ struct Cli {
     /// Default: http://gov.<domain>:3000/.
     #[arg(long, env = "NOI_GOV_PAGES")]
     pages: Option<Url>,
-    /// Mero's read API, for copying the approved roles and rules.
-    #[arg(long, env = "NOI_MERO_URL", default_value = "http://127.0.0.1:8787")]
-    mero: Url,
     /// Where email goes, such as smtp://127.0.0.1:55325, the mail catcher on this Mac (agreed
     /// 8 Nov). Without it, signing up and lost-passkey links are refused.
     #[arg(long, env = "NOI_GOV_MAIL")]
@@ -50,14 +47,14 @@ struct Cli {
 enum Command {
     /// Applies Governance's migrations (administrative).
     Migrate,
-    /// Runs Governance's server on loopback. Copies the roles and rules from Mero as it starts.
+    /// Runs Governance's server on loopback.
     Serve {
         #[arg(long, default_value = "127.0.0.1:8788")]
         bind: SocketAddr,
     },
-    /// Copies the roles and rules approved in Mero under noi.gov.
-    Copy,
-    /// Makes the first owner, once, while no owner exists, and prints the link for their first passkey.
+    /// Makes the first owner, once, while no owner exists, and prints the link for their first
+    /// passkey. A Governance that holds no roles and rules is given the first ones (Maintainer,
+    /// Owner and their two rules) first.
     Setup {
         #[arg(long)]
         handle: String,
@@ -80,6 +77,16 @@ enum Command {
     Voucher {
         #[command(subcommand)]
         command: VoucherCommand,
+    },
+    /// The move (step 3): takes in the roles and rules Mero held, with every revision, from the file
+    /// `noi export gov` writes. Once: run again with the same file, it changes nothing.
+    MoveIn { file: PathBuf },
+    /// For the worst case: no one can change roles and rules. Brings them back within reach of this
+    /// person, one step at a time, each written in the record. Does nothing when someone can
+    /// already change them.
+    Recover {
+        #[arg(long)]
+        handle: String,
     },
     /// Signs a vouch for one agent's run with a platform's key, as Hyperbase will (until it exists).
     Vouch {
@@ -164,7 +171,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 None => Url::parse(&format!("http://gov.{}:3000/", cli.domain))?,
             },
             domain: cli.domain.clone(),
-            mero: Some(cli.mero.clone()),
             mail: Mailer::from_setting(
                 cli.mail.as_ref(),
                 &cli.mail_from
@@ -179,10 +185,20 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             gov.migrate().await?;
             println!("{{\"migrations\": \"applied\"}}");
         }
-        Command::Copy => println!(
-            "{}",
-            serde_json::to_string_pretty(&gov.copy_from_mero().await?)?
-        ),
+        Command::MoveIn { file } => {
+            let moving: noi_gov::moving::MoveFile = serde_json::from_slice(&std::fs::read(&file)?)
+                .map_err(|e| format!("{}: not a move file from Mero: {e}", file.display()))?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&gov.move_in(&moving).await?)?
+            );
+        }
+        Command::Recover { handle } => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&gov.recover(&handle).await?)?
+            );
+        }
         Command::Setup {
             handle,
             name,
@@ -228,9 +244,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("Governance binds to loopback on this Mac".into());
             }
             noi_log::init();
-            match gov.copy_from_mero().await {
-                Ok(c) => tracing::info!("copied {} roles and {} rules from Mero", c.roles, c.rules),
-                Err(e) => tracing::warn!("{e}"),
+            if !gov.readiness().await.1 {
+                tracing::warn!("Governance holds no roles and rules yet: it refuses everything until setup, or the move, gives it some");
             }
             let listener = tokio::net::TcpListener::bind(bind).await?;
             tracing::info!(
@@ -310,7 +325,7 @@ mod tests {
     #[test]
     fn the_domain_is_one_of_the_two_names() {
         let domain = |args: &[&str]| {
-            Cli::try_parse_from([&["noi gov"], args, &["copy"]].concat()).map(|c| c.domain)
+            Cli::try_parse_from([&["noi gov"], args, &["migrate"]].concat()).map(|c| c.domain)
         };
         if std::env::var_os("NOI_DOMAIN").is_none() {
             assert_eq!(

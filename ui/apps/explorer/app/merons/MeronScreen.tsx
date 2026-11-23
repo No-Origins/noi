@@ -4,19 +4,17 @@ import { hrefOf, index, kindLabel, snapshot, type Index, type Meron, type Snapsh
 import { tree, type TreeNode } from '../../lib/tree'
 import { Connections, cx, Header, Record } from './parts'
 import { ChangeForm } from './ChangeForm'
-import { NewRoleForm } from './NewRoleForm'
-import { CedarEditor } from './CedarEditor'
-import { cedarKind, readCedar, rolesIn } from '../../lib/cedar'
-import { accountNames, mayHere, myRoles } from '../../lib/governance'
+import { cedarKind } from '../../lib/cedar'
+import { mayHere } from '../../lib/governance'
 import { ChildCards, KindView } from './views'
 import { Stage3D } from '@noi/eio-3d'
 import { Button } from '@noi/eio-react'
 import { worldScene } from '../../lib/world'
 import styles from './merons.module.css'
 
-/** `path` is a meron or group path; without one, the root. `change` opens the Change form; `fresh`,
- * on the Roles group, the New role form. */
-export async function MeronScreen({ path, change, fresh }: { path?: string; change?: boolean; fresh?: boolean }) {
+/** `path` is a meron or group path; without one, the root. `change` opens the Change form. Roles and
+ * rules are proposed on Governance's pages since step 3, not here. */
+export async function MeronScreen({ path, change }: { path?: string; change?: boolean }) {
   const s = await snapshot()
   const idx = index(s)
   const nodes = tree(s, idx)
@@ -24,27 +22,21 @@ export async function MeronScreen({ path, change, fresh }: { path?: string; chan
   if (!node) notFound()
   const parent = node.parent ? nodes.find(n => n.path === node.parent) : undefined
   const m = idx.byPath.get(node.path)
-  // Change and New role only where Governance would let you propose (9 Nov, step 6): one question,
-  // as if you touched, unrecorded. Governance decides again when you send.
-  const place = m ? m.identity.path : node.path === ROLES ? ROLES : undefined
-  const [writable = false] = place ? await mayHere([{ action: 'propose', targets: [{ path: place }] }]) : []
-  if (!m && node.path === ROLES && writable && fresh) return <NewRoleView nodes={nodes} />
-  if (!m) return <GroupView idx={idx} nodes={nodes} node={node} parent={parent} writable={writable} />
+  // Change only where Governance would let you propose (9 Nov, step 6): one question, as if you
+  // touched, unrecorded. Governance decides again when you send. A role or rule meron is Mero's
+  // record from before roles and rules moved into Governance (step 3): it is changed there.
+  const changeable = m && m.lifecycle.state === 'active' && !cedarKind(m)
+  const [writable = false] = changeable ? await mayHere([{ action: 'propose', targets: [{ path: m.identity.path }] }]) : []
+  if (!m) return <GroupView idx={idx} nodes={nodes} node={node} parent={parent} />
   return writable && change
-    ? <ChangeView nodes={nodes} s={s} m={m} />
+    ? <ChangeView m={m} />
     : <MeronView s={s} idx={idx} nodes={nodes} m={m} writable={writable} />
 }
 
-const ROLES = 'noi.gov.roles'
-
-function GroupView({ idx, nodes, node, parent, writable }: { idx: Index; nodes: TreeNode[]; node: TreeNode; parent?: TreeNode; writable: boolean }) {
-  // The Roles group is where a new role starts.
-  const add = node.path === ROLES && writable
-    ? <Button href={`${hrefOf(ROLES)}?new`} icon="plus">New role</Button>
-    : undefined
+function GroupView({ idx, nodes, node, parent }: { idx: Index; nodes: TreeNode[]; node: TreeNode; parent?: TreeNode }) {
   return (
     <article className={styles.view}>
-      <Header eyebrow="Group" title={node.name} path={node.path} action={add} />
+      <Header eyebrow="Group" title={node.name} path={node.path} />
       <p className={cx(styles.lead, 'eio-type-style-body')}>
         {node.count} merons{parent ? ` in ${parent.name}` : ''}. A group is a part of the path, not a meron of its own.
       </p>
@@ -56,7 +48,7 @@ function GroupView({ idx, nodes, node, parent, writable }: { idx: Index; nodes: 
 
 function MeronView({ s, idx, nodes, m, writable }: { s: Snapshot; idx: Index; nodes: TreeNode[]; m: Meron; writable: boolean }) {
   // Change opens the form; what you send goes to Review, like an agent's proposal.
-  const change = writable && m.lifecycle.state === 'active'
+  const change = writable
     ? <Button href={`${hrefOf(m.identity.path)}?change`} icon="pen">Change</Button>
     : undefined
   return (
@@ -81,52 +73,7 @@ function WorldModel({ idx, path }: { idx: Index; path: string }) {
   return model ? <Stage3D scene={model.scene} label={model.label} /> : null
 }
 
-/** The role and rule editor for this meron, or nothing when it isn't one or Mero can't read it
- * (then the Change form keeps its JSON box). */
-async function editorFor(s: Snapshot, nodes: TreeNode[], m: Meron) {
-  const kind = cedarKind(m)
-  if (!kind) return undefined
-  const [read, mine] = await Promise.all([readCedar([m]), myRoles()])
-  if (!read) return undefined
-  const reading = read.readings[0]
-  const owner = mine.some(r => r.role === 'owner')
-  const accounts = owner ? await accountNames() : {}
-  const { cedar, ...rest } = m.spec
-  return (
-    <CedarEditor
-      kind={kind}
-      form={'form' in reading ? reading.form : undefined}
-      byHand={'by_hand' in reading ? reading.by_hand : undefined}
-      cedar={cedar}
-      rest={rest}
-      verbs={read.verbs}
-      roles={rolesIn(s)}
-      accounts={Object.entries(accounts).map(([id, handle]) => ({ id, handle }))}
-      places={nodes.map(n => n.path)}
-      owner={owner}
-    />
-  )
-}
-
-/** A new role, with the role editor: one system, its verbs. */
-async function NewRoleView({ nodes }: { nodes: TreeNode[] }) {
-  const [read, mine] = await Promise.all([readCedar([]), myRoles()])
-  const form = { system: 'mero', pick: 'these' as const, verbs: ['read', 'propose'] }
-  return (
-    <article className={styles.view}>
-      <Header eyebrow="New · Rule · role" title="New role" path={`${ROLES}.…`} />
-      <NewRoleForm
-        back={hrefOf(ROLES)}
-        editor={read && (
-          <CedarEditor kind="role" form={form} cedar="" rest={{}} verbs={read.verbs} roles={[]} accounts={[]} places={nodes.map(n => n.path)} owner={mine.some(r => r.role === 'owner')} fresh pickSystem />
-        )}
-      />
-    </article>
-  )
-}
-
-async function ChangeView({ s, nodes, m }: { s: Snapshot; nodes: TreeNode[]; m: Meron }) {
-  const spec = await editorFor(s, nodes, m)
+function ChangeView({ m }: { m: Meron }) {
   return (
     <article className={styles.view}>
       <Header eyebrow={`Change · ${kindLabel(m)}`} title={m.identity.name} path={m.identity.path} m={m} />
@@ -140,7 +87,6 @@ async function ChangeView({ s, nodes, m }: { s: Snapshot; nodes: TreeNode[]; m: 
           responsibility: m.semantics.responsibility,
           spec: JSON.stringify(m.spec, null, 2),
         }}
-        spec={spec}
       />
     </article>
   )

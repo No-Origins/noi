@@ -12,14 +12,15 @@ import { tree, type TreeNode } from '../../lib/tree'
 import { CheckList, cx, Section } from '../merons/parts'
 import { KindView } from '../merons/views'
 import { Sentence } from '../merons/Sentence'
-import { cedarKind, readCedar, rolesIn } from '../../lib/cedar'
+import { cedarKind, meronText, readCedar, type CedarText } from '../../lib/cedar'
+import { roleNames } from '../../lib/governance'
 import { roleSentence, ruleSentence, type RoleForm, type RuleForm } from '../../lib/sentence'
 import { ApproveAll, Decide } from './Decide'
 import { ListDiff } from './ListDiff'
 import { asList, listChange, listChanged, type ListChange } from '../../lib/lists'
 import styles from './review.module.css'
 
-const OPERATION = { add: 'New', update: 'Change', rename: 'Rename', deprecate: 'Deprecate', reinstate: 'Reinstate' } as const
+const OPERATION = { add: 'New', update: 'Change', rename: 'Rename', deprecate: 'Deprecate', reinstate: 'Reinstate', retire: 'Retire' } as const
 const STATE = { waiting: 'Waiting', 'sent-back': 'Sent back', landing: 'Approved, waiting to land', approved: 'Approved', rejected: 'Rejected' } as const
 const ACTION: Record<string, string> = {
   'proposal.submit': 'proposed this batch',
@@ -164,6 +165,7 @@ function Changes({ p, before, s }: { p: Proposal; before?: Meron; s: Snapshot })
   const c = p.change
   if (c.operation === 'deprecate') return <p className="eio-type-style-body">Becomes deprecated: it stays readable, but nothing new should use it.</p>
   if (c.operation === 'reinstate') return <p className="eio-type-style-body">Comes back from deprecated to active, because: {c.reason}</p>
+  if (c.operation === 'retire') return <p className="eio-type-style-body">Retires, for good: it stays on record but can never change again. The note it carries: {c.reason}</p>
   if (c.operation === 'rename') return <Diff rows={[['Path', before?.identity.path ?? '', c.path]]} />
   if (c.operation === 'add') return null
   const show = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2))
@@ -173,7 +175,7 @@ function Changes({ p, before, s }: { p: Proposal; before?: Meron; s: Snapshot })
   // A role's or rule's Cedar reads as a sentence, before and after (agreed 8 Nov).
   const kind = before ? cedarKind(before) : undefined
   const words = kind && before && before.spec?.cedar !== c.meron.spec?.cedar
-    ? <WordsDiff kind={kind} before={before} after={c.meron} s={s} cedar={['spec.cedar', show(before.spec?.cedar), show(c.meron.spec?.cedar) ?? '—']} />
+    ? <WordsDiff kind={kind} before={meronText(before)} after={meronText(c.meron)} cedar={['spec.cedar', show(before.spec?.cedar), show(c.meron.spec?.cedar) ?? '—']} />
     : undefined
   if (before) {
     if (before.identity.name !== c.meron.name) rows.push(['Name', before.identity.name, c.meron.name])
@@ -212,9 +214,11 @@ function Changes({ p, before, s }: { p: Proposal; before?: Meron; s: Snapshot })
 }
 
 /** What a role or rule says, before and after, with the change highlighted; its Cedar one click
- * away. If either side is written by hand, or Mero can't read them, the Cedar shows instead. */
-async function WordsDiff({ kind, before, after, s, cedar }: {
-  kind: 'role' | 'rule'; before: Meron; after: { classification: Meron['classification']; spec?: Meron['spec'] }; s: Snapshot; cedar: [string, string, string]
+ * away. If either side is written by hand, or Governance can't read them, the Cedar shows instead.
+ * Review uses it for Mero's role and rule merons from before the move, and for Governance's
+ * proposals (step 3). */
+export async function WordsDiff({ kind, before, after, cedar }: {
+  kind: 'role' | 'rule'; before: CedarText; after: CedarText; cedar: [string, string, string]
 }) {
   const read = await readCedar([before, after])
   const plainCedar = <Diff rows={[cedar]} />
@@ -229,7 +233,7 @@ async function WordsDiff({ kind, before, after, s, cedar }: {
       </>
     )
   }
-  const names = { roles: Object.fromEntries(rolesIn(s).map(x => [x.id, x.name])) }
+  const names = { roles: Object.fromEntries((await roleNames()).map(x => [x.id, x.name])) }
   const was = kind === 'rule' ? ruleSentence(a.form as RuleForm, names, z.form as RuleForm, 'removed') : roleSentence(a.form as RoleForm, z.form as RoleForm, 'removed')
   const now = kind === 'rule' ? ruleSentence(z.form as RuleForm, names, a.form as RuleForm, 'added') : roleSentence(z.form as RoleForm, a.form as RoleForm, 'added')
   return (
@@ -252,7 +256,7 @@ async function WordsDiff({ kind, before, after, s, cedar }: {
   )
 }
 
-function Diff({ rows }: { rows: [string, string, string][] }) {
+export function Diff({ rows }: { rows: [string, string, string][] }) {
   return (
     <div className={styles.diff}>
       {rows.map(([field, a, z]) => (
@@ -288,7 +292,7 @@ function testRun(p: Proposal, idx: Index): Check[] {
   const again = [...new Set((o.rechecked ?? []).map(r => r.uid))]
   if (again.length) lines.push({ ok: true, text: `${again.length} meron${again.length === 1 ? '' : 's'} that read${again.length === 1 ? 's' : ''} it still pass${again.length === 1 ? 'es' : ''}: ${again.map(name).join(', ')}.` })
   if (!lines.length) {
-    const why = p.change.operation === 'rename' || p.change.operation === 'deprecate'
+    const why = p.change.operation === 'rename' || p.change.operation === 'deprecate' || p.change.operation === 'retire'
       ? 'Its spec stays as it is, so there was nothing to check again.'
       : 'No invariant covers it, so there was nothing to check.'
     lines.push({ ok: true, text: why })
@@ -301,6 +305,7 @@ function testRun(p: Proposal, idx: Index): Check[] {
     rename: 'Renames it. The old path still finds it.',
     deprecate: 'Moves it to deprecated.',
     reinstate: 'Checks it against today’s invariants, then moves it back to active.',
+    retire: 'Moves it to retired, through deprecated if it is active, each step with its note.',
   }[p.change.operation]
   lines.push({ ok: null, text: `What approving does: ${did}` })
   return lines

@@ -321,7 +321,7 @@ impl Governance {
         }))
     }
 
-    /// The roles and rules in Governance's copy, each role's verbs, and who holds it where.
+    /// The roles and rules Governance holds, each role's verbs, and who holds it where (owners).
     pub async fn roles(&self, credential: &Credential) -> Result<Value> {
         self.may_view(credential).await?;
         let mut conn = self.pool.acquire().await?;
@@ -335,10 +335,6 @@ impl Governance {
         )
         .fetch_all(&mut *conn)
         .await?;
-        let copied: Option<(DateTime<Utc>, String)> =
-            sqlx::query_as("SELECT at, source FROM gov.copies ORDER BY id DESC LIMIT 1")
-                .fetch_optional(&mut *conn)
-                .await?;
         let roles: Vec<Value> = policies
             .iter()
             .filter(|p| p.1 == "role")
@@ -359,10 +355,7 @@ impl Governance {
             .filter(|p| p.1 == "rule")
             .map(|(path, _, _, cedar, state, revision)| json!({"path": path, "cedar": cedar, "state": state, "revision": revision}))
             .collect();
-        Ok(json!({
-            "roles": roles, "rules": rules,
-            "copied": copied.map(|(at, source)| json!({"at": at, "source": source})),
-        }))
+        Ok(json!({ "roles": roles, "rules": rules }))
     }
 
     /// The record, newest first.
@@ -525,10 +518,14 @@ impl Governance {
     }
 }
 
-/// The kinds of record entries that change who may do what. Sign-ups count once confirmed (they
-/// name the account then), and copies of Mero's roles and rules only when a revision moved.
+/// The kinds of record entries that change who may do what: roles and rules approved, moved in or
+/// recovered (step 3), and grants. Sign-ups count once confirmed (they name the account then), and
+/// copies of Mero's roles and rules, taken before step 3, only when a revision moved.
 const CHANGE_KINDS: &[&str] = &[
     "setup",
+    "approve",
+    "move",
+    "recover",
     "grant",
     "end-grant",
     "add-agent",

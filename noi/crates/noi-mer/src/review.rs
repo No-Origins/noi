@@ -38,6 +38,15 @@ pub enum Change {
         expected_revision: i64,
         reason: String,
     },
+    /// Retires a meron for good, with a note saying why or where it went (step 3: the roles and
+    /// rules that moved to Governance). It leaves the system it was filed under, and links from
+    /// retired merons go; an active one is deprecated first, in the same step, so the lifecycle
+    /// still moves one step at a time; both steps carry the note.
+    Retire {
+        uid: Uuid,
+        expected_revision: i64,
+        reason: String,
+    },
 }
 impl Change {
     pub fn operation(&self) -> &'static str {
@@ -47,6 +56,7 @@ impl Change {
             Change::Rename { .. } => "rename",
             Change::Deprecate { .. } => "deprecate",
             Change::Reinstate { .. } => "reinstate",
+            Change::Retire { .. } => "retire",
         }
     }
     pub fn target(&self) -> Option<Uuid> {
@@ -55,7 +65,8 @@ impl Change {
             Change::Update { uid, .. }
             | Change::Rename { uid, .. }
             | Change::Deprecate { uid, .. }
-            | Change::Reinstate { uid, .. } => Some(*uid),
+            | Change::Reinstate { uid, .. }
+            | Change::Retire { uid, .. } => Some(*uid),
         }
     }
     fn expected_revision(&self) -> Option<i64> {
@@ -71,6 +82,9 @@ impl Change {
                 expected_revision, ..
             }
             | Change::Reinstate {
+                expected_revision, ..
+            }
+            | Change::Retire {
                 expected_revision, ..
             } => Some(*expected_revision),
         }
@@ -105,6 +119,15 @@ impl Change {
                 if reason.is_empty() || reason.chars().count() > 400 {
                     return Err(ValidationError(
                         "a reinstatement needs its reason, in at most 400 characters".into(),
+                    )
+                    .into());
+                }
+            }
+            Change::Retire { reason, .. } => {
+                let reason = reason.trim();
+                if reason.is_empty() || reason.chars().count() > 400 {
+                    return Err(ValidationError(
+                        "retiring needs its note, in at most 400 characters".into(),
                     )
                     .into());
                 }
@@ -317,6 +340,12 @@ impl Registry {
         }
         for change in &batch.changes {
             change.validate()?;
+        }
+        {
+            let mut conn = self.pool.acquire().await?;
+            for change in &batch.changes {
+                not_governances(&mut conn, change).await?;
+            }
         }
         let branch = batch
             .branch
@@ -1019,6 +1048,7 @@ impl Registry {
         let note = note_text(note, false)?;
         change.validate()?;
         let mut conn = self.pool.acquire().await?;
+        not_governances(&mut conn, &change).await?;
         refuse_no_op(&mut conn, &change).await?;
         let row = proposal_row(&mut conn, uid).await?;
         let owner: String = sqlx::query_scalar("SELECT proposer FROM mer.batches WHERE uid=$1")
@@ -1209,6 +1239,8 @@ impl Registry {
         approver: &Actor,
         change: &Change,
     ) -> Result<Value> {
+        // A batch proposed before roles and rules moved, approved after: refused here too.
+        not_governances(conn, change).await?;
         let before: i64 = sqlx::query_scalar("SELECT coalesce(max(sequence),0) FROM mer.events")
             .fetch_one(&mut *conn)
             .await?;
@@ -1301,6 +1333,61 @@ impl Registry {
                     *uid,
                     *expected_revision,
                     MeronState::Active,
+                    Some(reason.trim()),
+                )
+                .await?
+            }
+            Change::Retire {
+                uid,
+                expected_revision,
+                reason,
+            } => {
+                // Nothing may link to a retired meron. It leaves the system it was filed under, and
+                // links from merons already retired go; a live meron that still reads it must change
+                // first.
+                let links: Vec<Relationship> = sqlx::query_as::<_, RelationshipRow>(
+                    "SELECT * FROM mer.relationships WHERE target=$1 ORDER BY uid",
+                )
+                .bind(uid)
+                .fetch_all(&mut *conn)
+                .await?
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_>>()?;
+                for r in links {
+                    let source = load(&mut *conn, r.source).await?;
+                    if r.predicate != Predicate::Contains
+                        && source.lifecycle.state != MeronState::Retired
+                    {
+                        return Err(ValidationError(format!(
+                            "{} still links to it ({}): change or retire that first",
+                            source.identity.path,
+                            r.predicate.as_str()
+                        ))
+                        .into());
+                    }
+                    self.unrelate_in(conn, approver, r).await?;
+                }
+                let mut revision = *expected_revision;
+                if load(&mut *conn, *uid).await?.lifecycle.state == MeronState::Active {
+                    revision = self
+                        .transition_in(
+                            conn,
+                            approver,
+                            *uid,
+                            revision,
+                            MeronState::Deprecated,
+                            Some(reason.trim()),
+                        )
+                        .await?
+                        .revision;
+                }
+                self.transition_in(
+                    conn,
+                    approver,
+                    *uid,
+                    revision,
+                    MeronState::Retired,
                     Some(reason.trim()),
                 )
                 .await?
@@ -1556,6 +1643,12 @@ async fn change_actions(
                     vec![resource(&load(conn, *uid).await?)],
                 );
             }
+            // Retiring also takes it out of the links to it (step 3).
+            Change::Retire { uid, .. } => {
+                let meron = resource(&load(conn, *uid).await?);
+                add(&mut by, Action::Transition, vec![meron.clone()]);
+                add(&mut by, Action::Unrelate, vec![meron]);
+            }
         }
     }
     Ok(by.into_values().collect())
@@ -1600,4 +1693,88 @@ async fn hand_written(conn: &mut PgConnection, changes: &[Change]) -> Result<Vec
 /// The places a component's change touches: a component's meron, or the rule every component meets.
 fn is_component_place(path: &str) -> bool {
     crate::approved::covers(path)
+}
+
+/// The batch that retires the roles and rules under noi.gov once they have moved to Governance
+/// (step 3, decision 5): each role and rule in force, with a note saying where it went, and the two
+/// invariants that checked them, which would check nothing. Mero settles a batch in passes, so the
+/// invariants retire after what they cover. Empty when nothing is left to retire.
+pub fn retire_moved(held: &[Meron], on: &str) -> NewBatch {
+    use noi_gov::moving::{retired_invariant_note, retired_note};
+    let in_force = |m: &&Meron| {
+        matches!(
+            m.lifecycle.state,
+            MeronState::Active | MeronState::Deprecated
+        )
+    };
+    let retire = |m: &Meron, reason: String| Change::Retire {
+        uid: m.identity.uid,
+        expected_revision: m.revision,
+        reason,
+    };
+    // A role or rule meron, of this subtype.
+    let of = |m: &Meron, subtype: &str| {
+        m.classification.kind == MeronType::Rule
+            && m.classification.subtype.as_deref() == Some(subtype)
+    };
+    let mut changes: Vec<Change> = held
+        .iter()
+        .filter(in_force)
+        .filter(|m| m.identity.path.starts_with("noi.gov.") && (of(m, "role") || of(m, "policy")))
+        .map(|m| retire(m, retired_note(on)))
+        .collect();
+    // Each invariant retires only when everything it covers does: a rule meron anywhere else in
+    // Mero keeps it.
+    for (path, subtype) in [("noi.gov.inv.role", "role"), ("noi.gov.inv.rule", "policy")] {
+        let elsewhere = held
+            .iter()
+            .filter(in_force)
+            .any(|m| of(m, subtype) && !m.identity.path.starts_with("noi.gov."));
+        if let Some(m) = held
+            .iter()
+            .filter(in_force)
+            .find(|m| m.identity.path == path)
+        {
+            if !elsewhere {
+                changes.push(retire(m, retired_invariant_note(on)));
+            }
+        }
+    }
+    NewBatch {
+        title: "Retire the roles and rules: they moved to Governance".into(),
+        note: Some(format!(
+            "Step 3 (agreed 9 Nov, \"Where Roles and Rules Live\", decision 5): Governance took these in on {on}, with every revision. Approving retires them here, each with a note saying where it went, so they are kept in one place."
+        )),
+        changes,
+        touch: None,
+        branch: None,
+        commit: None,
+    }
+}
+
+/// Roles and rules live in Governance since the build order's step 3 (review, 21 Nov, finding 9):
+/// Mero takes no change to a role or rule meron under noi.gov, new or old, which would change
+/// nothing anyone may do. Retiring the ones it kept is the one change left, for the move.
+async fn not_governances(conn: &mut PgConnection, change: &Change) -> Result<()> {
+    let mut paths: Vec<String> = match change {
+        Change::Retire { .. } => return Ok(()),
+        Change::Add { meron, .. } => vec![meron.path.clone()],
+        Change::Update { uid, meron, .. } => {
+            vec![load(conn, *uid).await?.identity.path, meron.path.clone()]
+        }
+        Change::Rename { uid, path, .. } => {
+            vec![load(conn, *uid).await?.identity.path, path.clone()]
+        }
+        Change::Deprecate { uid, .. } | Change::Reinstate { uid, .. } => {
+            vec![load(conn, *uid).await?.identity.path]
+        }
+    };
+    paths.retain(|p| p.starts_with("noi.gov.roles.") || p.starts_with("noi.gov.rules."));
+    match paths.first() {
+        Some(path) => Err(ValidationError(format!(
+            "{path}: roles and rules live in Governance now; propose this on Governance's Roles page"
+        ))
+        .into()),
+        None => Ok(()),
+    }
 }

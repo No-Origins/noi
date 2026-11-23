@@ -222,7 +222,9 @@ pub(crate) async fn new_link(
 
 impl Governance {
     /// The first owner: an account, Maintainer and Owner in all of NOI, and a link for the first
-    /// passkey. Refused once anyone holds Owner.
+    /// passkey. Refused once anyone holds Owner. A Governance that holds no roles and rules yet is
+    /// given the ones every Governance starts with first (step 3: they are no longer copied from
+    /// Mero).
     pub async fn setup(&self, handle: &str, display_name: &str, email: &str) -> Result<Setup> {
         let mut tx = self.write().await?;
         let owners: i64 = sqlx::query_scalar(
@@ -236,6 +238,7 @@ impl Governance {
                 "an owner exists: setup runs only once".into(),
             ));
         }
+        let first = super::roles::write_first(tx.as_mut()).await?;
         let account = new_account(
             tx.as_mut(),
             handle,
@@ -259,9 +262,9 @@ impl Governance {
             )
             .await
             .map_err(|e| match e {
-                Error::Invalid(_) => Error::Invalid(format!(
-                    "{role} is not in Governance's copy: copy the roles and rules from Mero first"
-                )),
+                Error::Invalid(_) => {
+                    Error::Invalid(format!("{role} is not among the roles Governance holds"))
+                }
                 other => other,
             })?;
         }
@@ -282,7 +285,7 @@ impl Governance {
             &["noi".into()],
             true,
             "the first owner",
-            json!({"handle": handle, "grants": [MAINTAINER, OWNER]}),
+            json!({"handle": handle, "grants": [MAINTAINER, OWNER], "first_roles_and_rules": first}),
         )
         .await?;
         tx.commit().await?;
@@ -582,7 +585,24 @@ impl Governance {
                 )],
             )
             .await?;
+        // Nobody is locked out (decision 4; review, finding 6): giving a role can do it too, when a
+        // rule stops that role's holders changing roles and rules and the role goes to the only one
+        // who could.
+        let rows = super::decide::in_force(tx.as_mut()).await?;
+        let able_before = super::roles::someone_can_change(tx.as_mut(), &rows, None).await?;
         let id = add_grant(tx.as_mut(), account, spec, Some(by)).await?;
+        if able_before && !super::roles::someone_can_change(tx.as_mut(), &rows, None).await? {
+            return Err(self
+                .refused_after(
+                    tx,
+                    "grant",
+                    Some(by),
+                    Some("grant"),
+                    &[format!("account:{account}")],
+                    "no one could change roles and rules after this, so it is refused: nobody is locked out",
+                )
+                .await);
+        }
         record(
             tx.as_mut(),
             "grant",
@@ -639,10 +659,37 @@ impl Governance {
         .bind(OWNER)
         .fetch_one(tx.as_mut())
         .await?;
+        let whom_label = [format!("account:{account}")];
         if last_owner {
-            return Err(Error::Refused(
-                "this is the last owner: give Owner to someone else first".into(),
-            ));
+            return Err(self
+                .refused_after(
+                    tx,
+                    "end-grant",
+                    Some(by),
+                    Some("end-grant"),
+                    &whom_label,
+                    "this is the last owner: give Owner to someone else first",
+                )
+                .await);
+        }
+        // Nobody is locked out (agreed 9 Nov, "Where Roles and Rules Live", decision 4): ending a
+        // grant must not leave no one able to change roles and rules, as ending the last
+        // Maintainer of the only owner would.
+        let rows = super::decide::in_force(tx.as_mut()).await?;
+        if super::roles::someone_can_change(tx.as_mut(), &rows, None).await?
+            && !super::roles::someone_can_change(tx.as_mut(), &rows, Some(grant)).await?
+        {
+            // Refused, and recorded (review, finding 6): its transaction is undone, so not there.
+            return Err(self
+                .refused_after(
+                    tx,
+                    "end-grant",
+                    Some(by),
+                    Some("end-grant"),
+                    &whom_label,
+                    "no one could change roles and rules after this: give this role to someone else first",
+                )
+                .await);
         }
         sqlx::query("UPDATE gov.grants SET ended_at = now(), ended_by = $2, end_reason = 'ended by an owner' WHERE id = $1 AND ended_at IS NULL")
             .bind(grant)

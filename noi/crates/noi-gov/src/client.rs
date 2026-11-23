@@ -28,8 +28,6 @@ pub struct GovernanceClient {
     /// The request this client asks for, so Governance's log line carries the same ID as Mero's.
     request_id: Option<String>,
     known: Known,
-    /// How current Mero's roles and rules are (9 Nov, step 7), sent with each question.
-    rules_at: Arc<Mutex<Option<String>>>,
 }
 
 /// Who holds a credential, as Governance says.
@@ -62,17 +60,7 @@ impl GovernanceClient {
             http,
             request_id: None,
             known: Arc::default(),
-            rules_at: Arc::default(),
         }
-    }
-
-    /// Mero's roles and rules as they are now (see `crate::rules_version`): sent with each
-    /// question, so Governance never decides on a stale copy.
-    pub fn rules_now(&self, version: String) {
-        *self.rules_at.lock().expect("rules version") = Some(version);
-    }
-    fn rules_at(&self) -> Option<String> {
-        self.rules_at.lock().expect("rules version").clone()
     }
 
     /// The same client, asking on behalf of this request.
@@ -163,7 +151,6 @@ impl GovernanceClient {
         }
         let body = json!({
             "credential": credential,
-            "rules_at": self.rules_at(),
             "questions": questions.iter().map(|(action, paths)| json!({
                 "action": action.as_str(),
                 "targets": paths.iter().map(|p| json!({"path": p})).collect::<Vec<_>>(),
@@ -187,11 +174,6 @@ impl GovernanceClient {
             .as_str()
             .map(String::from)
             .ok_or_else(|| "Governance gave no run token".into())
-    }
-
-    /// After an approval in noi.gov: Governance copies the roles and rules again, from Mero.
-    pub async fn copy(&self) -> Result<Value, String> {
-        self.post("/api/copy", json!({})).await
     }
 
     /// An authorizer that asks on behalf of this credential. The touch goes only with approving,
@@ -230,7 +212,6 @@ impl GovernanceClient {
             "touch": touch,
             // What else the touch named (9 Nov, step 7): the decision and each proposal.
             "about": request.intent.get("touch_for"),
-            "rules_at": self.rules_at(),
         });
         let answer: MayAnswer = match self.post("/api/may", body).await {
             Ok(v) => match serde_json::from_value(v) {

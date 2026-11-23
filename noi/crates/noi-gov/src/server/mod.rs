@@ -1,23 +1,23 @@
 //! Governance's own server: who (accounts, passkeys), proof (sessions, touches, run tokens), access
-//! (grants and its own copy of the approved roles and rules) and the record of every answer.
+//! (grants, and the roles and rules it keeps, every version) and the record of every answer.
 //! It alone uses schema `gov`. Every refusal is recorded; anything it cannot decide is refused.
 mod accounts;
-mod copy;
 mod decide;
 pub mod http;
 mod mail;
 mod own;
 mod passkeys;
+mod roles;
 mod runs;
 mod sign_up;
 mod views;
 
 pub use crate::{Credential, Target};
 pub use accounts::{grant_about, invite_about, GrantSpec, Setup};
-pub use copy::Copied;
 pub use decide::Answer;
 pub use mail::{Mail, Mailer};
 pub use own::{Change, EMAIL_SENT};
+pub use roles::{decide_about, first, Decide, Draft, First, Operation, Proposal, Version};
 pub use runs::{new_voucher_key, vouch, Vouch};
 pub use sign_up::SENT;
 pub use views::{device_label, RecordFilter};
@@ -81,8 +81,6 @@ pub enum Error {
     Database(#[from] sqlx::Error),
     #[error("migration: {0}")]
     Migration(#[from] sqlx::migrate::MigrateError),
-    #[error("Mero: {0}")]
-    Mero(String),
     /// Too many tries (agreed 8 Nov): the reason says how long to wait.
     #[error("{0}")]
     TooMany(String),
@@ -97,7 +95,7 @@ impl From<webauthn_rs::prelude::WebauthnError> for Error {
     }
 }
 
-/// Where Governance is reached, where its pages are, and where Mero is.
+/// Where Governance is reached, where its pages are, and where its email goes.
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Governance's own address, such as http://localhost:8788. It answers only its API there.
@@ -111,8 +109,6 @@ pub struct Config {
     pub domain: String,
     /// Where email goes: links to confirm a sign-up and to add a lost passkey.
     pub mail: Mailer,
-    /// Mero's read API, for copying the approved roles and rules.
-    pub mero: Option<Url>,
 }
 
 #[derive(Clone)]
@@ -120,8 +116,6 @@ pub struct Governance {
     pool: PgPool,
     webauthn: Arc<Webauthn>,
     config: Config,
-    /// One copy of the roles and rules at a time, when a question finds the last one stale.
-    copying: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Governance {
@@ -203,13 +197,13 @@ impl Governance {
         Ok(gone)
     }
 
-    /// Whether the database answers, and whether a copy of the roles and rules is there to decide with.
+    /// Whether the database answers, and whether it holds roles and rules to decide with.
     pub async fn readiness(&self) -> (bool, bool) {
         match sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM gov.policies)")
             .fetch_one(&self.pool)
             .await
         {
-            Ok(copy) => (true, copy),
+            Ok(held) => (true, held),
             Err(_) => (false, false),
         }
     }
@@ -250,7 +244,6 @@ impl Governance {
             pool,
             webauthn: Arc::new(webauthn),
             config,
-            copying: Arc::default(),
         })
     }
 
