@@ -241,6 +241,34 @@ test('the astroid is the secondary colour', () => {
   assert.match(code(read('drawing/light.ts')), /Math\.max\(1, /, 'the light it is looked at in is never weaker than plain, so its top shows the colour itself')
 })
 
+// THE ASTROID GLOWS WHEN IT IS ACTIVE (23 Nov 2026, issue 132). In the intro that opens the world the astroids glow as
+// the platform is built. The user: "the asteroids between the tiles should glow when they render, and they have to
+// keep glowing till the camera reaches the end, and then they should go back to their normal state", and then:
+// "Since we added glow animation for the asteroids, it should be a state, right?" On seeing the glow: "Glow is right".
+test('the astroid has a default state and an active one, in which it glows all over, a soft light round it', () => {
+  assert.deepEqual(ASTROID.states.map(s => s.name), ['Default', 'Active'], 'two states, named as the stage\'s are')
+  const [plain, active] = ASTROID.states
+  assert.equal(plain.glow, undefined, 'in the default state it does not glow')
+  assert.deepEqual(poseIn(plain, 3), poseIn(active, 3), 'and in neither does it move')
+  assert.equal(active.glow.colour, ASTROID.surface.colour, 'it glows in its own colour, the secondary')
+  assert.deepEqual(active.glow.borders, [], 'it has no border to light: all of it is lit')
+  const whole = active.glow.whole
+  assert.equal(whole.bright, value('noi.eio.world.astroid.active-bright'))
+  assert.ok(whole.bright > 1, 'it gives off more than the colour itself')
+  assert.deepEqual(whole.round, { across: value('noi.eio.world.astroid.active-light-across'), above: value('noi.eio.world.astroid.active-light-above'), bright: value('noi.eio.world.astroid.active-light-bright') })
+  assert.ok(whole.round.across > ASTROID.size.x && whole.round.across < BASE_TILE.size.x, 'the light round it reaches beyond it, and not as far as the next astroid\'s')
+  assert.ok(whole.round.above > 0, 'and lies over the tiles\' tops, never in them')
+  // a made thing acts that out, alone or laid many times
+  const made = code(read('drawing/make.ts'))
+  assert.match(made, /matteWith\(element\.surface\.colour, light\.gives\.mul\(light\.lit\)/, 'the thing itself gives off the light, as lit as its state has it')
+  assert.match(made, /name: `\$\{element\.id\} light`, shape: new THREE\.PlaneGeometry\(round\.across, round\.across\), surface, up: element\.size\.z \+ round\.above/, 'and the soft light lies round it, over its top')
+  assert.match(made, /is = was \+ \(\(s\?\.glow\?\.whole \? 1 : 0\) - was\) \* share/, 'lit when the state lights it all over, dark when not, and smoothly from one to the other')
+  assert.match(made, /for \(const thing of roundLights\) thing\.visible = is > 0/, 'the soft light is drawn only while it is lit')
+  assert.match(made, /state\(id, atOnce = false\) \{\s+const next = states\.find\(s => s\.id === id\)\s+if \(!whole\.any \|\| !next\) return false/, 'laid many times, the astroids can be put in a state too')
+  // the drone's body is the astroid's shape, not the astroid: the drone does not glow with it
+  assert.equal(DRONE.states.some(s => s.glow?.whole), false)
+})
+
 // THE FOUR SOLIDS REMOVED (22 Nov 2026, issue 127). The user: "I want you to remove the diamond, [low-poly]
 // sphere, octahedron, hexagon [tori] shapes from the world elements that we have built in the gallery."
 // THE CHARACTERS JOINED (23 Nov 2026). The user: "bring in the characters into elements". They come after the rest.

@@ -401,6 +401,12 @@ export const tokens = {
     }
   },
   "world": {
+    "astroid": {
+      "active-bright": 1.5,
+      "active-light-above": 0.05,
+      "active-light-across": 9,
+      "active-light-bright": 0.5
+    },
     "base-platform": {
       "length": 600,
       "width": 210

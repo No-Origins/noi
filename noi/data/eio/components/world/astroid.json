@@ -5,22 +5,30 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The shape four base tiles leave open where they meet two by two: four points and four sides curved inward, each a tile’s rounded corner, as thick as a tile, matte in Eidos’s secondary colour. Your words, 21 Nov.",
+    "definition": "The shape four base tiles leave open where they meet two by two: four points and four sides curved inward, each a tile’s rounded corner, as thick as a tile, matte in Eidos’s secondary colour. Active, it glows in that colour, with a soft light on the tiles round it. Your words, 21 and 23 Nov.",
     "responsibility": "Be the one astroid every No Origins app uses. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
   "spec": {
     "package": "@noi/eio-3d",
     "part": "component",
-    "job": "Fill the middle where four base tiles meet; be the drone’s body.",
+    "job": "Fill the middle where four base tiles meet, lying matte or glowing; be the drone’s body.",
     "states": {
+      "state": {
+        "default": "lying matte, in the secondary colour",
+        "active": "glowing in its own colour, a soft light of that colour on the tiles round it"
+      },
       "measure": {
         "radius": "how far its four points reach from its middle: the base tile’s corner radius",
         "thickness": "how thick it is: the base tile’s thickness"
       }
     },
     "reads": [
-      "noi.eio.color.action.secondary"
+      "noi.eio.color.action.secondary",
+      "noi.eio.world.astroid.active-bright",
+      "noi.eio.world.astroid.active-light-above",
+      "noi.eio.world.astroid.active-light-across",
+      "noi.eio.world.astroid.active-light-bright"
     ],
     "uses": [
       "noi.eio.components.world.base-tile",
@@ -29,7 +37,7 @@
     "files": [
       {
         "path": "src/astroid/astroid.ts",
-        "sha256": "5f8a662e857ccd6dafa76740c1323fff5873b923b9a1e964d6bcb795864d9c73"
+        "sha256": "99ec3c72f26dcefc38aebfa449cc14fad1db54628730fa33c0fdbe2a83342f92"
       }
     ]
   }

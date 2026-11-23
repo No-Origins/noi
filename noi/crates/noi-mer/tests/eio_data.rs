@@ -483,14 +483,16 @@ fn eio_world_values_pass_their_invariants() {
     .collect();
     let mut numbers = vec![];
     // The characters' four groups (17 Nov), and the new world's fifteen (23 Nov): its elements, what
-    // draws and lights them, and its land's coordinates; and the Fairy Bot's wings (23 Nov, when the
-    // characters became elements of the new world).
+    // draws and lights them, and its land's coordinates; the Fairy Bot's wings (23 Nov, when the
+    // characters became elements of the new world); and the astroid's (23 Nov, when it got a state in
+    // which it glows).
     let groups = [
         "character",
         "movement",
         "flight",
         "eye",
         "fairy-bot",
+        "astroid",
         "stud-grid",
         "first-sight",
         "base-tile",
@@ -510,9 +512,10 @@ fn eio_world_values_pass_their_invariants() {
     for group in groups {
         numbers.extend(data(&format!("world/{group}")));
     }
-    // The characters' 19, the new world's 152, and the 9 the characters brought when they joined it:
-    // the room a character takes up, how far its arms hang out, and the six of the Fairy Bot's wings.
-    assert_eq!(numbers.len(), 19 + 152 + 9);
+    // The characters' 19, the new world's 152, the 9 the characters brought when they joined it (the
+    // room a character takes up, how far its arms hang out, and the six of the Fairy Bot's wings), and
+    // the 4 of the astroid's active state (23 Nov: how it glows, and the soft light round it).
+    assert_eq!(numbers.len(), 19 + 152 + 9 + 4);
     for n in &numbers {
         n.validate().unwrap();
         assert!(n.path.starts_with("noi.eio.world."), "{}", n.path);

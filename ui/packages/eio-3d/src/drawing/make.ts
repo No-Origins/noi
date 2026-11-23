@@ -8,7 +8,9 @@
 // shows without lighting the rest of the world. FROSTED glass (the stage, 23 Nov 2026) lets what is behind it
 // through, softened, and its thin edge gives off a little light. A PIECE WITH A BORDER is two parts, as a base
 // tile is; and a border can be lit by the state the thing is in (element.ts, `glow`): it then gives off a colour,
-// whatever light falls on it. A MATTE surface may be made to shine all the same (element.ts, `shine`): smoother,
+// whatever light falls on it. A PLAIN THING, one shape without pieces or a border (the astroid), can be lit all
+// over by its state (`glow.whole`, 23 Nov 2026): it gives off its colour, and a soft light of that colour lies
+// round it on what it stands on. That light is shown when the thing is laid many times too. A MATTE surface may be made to shine all the same (element.ts, `shine`): smoother,
 // and mirroring the room.
 //
 // Every number of how a surface looks (noi.eio.world.surface), of the mirrored room (noi.eio.world.room) and of
@@ -51,7 +53,17 @@ interface Part {
    * border where it looks up or down (`colour`), where it looks sideways (`side`), and of the piece's whole top
    * face (`topColour`), each as bright as the state says. */
   lights?: { piece: string; lit: { value: number }; upOnly: { value: number }; top: { value: number }; colour: { value: Tint }; side: { value: Tint }; topColour: { value: Tint } }
+  /** Set on the parts of a plain thing a state can light all over (element.ts, `glow.whole`): what the state
+   * lights them by. How lit it is, from 0 to 1; the colour the thing itself gives off, as bright as the state
+   * says (`gives`); the colour of the soft light round it (`round`), and how strong that is at its middle. The
+   * thing itself and the light round it share one. */
+  glows?: WholeLight
+  /** Set on the soft light round such a thing: it is shown only while it is lit. */
+  round?: true
 }
+
+/** What a state lights a plain thing all over by (Part, `glows`). */
+interface WholeLight { lit: { value: number }; gives: { value: Tint }; round: { value: Tint }; roundBright: { value: number } }
 
 /** A colour as three.js holds it, as far as this file sets one: to a colour of the page, then so bright. */
 interface Tint { set(colour: string): { multiplyScalar(by: number): unknown } }
@@ -316,7 +328,24 @@ function parts(world: ThreeWorld, element: WorldElement, colourOf: (token: strin
   }
   const within = withinBorder(element)
   if (!element.border || !within) {
-    return [{ name: element.id, shape: raised(new THREE.Shape(points(element))), surface: surfaceOf(element) as InstanceType<typeof THREE.Material> }]
+    // A PLAIN THING A STATE LIGHTS ALL OVER (element.ts, `glow.whole`; the astroid). When it is matte and one of
+    // its states says so, it has a surface to itself that can give off that light; and the soft light round it is
+    // a part of its own: a flat round of light lying over the thing's top, strongest at its middle and nothing
+    // at its edge, that adds to what is under it. Both are dark until a state lights them. (The light round it
+    // is as large as the first state that has one says: one size for the thing.)
+    const whole = element.surface.finish === 'matte' ? (element.states ?? []).map(s => s.glow?.whole).find(w => w) : undefined
+    if (!whole) return [{ name: element.id, shape: raised(new THREE.Shape(points(element))), surface: surfaceOf(element) as InstanceType<typeof THREE.Material> }]
+    const light = { lit: TSL.uniform(0), gives: TSL.uniform(new THREE.Color(0, 0, 0)), round: TSL.uniform(new THREE.Color(0, 0, 0)), roundBright: TSL.uniform(0) }
+    const body: Part = { name: element.id, shape: raised(new THREE.Shape(points(element))), surface: matteWith(element.surface.colour, light.gives.mul(light.lit), element.surface.shine ?? 0), glows: light }
+    const round = (element.states ?? []).map(s => s.glow?.whole?.round).find(r => r)
+    if (!round) return [body]
+    const far = TSL.length(TSL.uv().sub(0.5)).mul(2) // 0 at the light's middle, 1 at its edge
+    const soft = TSL.float(1).sub(TSL.smoothstep(0, 1, far))
+    // seen from both sides: `xyz` is a mirror, and a thing laid on the face below is turned over
+    const surface = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })
+    surface.colorNode = light.round
+    surface.opacityNode = soft.mul(soft).mul(light.lit).mul(light.roundBright)
+    return [body, { name: `${element.id} light`, shape: new THREE.PlaneGeometry(round.across, round.across), surface, up: element.size.z + round.above, glows: light, round: true }]
   }
   // the border is the whole outline with what lies inside the border cut out of it
   const ring = new THREE.Shape(points(element))
@@ -325,6 +354,34 @@ function parts(world: ThreeWorld, element: WorldElement, colourOf: (token: strin
     { name: element.id, shape: raised(new THREE.Shape(points(within))), surface: matte(element.surface.colour) },
     { name: `${element.id} border`, shape: raised(ring), surface: matte(element.border.colour) },
   ]
+}
+
+/** THE LIGHT A STATE GIVES A PLAIN THING ALL OVER (element.ts, `glow.whole`), for the parts that take it (`glows`)
+ * and the things that are the soft light round it (`roundLights`). `colours` sets what a state's light is;
+ * `from` says the state has just changed (it goes over from how lit it is now); `show` shows it `share` of the
+ * way over to a state (0 to 1): lit when the state lights the thing all over, dark when not. The soft light is
+ * shown only while it is lit at all. `any`: whether the thing has such a light. */
+function wholeLight(made: readonly Part[], roundLights: readonly Object3D[], colourOf: (token: string) => string) {
+  const lights = [...new Set(made.flatMap(part => (part.glows ? [part.glows] : [])))]
+  let [is, was] = [0, 0]
+  return {
+    any: lights.length > 0,
+    colours(s: ElementState | undefined) {
+      const glow = s?.glow
+      if (!glow?.whole) return
+      for (const light of lights) {
+        light.gives.value.set(colourOf(glow.colour)).multiplyScalar(glow.whole.bright)
+        light.round.value.set(colourOf(glow.colour))
+        light.roundBright.value = glow.whole.round?.bright ?? 0
+      }
+    },
+    from() { was = is },
+    show(s: ElementState | undefined, share: number) {
+      is = was + ((s?.glow?.whole ? 1 : 0) - was) * share
+      for (const light of lights) light.lit.value = is
+      for (const thing of roundLights) thing.visible = is > 0
+    },
+  }
 }
 
 /** Makes one element. `colourOf` gives a colour of Eidos by its token's name, as the page's style has it. */
@@ -357,9 +414,11 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
     return group
   }
   const spinners: Array<{ mesh: Object3D; piece: Piece; spun: number }> = []
+  const roundLights: Object3D[] = []
   for (const part of made) {
     const mesh = new THREE.Mesh(part.shape, part.surface)
     mesh.name = part.name
+    if (part.round) roundLights.push(mesh)
     ;(part.partOf ? partNamed(part.partOf) : body).add(mesh)
     // a piece whose base is above the element's base stands that far up, as its data says
     if (part.up) mesh.position.z = part.up
@@ -397,9 +456,12 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
   // and how lit it was when the state last changed. A state that glows says the colour and the faces of the
   // borders it names; they are set as the thing goes into it, and a border fades as smoothly as the rest.
   const lights = made.flatMap(part => (part.lights ? [{ ...part.lights, is: 0, was: 0, topIs: 0, topWas: 0 }] : []))
+  // and the light a state gives a plain thing all over (`glow.whole`)
+  const whole = wholeLight(made, roundLights, colourOf)
   // the colour each of the element's own colours has now: its own to begin with, another while one is tried
   const tried = new Map((element.colours ?? []).map(c => [c.id, c.colour]))
   const lightUp = (s: ElementState | undefined) => {
+    whole.colours(s)
     if (!s?.glow) return
     const glow = s.glow
     // a part's colour: the one of the element's own colours it names, as that is now; else the glow's
@@ -418,6 +480,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
     }
   }
   lightUp(state)
+  whole.show(state, 1)
   drawn?.act(state)
   let since = 0 // seconds it has been in this state
   let last: number | null = null // when it was last moved on
@@ -456,6 +519,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
         light.topIs = between(light.topWas, state?.glow?.tops?.some(t => t.piece === light.piece) ? 1 : 0)
         light.top.value = light.topIs
       }
+      whole.show(state, share)
       for (const spinner of spinners) {
         // as far as its own data turns it in the time that passed, times what the state says
         spinner.spun += (pieceTurn(spinner.piece, passed) - pieceTurn(spinner.piece, 0)) * is.spin
@@ -481,6 +545,7 @@ export function makeElement(world: ThreeWorld, element: WorldElement, colourOf: 
         state = next
         since = 0
         for (const light of lights) { light.was = light.is; light.topWas = light.topIs }
+        whole.from()
         lightUp(next)
         drawn?.act(next)
         // or is there at once: nothing to go over from
@@ -547,16 +612,20 @@ function makeLaid(world: ThreeWorld, element: WorldElement, shape: Laid, colourO
 
 /** Makes one element many times over, each on its own place by the middle of its base: each part is one thing
  * for three.js to draw, however many places there are. Drawn still: what turns or spins in the element does
- * not move here yet. */
+ * not move here yet. But THE LIGHT A STATE GIVES A PLAIN THING ALL OVER is shown (element.ts, `glow.whole`; the
+ * astroids of a platform, 23 Nov 2026): all the many are in one state, the element's first to begin with; put in
+ * another, they go over smoothly as one thing does, when `step` is called before each picture. */
 export function makeMany(world: ThreeWorld, element: WorldElement, places: readonly Xyz[], colourOf: (token: string) => string, over = false, frame?: (p: Xyz) => InstanceType<typeof THREE_.Matrix4>): Made {
   const THREE = world.three
   const made = parts(world, element, colourOf, true)
   const thing = new THREE.Group()
   thing.name = element.id
   const put = new THREE.Matrix4()
+  const roundLights: Object3D[] = []
   const many = made.map(part => {
     const mesh = new THREE.InstancedMesh(part.shape, part.surface, places.length)
     mesh.name = part.name
+    if (part.round) roundLights.push(mesh)
     // a piece that faces the front is stood upright and put on its own place in each of the many
     const front = part.front
     const upright = front ? new THREE.Matrix4().makeRotationZ(((front.turn ?? 0) * Math.PI) / 180).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)) : null
@@ -575,10 +644,38 @@ export function makeMany(world: ThreeWorld, element: WorldElement, places: reado
     thing.add(mesh)
     return mesh
   })
+  // the state the many are in, as far as it lights them all over; how far they have gone over to it: 0 to 1
+  const states = element.states ?? []
+  const whole = wholeLight(made, roundLights, colourOf)
+  let state = states[0]
+  let changed = 1
+  let last: number | null = null // when they were last moved on
+  whole.colours(state)
+  whole.show(state, 1)
   return {
     thing,
     body: thing,
-    state: () => false, // laid many times, a thing is drawn still: it acts out no state yet
+    step: whole.any
+      ? seconds => {
+        const passed = last === null ? 0 : Math.max(0, Math.min(seconds - last, LONGEST_STEP))
+        last = seconds
+        changed = Math.min(1, changed + passed / CHANGE)
+        whole.show(state, changed * changed * (3 - 2 * changed)) // gently off, gently there
+      }
+      : undefined,
+    // laid many times, a thing does not move; of a state it shows only the light that lights it all over
+    state(id, atOnce = false) {
+      const next = states.find(s => s.id === id)
+      if (!whole.any || !next) return false
+      if (next !== state) {
+        whole.from()
+        state = next
+        changed = atOnce ? 1 : 0
+        whole.colours(next)
+        whole.show(next, changed)
+      }
+      return true
+    },
     colour: () => false,
     gone() {
       thing.removeFromParent()

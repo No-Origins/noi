@@ -120,6 +120,8 @@ export type TreeRowState = 'other' | 'selected'
 // noi.eio.components.world.astroid
 /** radius: how far its four points reach from its middle: the base tile’s corner radius · thickness: how thick it is: the base tile’s thickness */
 export type AstroidMeasure = 'radius' | 'thickness'
+/** active: glowing in its own colour, a soft light of that colour on the tiles round it · default: lying matte, in the secondary colour */
+export type AstroidState = 'active' | 'default'
 
 // noi.eio.components.world.base-platform
 /** length: how far it runs along y · width: how far it runs along x: 21 tiles */
@@ -258,6 +260,7 @@ export const states = {
   },
   'noi.eio.components.world.astroid': {
     measure: ['radius', 'thickness'],
+    state: ['active', 'default'],
   },
   'noi.eio.components.world.base-platform': {
     measure: ['length', 'width'],

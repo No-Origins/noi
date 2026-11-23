@@ -17,7 +17,7 @@ import { WAVE_PLATFORM } from './wave-platform/wave-platform.ts'
 
 // ——— the elements ———
 export { BASE_TILE, BASE_TILE_MEASURES } from './base-tile/base-tile.ts'
-export { ASTROID, ASTROID_MEASURES } from './astroid/astroid.ts'
+export { ASTROID, ASTROID_MEASURES, ASTROID_STATES } from './astroid/astroid.ts'
 export { BASE_PLATFORM, BASE_PLATFORM_MEASURES } from './base-platform/base-platform.ts'
 export { MOBIUS_PLATFORM, MOBIUS_PLATFORM_MEASURES } from './mobius-platform/mobius-platform.ts'
 export { PROFILE, WAVE, WAVE_PLATFORM, WAVE_PLATFORM_MEASURES } from './wave-platform/wave-platform.ts'

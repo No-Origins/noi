@@ -74,7 +74,7 @@
       },
       {
         "path": "src/drawing/element.ts",
-        "sha256": "ff296e5b375efe041e5dcf03cec116c2a0cdb6f070b350ca48df5aa68e13d60b"
+        "sha256": "a0a15cf45669f9a5471db57df9e42cb85bb18d22281d3e2f906b759ed7b6322a"
       },
       {
         "path": "src/drawing/light.ts",
@@ -82,7 +82,7 @@
       },
       {
         "path": "src/drawing/make.ts",
-        "sha256": "0aa4e1adf83caaed4bf8ca25e7b7b86897ce06dd8a09a17b058c802b4e908898"
+        "sha256": "594b9de070028c28ce4f0e7ea0f6d3eac38e68b7a8b2375f31c70e99382f93d4"
       },
       {
         "path": "src/drawing/outline.ts",

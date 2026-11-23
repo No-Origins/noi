@@ -327,11 +327,17 @@ export interface ElementState {
    * colours (ElementColour, by its id).
    * HOW BRIGHTLY, from 0 to 1 (left out: 1, the colour itself): a border's `bright` is for where it looks up
    * or down, its `sidesBright` for where it looks sideways (a block's walls; left out: as `bright`), a top's
-   * `bright` for that top face. */
+   * `bright` for that top face.
+   * `whole` (23 Nov 2026, for the astroid; the user: "the asteroids between the tiles should glow ... it should be
+   * a state, right?"): a thing that is ONE PLAIN SHAPE, without pieces or a border, gives off light all over, so
+   * many times its colour (`bright`: 1 is the colour itself, more is brighter than it). And `round` it, on what it
+   * stands on, lies a soft light of that colour: `across` metres across, `above` metres over the thing's top,
+   * and so strong at its middle (`bright`, 0 to 1), fading to nothing at its edge; it adds to what is under it. */
   readonly glow?: {
     readonly colour: string
     readonly borders: ReadonlyArray<{ readonly piece: string; readonly faces?: 'up'; readonly colour?: string; readonly bright?: number; readonly sidesBright?: number }>
     readonly tops?: ReadonlyArray<{ readonly piece: string; readonly colour?: string; readonly bright?: number }>
+    readonly whole?: { readonly bright: number; readonly round?: { readonly across: number; readonly above: number; readonly bright: number } }
   }
   /** What a character does in it, by the motion Mero holds for the character drawing: stands plainly, or plays its
    * walk or its run on its place. Left out: it stands. */

@@ -15,6 +15,10 @@
     "job": "Make the 3D elements one package that apps can use, and test it.",
     "states": {},
     "reads": [
+      "noi.eio.world.astroid.active-bright",
+      "noi.eio.world.astroid.active-light-above",
+      "noi.eio.world.astroid.active-light-across",
+      "noi.eio.world.astroid.active-light-bright",
       "noi.eio.world.character.height"
     ],
     "uses": [
@@ -39,11 +43,11 @@
       },
       {
         "path": "src/index.ts",
-        "sha256": "5dc3762e0c35c6a5e69de0894896697eeb29715daa4f46c0451e349d328068e9"
+        "sha256": "99053bb1d29ef08304277f9affce11d412239558719fc4eed639124bc92a0966"
       },
       {
         "path": "test/elements.test.mjs",
-        "sha256": "531f6b1e33ef63bae144cd55f57de5c4552a36ad4bb932977b983eb570b1177f"
+        "sha256": "fcf2f4c9645e950c0849383c0339f3baeff8537d87b22b44f4a1772b0704cbd3"
       },
       {
         "path": "test/rules.test.mjs",
