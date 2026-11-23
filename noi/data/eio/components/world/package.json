@@ -5,7 +5,7 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The files of @noi/eio-3d that belong to no one element: the export list, the settings, the type for style files, the tests of its rules and states, and the tool that made the characters’ small copies.",
+    "definition": "The files of @noi/eio-3d that belong to no one element: the export list, the settings, the tests of its rules and states, and the tool that made the characters’ small copies.",
     "responsibility": "Hold the files of the package that belong to no one component, so that every file of it belongs to exactly one meron. It changes only through a proposal you approve."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
@@ -16,35 +16,24 @@
     "states": {},
     "reads": [],
     "uses": [
-      "noi.eio.components.world.arch",
-      "noi.eio.components.world.character-drawing",
-      "noi.eio.components.world.drawing",
-      "noi.eio.components.world.gateway",
-      "noi.eio.components.world.land",
-      "noi.eio.components.world.pool",
-      "noi.eio.components.world.stage",
-      "noi.eio.components.world.steps"
+      "noi.eio.components.world.character-drawing"
     ],
     "files": [
       {
         "path": "package.json",
-        "sha256": "8ca6daaf114001803bc0e5bb5e7f46b2b1d647d1f8f1e8a23deec6cc82274c26"
-      },
-      {
-        "path": "src/css.d.ts",
-        "sha256": "7a2f87015ef7f1aeedbae628457ec9ead7f059addab8cd14865bcbe482edb643"
+        "sha256": "807fc9cbd626ace64670d0bc88b32f4a45dc112b1ffaf75bc12ae20f8e80fe78"
       },
       {
         "path": "src/index.ts",
-        "sha256": "a5624c3a88d711763aea1dd7db9ba52b20f2dffe916d50d585d723ebffa60633"
+        "sha256": "9256dda91e699abd8f8fb3f4742d1be3d83df954e18035534d5c1f6506190d0b"
       },
       {
         "path": "test/rules.test.mjs",
-        "sha256": "3201714469a5a50b95f952027aea5978ee045e9410c595c54f3e80a05f474196"
+        "sha256": "2356f8c60d075b0b0588318492de2dc9bd3223324a05293f22d1d57725e5e112"
       },
       {
         "path": "test/states.test.mjs",
-        "sha256": "59ae3f1d4f5f8d35c589cb3003edbcabf84afeecb3cebd77a9e94f83e151155d"
+        "sha256": "83404c6694e69dfd37c5956787c3e50a3cfb1af56f66c4518ec851503078f9df"
       },
       {
         "path": "tools/trim-character.mjs",

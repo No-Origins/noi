@@ -117,10 +117,6 @@ export type TreeRowInteraction = 'focus' | 'hover'
 /** other: not chosen · selected: chosen */
 export type TreeRowState = 'other' | 'selected'
 
-// noi.eio.components.world.arch
-/** distance: how far its back stands from the pool’s middle · height: how tall · reach: how far its top reaches toward the pool · thickness: how thick its posts and beam are · width: how wide */
-export type ArchMeasure = 'distance' | 'height' | 'reach' | 'thickness' | 'width'
-
 // noi.eio.components.world.character-drawing
 /** catchUp: Eye catch-up time · ceiling: Flight ceiling · chase: Eye in fast flight · dark: Going dark · eyeGateway: Eye in a gateway · eyeJump: Eye in the jump · fly: Fly · height: Character height · hover: Hover height · jump: Jump height · jumpHeight: Flight jump height · jumpTime: Flight jump time · leastIn: Least time in a gateway · onFoot: Eye on foot · rise: Rise and sink · run: Run · stepUp: Highest step without a jump · topSpeed: Flight top speed · walk: Walk */
 export type CharacterDrawingMeasure = 'catchUp' | 'ceiling' | 'chase' | 'dark' | 'eyeGateway' | 'eyeJump' | 'fly' | 'height' | 'hover' | 'jump' | 'jumpHeight' | 'jumpTime' | 'leastIn' | 'onFoot' | 'rise' | 'run' | 'stepUp' | 'topSpeed' | 'walk'
@@ -135,29 +131,13 @@ export type ClayClips = 'running' | 'walking'
 /** running: running · walking: walking */
 export type FairyBotClips = 'running' | 'walking'
 
-// noi.eio.components.world.gateway
-/** ahead: how far ahead they run · behind: how far behind the character ripples start · depth: how deep the gateway goes · gap: the time between lime ripples · speed: how fast a ripple runs · tail: a ripple’s tail */
-export type GatewayMeasure = 'ahead' | 'behind' | 'depth' | 'gap' | 'speed' | 'tail'
-
-// noi.eio.components.world.land
-/** band: how far past the edge nothing is left · circle-radius: a circle’s radius · dash: a dash of a circle’s line · grain: one grain of the dust · line: a circle’s line · place: the place each circle has · radius: the land’s radius */
-export type LandMeasure = 'band' | 'circle-radius' | 'dash' | 'grain' | 'line' | 'place' | 'radius'
-
 // noi.eio.components.world.mannequin
 /** running: running · walking: walking */
 export type MannequinClips = 'running' | 'walking'
 
-// noi.eio.components.world.pool
-/** pool-radius: the pool’s radius · wall-height: the wall’s height · wall-width: the wall’s width */
-export type PoolMeasure = 'pool-radius' | 'wall-height' | 'wall-width'
-
 // noi.eio.components.world.stage
-/** drag: turned: dragged, scrolled or pinched closer · focus: focused, with the focus ring */
-export type StageInteraction = 'drag' | 'focus'
-
-// noi.eio.components.world.steps
-/** depth: a step’s depth · height: a step’s height · start: where the steps begin · top: the top step’s height */
-export type StepsMeasure = 'depth' | 'height' | 'start' | 'top'
+/** active: glowing: its borders fully, its top and its sides half as brightly · default: standing dark, in the base tile’s style */
+export type StageState = 'active' | 'default'
 
 /** Every component's states by key: each group and its keys. */
 export const states = {
@@ -238,9 +218,6 @@ export const states = {
     interaction: ['focus', 'hover'],
     state: ['other', 'selected'],
   },
-  'noi.eio.components.world.arch': {
-    measure: ['distance', 'height', 'reach', 'thickness', 'width'],
-  },
   'noi.eio.components.world.character-drawing': {
     measure: ['catchUp', 'ceiling', 'chase', 'dark', 'eyeGateway', 'eyeJump', 'fly', 'height', 'hover', 'jump', 'jumpHeight', 'jumpTime', 'leastIn', 'onFoot', 'rise', 'run', 'stepUp', 'topSpeed', 'walk'],
     motion: ['run', 'stand', 'walk'],
@@ -251,22 +228,10 @@ export const states = {
   'noi.eio.components.world.fairy-bot': {
     clips: ['running', 'walking'],
   },
-  'noi.eio.components.world.gateway': {
-    measure: ['ahead', 'behind', 'depth', 'gap', 'speed', 'tail'],
-  },
-  'noi.eio.components.world.land': {
-    measure: ['band', 'circle-radius', 'dash', 'grain', 'line', 'place', 'radius'],
-  },
   'noi.eio.components.world.mannequin': {
     clips: ['running', 'walking'],
   },
-  'noi.eio.components.world.pool': {
-    measure: ['pool-radius', 'wall-height', 'wall-width'],
-  },
   'noi.eio.components.world.stage': {
-    interaction: ['drag', 'focus'],
-  },
-  'noi.eio.components.world.steps': {
-    measure: ['depth', 'height', 'start', 'top'],
+    state: ['active', 'default'],
   },
 } as const

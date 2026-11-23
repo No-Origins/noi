@@ -1,6 +1,6 @@
 // Component States (agreed 18 Nov 2026), decision 4, for the 3D elements: every option Mero holds (a
 // measure, a motion) is read through a table typed from the file Mero writes; each character's model
-// has the clips Mero lists; what happens to the stage has a rule in its style file. Comments are taken
+// has the clips Mero lists; what happens to an element has a rule in its style file. Comments are taken
 // out first: only what the code does counts.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -39,7 +39,7 @@ const typesOf = group => {
 }
 
 test('Mero holds states for the 3D elements', () => {
-  assert.ok(ours.length >= 9, `found ${ours.length}`)
+  assert.ok(ours.length >= 5, `found ${ours.length}`)
 })
 
 test('no table is forced into shape: a cast would let it leave keys out', () => {
@@ -86,19 +86,3 @@ for (const [path, groups] of ours) {
     }
   }
 }
-
-// What a page asks the stage to show: in each scene (an interface with its element), a field named for a
-// group Mero holds takes one of Mero's types for that group, never a string of its own.
-test('a scene’s measure and motion take Mero’s types', () => {
-  const scenes = [...code.matchAll(/\binterface\s+(\w+)[^{]*\{([\s\S]*?)\n\}/g)].filter(([, , body]) => /^\s*element:\s*'/m.test(body))
-  assert.ok(scenes.length >= 6, `found ${scenes.length} scenes`)
-  const groups = new Set(ours.flatMap(([, gs]) => Object.keys(gs)))
-  for (const [, scene, body] of scenes) {
-    for (const group of groups) {
-      const member = body.match(new RegExp(`^\\s*(?:readonly\\s+)?${group}\\??:\\s*([^\\n]+)$`, 'm'))
-      if (!member) continue
-      const named = member[1].match(/\b[A-Z]\w*\b/g) ?? []
-      assert.ok(named.some(t => typesOf(group).includes(t)), `${scene}.${group} is ${member[1].trim()}, not one of Mero’s types`)
-    }
-  }
-})

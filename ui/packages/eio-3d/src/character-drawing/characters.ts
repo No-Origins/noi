@@ -1,10 +1,11 @@
 // THE CHARACTERS (noi.eio.world.character): Clay, the Mannequin and the Fairy Bot, made with Meshy.ai in
 // the old No Origins project and brought in at the user's word (17 Nov: Clay; then "we should bring in
-// Mannequin and Fairyboat too"). three.js draws them, and nothing else (decision 7): into the same picture as
-// the land, after it, with the same eye, so they stand in the world. Moved from the 3D world page.
+// Mannequin and Fairyboat too"). three.js draws them. The painter below was made for the first world's stage,
+// which lent it its WebGL 2 picture and its eye; that stage is gone (23 Nov), and the characters go into the
+// new world next, where three.js draws everything.
 // Their height comes from Eidos (noi.eio.world.character.height, 6 feet). Their files are small copies
 // (tools/trim-character.mjs) kept in this package's assets/characters, served by the app that shows them.
-import type { Vec3 } from '../drawing/math.ts'
+import type { Vec3 } from './character-measures.ts'
 
 /** One character's files, as the app serves them. */
 export interface CharacterFiles {

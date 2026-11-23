@@ -2,8 +2,10 @@
 // (noi.eio.world.movement), ITS FLIGHT INTO A SYSTEM (noi.eio.world.flight) and THE EYE THAT FOLLOWS IT
 // (noi.eio.world.eye). A length is a line beside or behind the character; a speed or a time is words over him,
 // and a walk or a run is shown by his clip at that speed. He stands at the middle, facing the eye (+z).
-import type { Vec3 } from '../drawing/math.ts'
 import type { Motion } from './characters.ts'
+
+/** A point or a direction, in metres: x, y and z, with y up, as three.js has it. */
+export type Vec3 = [number, number, number]
 
 // Its measures are the keys Mero holds for it, written by Mero into @noi/eio-tokens (Component States,
 // agreed 18 Nov): the table below names every one, so a measure missing here, or one Mero never
@@ -68,4 +70,10 @@ export function characterLine(v: CharacterValues, which: CharacterMeasure): { fr
       return unnamed
     }
   }
+}
+
+/** A measure in words, as a page shows it beside or over him: its name, its number and its unit. */
+export function measureWords(v: CharacterValues, which: CharacterMeasure): string {
+  const m = CHARACTER_MEASURES[which]
+  return `${m.name} · ${v[which].toLocaleString('en-GB', { maximumFractionDigits: 2 })} ${m.unit}`
 }

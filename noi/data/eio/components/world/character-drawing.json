@@ -5,7 +5,7 @@
     "type": "component"
   },
   "semantics": {
-    "definition": "The code that draws the characters with three.js, into the same picture as the land, and the numbers they carry: their height, how they move, their flight into a system, and the eye that follows them.",
+    "definition": "The code that draws the characters with three.js, and the numbers they carry: their height, how they move, their flight into a system, and the eye that follows them.",
     "responsibility": "Hold what several Eidos components share, once. It changes only through a proposal you approve; Mero keeps the fingerprints of the version you approved, git keeps the code."
   },
   "authority_scope": "ea248469-04ce-4f5d-959e-b66c5fd5fbed",
@@ -64,18 +64,17 @@
     ],
     "uses": [
       "noi.eio.components.world.clay",
-      "noi.eio.components.world.drawing",
       "noi.eio.components.world.fairy-bot",
       "noi.eio.components.world.mannequin"
     ],
     "files": [
       {
         "path": "src/character-drawing/character-measures.ts",
-        "sha256": "2e9cbef78531002d5fbe83c2a6922ad2df72ab23a6644dd24dc88166511c848e"
+        "sha256": "03f4ad5cd80de2e8ae7d766068285018a70b298e665693375634461af83c2892"
       },
       {
         "path": "src/character-drawing/characters.ts",
-        "sha256": "3d7b2dfd32a35e496934ce44e9b2d9ec87f7fd98faa2431cbf3461f5ca94e5ee"
+        "sha256": "70e6cf8563402ed518b6117fd053e98b04ec5321f27a4895a5734a846781478c"
       }
     ]
   }

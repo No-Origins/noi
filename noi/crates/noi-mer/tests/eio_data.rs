@@ -337,8 +337,9 @@ fn eio_world_kinds_take_the_worlds_numbers() {
 
 #[test]
 fn eio_world_values_pass_their_invariants() {
-    // The 3D world's values (17 Nov): two colours of a new family, ten colour roles, and the
-    // numbers that set its look, each under the invariant of its kind.
+    // The 3D world's values (17 Nov): a colour of a new family, colour roles, and the characters'
+    // numbers, each under the invariant of its kind. The first world's own elements and their numbers
+    // were taken out on 23 Nov; the roles the new world reads stay.
     let token = invariant("color-token-invariant.json");
     let role = invariant("color-role-invariant.json");
     let mut colors = HashMap::new();
@@ -348,8 +349,8 @@ fn eio_world_values_pass_their_invariants() {
     let world = data("world/palette");
     assert_eq!(
         world.len(),
-        2,
-        "only the water's two blues: the greys are Eidos's own (17 Nov)"
+        1,
+        "only the water's blue: the greys are Eidos's own (17 Nov)"
     );
     for c in &world {
         c.validate().unwrap();
@@ -370,7 +371,7 @@ fn eio_world_values_pass_their_invariants() {
         colors.insert(c.path.clone(), Oklch::from_palette_spec(&c.spec).unwrap());
     }
     let roles = data("world/roles");
-    assert_eq!(roles.len(), 10, "no stand-in figure (17 Nov)");
+    assert_eq!(roles.len(), 8, "no stand-in figure (17 Nov)");
     let resolved: HashMap<String, Resolved> = colors
         .iter()
         .map(|(path, c)| (path.clone(), Resolved::Palette(*c)))
@@ -403,24 +404,10 @@ fn eio_world_values_pass_their_invariants() {
     .into_iter()
     .collect();
     let mut numbers = vec![];
-    for group in [
-        "land",
-        "edge",
-        "circles",
-        "pool",
-        "wall",
-        "steps",
-        "arch",
-        "gateway",
-        "ripples",
-        "character",
-        "movement",
-        "flight",
-        "eye",
-    ] {
+    for group in ["character", "movement", "flight", "eye"] {
         numbers.extend(data(&format!("world/{group}")));
     }
-    assert_eq!(numbers.len(), 44);
+    assert_eq!(numbers.len(), 19);
     for n in &numbers {
         n.validate().unwrap();
         assert!(n.path.starts_with("noi.eio.world."), "{}", n.path);
@@ -445,10 +432,6 @@ fn eio_world_values_pass_their_invariants() {
             .as_f64()
             .unwrap()
     };
-    assert_eq!(value("noi.eio.world.circles.radius"), 4.0);
-    assert_eq!(value("noi.eio.world.wall.height"), 0.6);
-    assert_eq!(value("noi.eio.world.arch.thickness"), 4.0);
-    assert_eq!(value("noi.eio.world.ripples.gap"), 1.0);
     // Your word (17 Nov): one fixed height to fly to, everywhere.
     assert_eq!(value("noi.eio.world.movement.ceiling"), 100.0);
     // And they all export: roles as CSS variables, numbers only into the typed tree.
@@ -471,10 +454,8 @@ fn eio_world_values_pass_their_invariants() {
         "no CSS for lengths, times, speeds"
     );
     let tree: Value = serde_json::from_str(&files.json).unwrap();
-    assert_eq!(tree["world"]["arch"]["height"], 56);
-    assert_eq!(tree["world"]["arch"]["reach"], 41.44);
     assert_eq!(tree["world"]["movement"]["walk"], 1.4);
-    assert_eq!(tree["world"].as_object().unwrap().len(), 13);
+    assert_eq!(tree["world"].as_object().unwrap().len(), 4);
 }
 
 #[test]
