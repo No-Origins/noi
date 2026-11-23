@@ -202,7 +202,12 @@ async fn land_what_main_carries(
     let Some(since) = noi_mer::approved::look_since(&waiting) else {
         return Ok(json!({"landed": landed, "sent_back": sent_back, "failed": failed}));
     };
+    // The paths are the repository's, so git is asked from its top folder: `pnpm land` runs this
+    // from `noi/`, where the same paths name nothing, and every batch was silently left waiting.
+    let top = git(&["rev-parse", "--show-toplevel"])?;
     let commits = git(&[
+        "-C",
+        &top,
         "log",
         "--first-parent",
         "--reverse",
