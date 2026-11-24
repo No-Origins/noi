@@ -39,7 +39,9 @@ type Open = World & {
   place: { read: typeof readPlace; write: typeof writePlace; readSpan: typeof readSpan; writeSpan: typeof writeSpan; toThree: typeof toThree; fromThree: typeof fromThree }
 }
 
-export function WorldView() {
+/** `onOpen`: called once the world is open and its land is drawn (the intro that opens the world waits for it:
+ * intro/WorldOpens.tsx). */
+export function WorldView({ onOpen }: { onOpen?: () => void } = {}) {
   const stage = useRef<HTMLDivElement>(null)
   const [cannot, setCannot] = useState(false)
   // the open land, and whether it shows its markers: kept here only to draw the toggle, never to decide
@@ -83,6 +85,7 @@ export function WorldView() {
         unwatch = opened.watch(now => setMarkers(markersShown(now)))
         setMarkers(markersShown(opened.state))
         setLand(opened)
+        onOpen?.()
         const open: Open = Object.assign(w, { land: opened, place: { read: readPlace, write: writePlace, readSpan, writeSpan, toThree, fromThree } })
         ;(window as unknown as { __world?: Open }).__world = open
       })

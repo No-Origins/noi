@@ -7,7 +7,7 @@ import { Panes } from '@noi/eio-react'
 import styles from './studio.module.css'
 
 /** The pages shown on the whole screen, without Studio's frame. */
-const WHOLE_SCREEN = ['/world']
+const WHOLE_SCREEN = ['/world', '/world/intro']
 
 export function StudioFrame({ top, list, children }: { top: ReactNode; list: ReactNode; children: ReactNode }) {
   // On Hyperbase's own name the folder is not in the address; under another name it is.
