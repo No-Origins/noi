@@ -262,7 +262,10 @@ export function drawSnail(world: World, strip: Strip, colourOf: (token: string) 
   // each turn is so much larger than the one inside it that their whorls just close on each other
   const grows = (Math.log((1 + SPIRAL.tube) / (1 - SPIRAL.tube)) / (2 * Math.PI)) * SPIRAL.closes
   const outAtEnd = BODY.shell / (1 + SPIRAL.tube)
-  const spiralAt = (i: number, reach: number, side: number, thick: number) => {
+  /** Ring i of a shape that follows the spiral: `outside`, how far outside the spiral's middle line it runs, as a
+   * share of the whorl's own reach (0: along the middle of the whorl); `side`, how far it reaches to either side
+   * at the rim; `thick`, how thick it is, as a share of the whorl. */
+  const spiralAt = (i: number, outside: number, side: number, thick: number) => {
     const a = (far * i) / (SPIRAL.rings - 1)
     const out = outAtEnd * Math.exp(grows * (a - far))
     // rounded off where the spiral begins and where it ends
@@ -271,17 +274,19 @@ export function drawSnail(world: World, strip: Strip, colourOf: (token: string) 
     const [dy, dz] = [grows * c - s, grows * s + c]
     const long = Math.hypot(dy, dz)
     const tube = SPIRAL.tube * out
+    // what runs outside the whorl stays on it where the whorl is rounded off
+    const reach = 1 + SPIRAL.tube * outside * ends
     return {
       y: out * reach * c, z: out * reach * s, ty: dy / long, tz: dz / long,
       side: side * (out / outAtEnd) ** 0.75 * ends, above: thick * tube * ends, below: thick * tube * ends,
     }
   }
   const whorl = swept(SPIRAL.rings, SPIRAL.round)
-  whorl.put(i => spiralAt(i, 1, BODY.shellWide / 2, 1))
+  whorl.put(i => spiralAt(i, 0, BODY.shellWide / 2, 1))
   add(shell, whorl.shape, shellLook, 'shell')
   // its rim: a band of the primary colour along the spiral's outer edge, which glows as the boost grows
   const rim = swept(SPIRAL.rings, 8)
-  rim.put(i => spiralAt(i, 1 + SPIRAL.tube * 0.93, BODY.shellWide * 0.13, 0.2))
+  rim.put(i => spiralAt(i, 0.93, BODY.shellWide * 0.13, 0.2))
   add(shell, rim.shape, rimLook, 'shell rim')
   /** Something of Eidos's own, made by Eidos's drawing: a plain shape lying flat, as thick as its size says. */
   const ofEidos = (id: string, shape: WorldElement['shape'], across: number, thick: number, colour: RolePath, finish: 'matte' | 'lit'): Object3D => {
